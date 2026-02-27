@@ -1,0 +1,48 @@
+scripts/fetch.js:4:const { fetchTransactionHistory } = require("../lib/sql-api");
+scripts/fetch.js:7: * Fetches transaction history using eth_getTransactionByHash.
+scripts/fetch.js:141:  if (process.env.SQL_API_KEY && process.env.SQL_API_ENDPOINT) {
+scripts/fetch.js:145:      const sqlResult = await fetchTransactionHistory(entityId);
+scripts/fetch.js:147:      console.log(`  Transactions: ${(sqlResult.transactions || []).length}`);
+scripts/fetch.js:148:      if (sqlResult.fallback) {
+scripts/fetch.js:155:    console.log("\n--- SQL API: SKIPPED (SQL_API_KEY or SQL_API_ENDPOINT not set) ---");
+test/deploy.test.js:4:const { getVerifiedAccounts } = require("../lib/bank-accounts");
+test/deploy.test.js:17:    it("Should load legal entity for deploy context", function () {
+test/deploy.test.js:23:    it("Should have verified bank accounts for deploy context", function () {
+test/sql-api.test.js:2:const { fetchTransactionHistory } = require("../lib/sql-api");
+test/sql-api.test.js:20:    endpoint: "https://sql-api.example.com",
+test/sql-api.test.js:24:    it("Should parse a valid transaction history response", async function () {
+test/sql-api.test.js:195:        expect(err.message).to.include("SQL_API_KEY is not configured");
+lib/validate-env.js:53:    name: "SQL_API_KEY",
+lib/validate-env.js:55:    description: "API key for SQL transaction history endpoint",
+lib/sql-api.js:2: * SQL Data API client for transaction history.
+lib/sql-api.js:3: * Uses HTTP fetch with env-driven config (SQL_API_KEY, SQL_API_ENDPOINT).
+lib/sql-api.js:8: * Fetches transaction history for a given entity from the SQL data API.
+lib/sql-api.js:9: * @param {string} entityId - The legal entity identifier
+lib/sql-api.js:11: * @param {string} [options.apiKey] - Override SQL_API_KEY
+lib/sql-api.js:14: * @returns {Promise<object>} Parsed transaction history response
+lib/sql-api.js:17:  const apiKey = "apiKey" in options ? options.apiKey : process.env.SQL_API_KEY;
+lib/sql-api.js:22:    throw new Error("SQL_API_KEY is not configured");
+lib/legal-entity.js:7: * Loads and validates the legal entity simulation data.
+scripts/deploy.js:6:const { getVerifiedAccounts } = require("../lib/bank-accounts");
+scripts/deploy.js:34:  const bankAccounts = getVerifiedAccounts();
+scripts/deploy.js:35:  console.log(`Verified bank accounts: ${bankAccounts.length}`);
+lib/bank-accounts.js:4:const DATA_PATH = path.join(__dirname, "..", "data", "bank-accounts.json");
+lib/bank-accounts.js:7: * Loads and validates external bank account simulation data.
+lib/bank-accounts.js:8: * Returns the array of bank accounts with required fields verified.
+lib/bank-accounts.js:22:  const required = ["id", "holder", "routingNumber", "accountNumber", "bankName", "type", "currency"];
+lib/bank-accounts.js:42: * Returns only verified bank accounts.
+test/config.test.js:4:const { loadBankAccounts, getVerifiedAccounts } = require("../lib/bank-accounts");
+test/config.test.js:70:    it("Should throw when SQL_API_KEY is missing", function () {
+test/config.test.js:72:        SQL_API_KEY: process.env.SQL_API_KEY,
+test/config.test.js:76:      delete process.env.SQL_API_KEY;
+test/config.test.js:79:      expect(() => validateEnv(SQL_ENV_VARS)).to.throw("SQL_API_KEY");
+test/config.test.js:89:        SQL_API_KEY: process.env.SQL_API_KEY,
+test/config.test.js:93:      process.env.SQL_API_KEY = "some-key";
+test/config.test.js:106:        SQL_API_KEY: process.env.SQL_API_KEY,
+test/config.test.js:110:      process.env.SQL_API_KEY = "some-key";
+test/config.test.js:123:        SQL_API_KEY: process.env.SQL_API_KEY,
+test/config.test.js:127:      process.env.SQL_API_KEY = "test-api-key-123";
+test/config.test.js:128:      process.env.SQL_API_ENDPOINT = "https://sql-api.example.com";
+test/config.test.js:140:    it("Should load legal entity with required fields", function () {
+test/config.test.js:158:    it("Should load bank accounts with required fields", function () {
+test/config.test.js:167:        expect(acct).to.have.property("bankName");

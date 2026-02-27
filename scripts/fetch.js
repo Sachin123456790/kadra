@@ -1,6 +1,7 @@
 const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
+const { fetchTransactionHistory } = require("../lib/sql-api");
 
 /**
  * Fetches transaction history using eth_getTransactionByHash.
@@ -134,6 +135,24 @@ async function main() {
       fs.writeFileSync(path.join(evidenceDir, "fetch-output.log"), msg + "\n");
       process.exitCode = 1;
     }
+  }
+
+  // ── SQL API: Transaction History ─────────────────────────
+  if (process.env.SQL_API_KEY && process.env.SQL_API_ENDPOINT) {
+    console.log("\n--- SQL API: Transaction History ---");
+    try {
+      const entityId = process.env.LEGAL_ENTITY_NAME || "unknown";
+      const sqlResult = await fetchTransactionHistory(entityId);
+      console.log(`  Entity: ${entityId}`);
+      console.log(`  Transactions: ${(sqlResult.transactions || []).length}`);
+      if (sqlResult.fallback) {
+        console.log("  Note: returned fallback (missing entity)");
+      }
+    } catch (err) {
+      console.error(`  SQL API error: ${err.message}`);
+    }
+  } else {
+    console.log("\n--- SQL API: SKIPPED (SQL_API_KEY or SQL_API_ENDPOINT not set) ---");
   }
 
   console.log("\n=== Fetch Complete ===\n");

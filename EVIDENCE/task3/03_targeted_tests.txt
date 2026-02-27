@@ -1,0 +1,52 @@
+
+> markus@1.0.0 test
+> npx hardhat test --grep SQL|sql|fetch|transaction
+
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+
+
+  Configuration and Simulation Data
+    SQL env validation
+      ✔ Should throw when SQL_API_KEY is missing
+      ✔ Should throw when SQL_API_ENDPOINT is missing
+      ✔ Should throw for invalid SQL_API_ENDPOINT format
+      ✔ Should pass with valid SQL env vars
+
+  Transaction History Fetch
+    Hash validation
+      ✔ Should accept valid transaction hash
+      ✔ Should reject invalid transaction hash
+    eth_getTransactionByHash
+      ✔ Should return null for nonexistent transaction (212ms)
+      ✔ Should return transaction data for real transaction
+    Response validation
+      ✔ Should validate required fields in transaction response
+
+  SQL API - fetchTransactionHistory
+    Success response
+      ✔ Should parse a valid transaction history response
+      ✔ Should handle empty transaction list
+    4xx client errors
+      ✔ Should throw on 400 bad request
+      ✔ Should throw on 404 not found
+      ✔ Should handle empty error body on 4xx
+    5xx server errors
+      ✔ Should throw on 500 internal server error
+      ✔ Should throw on 503 service unavailable
+    Expired token / auth failure
+      ✔ Should throw on 401 unauthorized (expired token)
+      ✔ Should throw on 403 forbidden
+    Missing entity fallback
+fetchTransactionHistory: missing or invalid entityId, returning empty fallback
+      ✔ Should return empty fallback for null entityId
+fetchTransactionHistory: missing or invalid entityId, returning empty fallback
+      ✔ Should return empty fallback for empty string entityId
+fetchTransactionHistory: missing or invalid entityId, returning empty fallback
+      ✔ Should return empty fallback for undefined entityId
+    Missing configuration
+      ✔ Should throw when apiKey is not set
+      ✔ Should throw when endpoint is not set
+
+
+  23 passing (240ms)
+
