@@ -1,2 +1,2 @@
---- exit code: 1 ---
-NOTE: @coinbase/wallet-sdk, @types/pg, and pg not present. @nomicfoundation/hardhat-toolbox (not toolchain) is the actual dep.
+18:    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
+24:    "@coinbase/coinbase-sdk": "^0.25.0",

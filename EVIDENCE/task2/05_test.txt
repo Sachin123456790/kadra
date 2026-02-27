@@ -2,11 +2,11 @@
 > markus@1.0.0 test
 > npx hardhat test
 
-[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+[dotenv@17.3.1] injecting env (20) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
 
 
   Lock
-    ✔ Should set the right unlockTime (718ms)
+    ✔ Should set the right unlockTime (214ms)
     ✔ Should set the right owner
     ✔ Should revert with the right error if called too soon
 
@@ -85,6 +85,6 @@ fetchTransactionHistory: missing or invalid entityId, returning empty fallback
       ✔ Should throw when endpoint is not set
 
 
-  47 passing (758ms)
+  47 passing (259ms)
 
---- exit code: 0 ---
+EXIT CODE: 

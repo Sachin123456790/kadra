@@ -1,31 +1,45 @@
-# Task 2 Dependency and Configuration Decisions
+# Task 2: Dependency and Configuration Decisions
+
+Generated: 2026-02-26 (fresh session)
 
 ## Dependency Audit
 
 | Requested Package | Decision | Rationale |
 |---|---|---|
-| `@coinbase/wallet-sdk` | SKIPPED | Already using `@coinbase/coinbase-sdk` which covers SDK functionality |
-| `@nomicfoundation/hardhat-toolchain` | SKIPPED | Already using `@nomicfoundation/hardhat-toolbox` (equivalent) |
-| `@types/pg` | SKIPPED | Project is JavaScript, not TypeScript; no type definitions needed |
-| `pg` | SKIPPED | SQL API module will use HTTP fetch (built-in), not direct PostgreSQL connections |
+| `@coinbase/wallet-sdk` | **SKIPPED** | Already using `@coinbase/coinbase-sdk` (line 24 of package.json) |
+| `@nomicfoundation/hardhat-toolchain` | **SKIPPED** | Already using `@nomicfoundation/hardhat-toolbox` ^6.1.2 (equivalent) |
+| `@types/pg` | **SKIPPED** | Project is JavaScript, not TypeScript; no type definitions needed |
+| `pg` | **SKIPPED** | SQL API uses HTTP fetch (built-in), not direct PostgreSQL connections |
 
-## Environment Variable Additions
+## Environment Variable Contract
 
-| Variable | Purpose | Status |
+| Variable | File | Status |
 |---|---|---|
-| `TESTNET_RPC` | Alias for SEPOLIA_RPC_URL per scope requirement | Added to .env.example |
-| `SQL_API_KEY` | API key for SQL transaction history endpoint | Added to .env.example and validate-env.js |
-| `SQL_API_ENDPOINT` | Base URL for SQL data API | Added to .env.example and validate-env.js |
+| `SEPOLIA_RPC_URL` | `.env.example:4`, `lib/validate-env.js:31` | EXISTS (primary) |
+| `TESTNET_RPC` | `.env.example:5` | EXISTS (alias, per scope requirement) |
+| `SQL_API_KEY` | `.env.example:38`, `lib/validate-env.js:53` | EXISTS |
+| `SQL_API_ENDPOINT` | `.env.example:40`, `lib/validate-env.js:58` | EXISTS |
+| `DEPLOYER_PRIVATE_KEY` | `.env.example:9`, `lib/validate-env.js:36` | EXISTS |
 
-## Security Notes
+## Testnet Safety
 
-- Replaced hardcoded Coinbase secrets in .env.example with placeholder values
-- `.env` remains gitignored (contains actual credentials)
-- Hardhat config validates private key format before use (no Error HH8 from placeholders)
-- No mainnet network paths exist in hardhat.config.js
+- `hardhat.config.js` only defines `sepolia` network (chainId 11155111)
+- No `mainnet` network path exists
+- `DEPLOYER_PRIVATE_KEY` validated with regex before use — placeholder values are safely ignored
+- `scripts/deploy.js` has explicit `ALLOWED_NETWORKS` guard blocking non-testnet networks
 
-## Test Coverage
+## SQL Env Validation Tests (test/config.test.js)
 
-- 4 new SQL env validation tests added to config.test.js
-- Tests cover: missing SQL_API_KEY, missing SQL_API_ENDPOINT, invalid endpoint format, valid vars
-- Full suite: 47 tests pass (includes tests from later tasks)
+4 tests cover SQL env vars:
+1. Missing `SQL_API_KEY` -> throws
+2. Missing `SQL_API_ENDPOINT` -> throws
+3. Invalid `SQL_API_ENDPOINT` format -> throws
+4. Valid SQL env vars -> passes
+
+## Acceptance Criteria Check
+
+- [x] Dependency decisions explicit and evidence-backed (all 4 audited)
+- [x] `.env.example` documents SQL/testnet vars with placeholders only
+- [x] Env validation tests cover missing/invalid new variables
+- [x] Hardhat config remains testnet-safe (no mainnet default)
+- [x] Compile and tests pass (47/47, exit code 0)
