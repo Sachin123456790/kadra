@@ -1,10 +1,6 @@
-$ ls -la docs/architecture
-
-total 24
-drwxr-xr-x  5 chinmay_shringi  staff   160 .
-drwxr-xr-x  4 chinmay_shringi  staff   128 ..
--rw-r--r--  1 chinmay_shringi  staff  3931 DESIGN.md
--rw-r--r--  1 chinmay_shringi  staff  2405 implementation-plan.md
--rw-r--r--  1 chinmay_shringi  staff  1321 README.md
-
-Result: All three architecture docs exist and are non-empty.
+total 40
+drwxr-xr-x@ 5 chinmay_shringi  staff   160 Feb 26 21:25 .
+drwxr-xr-x@ 4 chinmay_shringi  staff   128 Feb 26 20:26 ..
+-rw-r--r--@ 1 chinmay_shringi  staff  6982 Feb 26 21:24 DESIGN.md
+-rw-r--r--@ 1 chinmay_shringi  staff  5794 Feb 26 21:25 implementation-plan.md
+-rw-r--r--@ 1 chinmay_shringi  staff  2670 Feb 26 21:23 README.md

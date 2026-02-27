@@ -1,6 +1,4 @@
-$ wc -c docs/architecture/*
-
-    3931 docs/architecture/DESIGN.md
-    2405 docs/architecture/implementation-plan.md
-    1321 docs/architecture/README.md
-    7657 total
+    6982 docs/architecture/DESIGN.md
+    5794 docs/architecture/implementation-plan.md
+    2670 docs/architecture/README.md
+   15446 total
