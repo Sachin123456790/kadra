@@ -2,6 +2,6 @@
 > markus@1.0.0 compile
 > npx hardhat compile
 
-[dotenv@17.3.1] injecting env (20) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
 Nothing to compile
---- exit code: 0 ---
+EXIT CODE: 0
