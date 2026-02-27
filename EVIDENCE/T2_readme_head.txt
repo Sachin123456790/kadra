@@ -18,3 +18,13 @@ contracts/
 
 lib/
   coinbase-sdk-helper.js  33 LOC  getCoinbaseClient() — SDK factory for Sepolia (chainId 11155111)
+  sql-api.js              59 LOC  fetchTransactionHistory(entityId, options) — HTTP + auth + fallback
+  validate-env.js         64 LOC  validateEnv() with DEPLOY/TRANSFER/SQL env var sets
+  legal-entity.js         34 LOC  loadLegalEntity() — validates data/legal-entity.json fields
+  bank-accounts.js        48 LOC  loadBankAccounts(), getVerifiedAccounts() — bank fixture loader
+
+scripts/
+  deploy.js             111 LOC  Lock deploy + ETH transfer + mainnet guard + evidence artifacts
+  fetch.js              164 LOC  eth_getTransactionByHash + SQL API integration + edge cases
+  mcp-agentkit-server.mjs        MCP server using Coinbase AgentKit
+

@@ -18,3 +18,13 @@ All runtime behaviour is configured through environment variables validated at s
 - **Validation**: `lib/validate-env.js` (64 LOC) checks presence and format of required variables before any operation. Separate validation sets exist for deploy (`DEPLOY_ENV_VARS`), transfer (`TRANSFER_ENV_VARS`), and SQL API (`SQL_ENV_VARS`). Tested by 12 cases in `test/config.test.js`.
 
 ## Coinbase SDK and Hardhat interaction boundaries
+
+| Layer | Responsibility | Module | Key exports |
+|---|---|---|---|
+| **Smart contracts** | On-chain logic (Lock contract with time-locked withdrawals) | `contracts/Lock.sol` (23 LOC) | `constructor(uint)`, `withdraw()` |
+| **Hardhat scripts** | Contract deployment, ETH transfers, transaction fetching | `scripts/deploy.js` (111 LOC), `scripts/fetch.js` (164 LOC) | Hardhat run scripts |
+| **Coinbase SDK helper** | SDK client initialisation for Sepolia, credential validation | `lib/coinbase-sdk-helper.js` (33 LOC) | `getCoinbaseClient()`, `NETWORK`, `CHAIN_ID` |
+| **MCP AgentKit server** | Exposes Coinbase AgentKit actions over Model Context Protocol | `scripts/mcp-agentkit-server.mjs` | `npm run mcp:server` |
+| **SQL API client** | Transaction history fetch with auth and error handling | `lib/sql-api.js` (59 LOC) | `fetchTransactionHistory(entityId, options)` |
+| **Simulation data** | Legal entity and bank account fixtures for test scenarios | `lib/legal-entity.js` (34 LOC), `lib/bank-accounts.js` (48 LOC) | `loadLegalEntity()`, `getVerifiedAccounts()` |
+
