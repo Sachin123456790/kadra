@@ -1,7 +1,0 @@
-$ npm run compile
-
-> markus@1.0.0 compile
-> npx hardhat compile
-
-[dotenv@17.3.1] injecting env (20) from .env
-Nothing to compile

@@ -1,3 +1,0 @@
-=== SQL path check ===
-lib/sql-api.js: EXISTS (59 lines)
-src/utils/sqlApi.ts: NOT PRESENT (mapped to lib/sql-api.js per JS convention)

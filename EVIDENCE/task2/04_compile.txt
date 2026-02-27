@@ -1,8 +1,0 @@
-
-> markus@1.0.0 compile
-> npx hardhat compile
-
-[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
-Nothing to compile
-EXIT CODE: 
-EXIT CODE: 0

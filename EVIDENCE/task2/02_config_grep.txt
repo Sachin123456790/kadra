@@ -1,4 +1,0 @@
-11:    sepolia: {
-12:      url: process.env.SEPOLIA_RPC_URL || "",
-13:      accounts: isValidPrivateKey(process.env.DEPLOYER_PRIVATE_KEY)
-16:      chainId: 11155111,

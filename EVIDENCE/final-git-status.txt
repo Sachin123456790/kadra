@@ -1,9 +1,0 @@
-$ git status --short
-
-?? demo.pdf
-?? docs/
-?? kadra.pdf
-?? scripts/mcp-agentkit-server.mjs
-
-Note: Untracked files are not part of this feature scope.
-All task-related changes are committed.

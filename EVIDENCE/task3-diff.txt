@@ -1,7 +1,0 @@
-Files changed: test/sql-api.test.js, test/deploy.test.js, test/fetch.test.js
-No source files (lib/, scripts/) were modified — only test files.
-
-New tests added:
-- test/sql-api.test.js: +70 lines (non-string entityId, 429 rate limit, network error, zero-balance)
-- test/deploy.test.js: +42 lines (invalid wallet format, bad routing number)
-- test/fetch.test.js: +9 lines (wrong-length hash)

@@ -1,22 +1,23 @@
-total 1336
-drwxr-xr-x@  21 chinmay_shringi  staff     672 Feb 26 20:41 .
-drwx------@  23 chinmay_shringi  staff     736 Feb 26 19:11 ..
+total 1352
+drwxr-xr-x@  22 chinmay_shringi  staff     704 Feb 26 21:37 .
+drwx------@  24 chinmay_shringi  staff     768 Feb 26 21:32 ..
 -rw-r--r--@   1 chinmay_shringi  staff    2311 Feb 26 20:41 .env
 -rw-r--r--@   1 chinmay_shringi  staff    2222 Feb 26 20:41 .env.example
-drwxr-xr-x@  14 chinmay_shringi  staff     448 Feb 26 20:57 .git
+drwxr-xr-x@  14 chinmay_shringi  staff     448 Feb 26 21:32 .git
 -rw-r--r--@   1 chinmay_shringi  staff      73 Feb 26 19:31 .gitignore
 drwxr-xr-x@   4 chinmay_shringi  staff     128 Feb 26 19:33 artifacts
 drwxr-xr-x@   3 chinmay_shringi  staff      96 Feb 26 19:33 cache
+-rw-r--r--@   1 chinmay_shringi  staff    5872 Feb 26 21:37 CLAUDE_DOCKER_RECOVERY_PLAN.md
 drwxr-xr-x@   3 chinmay_shringi  staff      96 Feb 26 19:31 contracts
-drwxr-xr-x@   4 chinmay_shringi  staff     128 Feb 26 20:57 data
+drwxr-xr-x@   4 chinmay_shringi  staff     128 Feb 26 21:32 data
 -rw-r--r--@   1 chinmay_shringi  staff  220936 Feb 26 19:10 demo.pdf
 drwxr-xr-x@   4 chinmay_shringi  staff     128 Feb 26 20:26 docs
-drwxr-xr-x@   8 chinmay_shringi  staff     256 Feb 26 20:45 EVIDENCE
+drwxr-xr-x@  18 chinmay_shringi  staff     576 Feb 26 21:37 EVIDENCE
 -rw-r--r--@   1 chinmay_shringi  staff     511 Feb 26 20:39 hardhat.config.js
 -rw-r--r--@   1 chinmay_shringi  staff   88513 Feb 26 19:11 kadra.pdf
 drwxr-xr-x@   7 chinmay_shringi  staff     224 Feb 26 20:44 lib
-drwxr-xr-x@ 490 chinmay_shringi  staff   15680 Feb 26 20:57 node_modules
+drwxr-xr-x@ 490 chinmay_shringi  staff   15680 Feb 26 21:32 node_modules
 -rw-r--r--@   1 chinmay_shringi  staff  348779 Feb 26 20:34 package-lock.json
 -rw-r--r--@   1 chinmay_shringi  staff     795 Feb 26 20:26 package.json
 drwxr-xr-x@   5 chinmay_shringi  staff     160 Feb 26 20:43 scripts
-drwxr-xr-x@   7 chinmay_shringi  staff     224 Feb 26 20:45 test
+drwxr-xr-x@   7 chinmay_shringi  staff     224 Feb 26 21:10 test

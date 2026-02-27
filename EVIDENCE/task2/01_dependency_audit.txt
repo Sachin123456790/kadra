@@ -1,2 +1,0 @@
-18:    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
-24:    "@coinbase/coinbase-sdk": "^0.25.0",

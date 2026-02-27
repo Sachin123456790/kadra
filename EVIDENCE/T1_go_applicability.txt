@@ -1,0 +1,1 @@
+GO_ABSENT - Go gates NOT applicable (Node.js project, skip Go gates)
