@@ -1,0 +1,22 @@
+ D EVIDENCE/task4/01_pwd.txt
+ D EVIDENCE/task4/02_npm_ci.txt
+ D EVIDENCE/task4/03_compile.txt
+ D EVIDENCE/task4/04_test.txt
+ D EVIDENCE/task4/05_fetch.txt
+ D EVIDENCE/task4/06_grep.txt
+ D EVIDENCE/task4/07_git_status.txt
+ D EVIDENCE/task4/edge-case-invalid-hash.log
+ D EVIDENCE/task4/edge-case-no-history.log
+ D EVIDENCE/task4/fetch-output.log
+ D EVIDENCE/task4/final-gates-summary.md
+ M package-lock.json
+ M package.json
+ M test/deploy.test.js
+?? EVIDENCE/task4/01_compile.txt
+?? EVIDENCE/task4/02_test.txt
+?? EVIDENCE/task4/03_safety_grep.txt
+?? EVIDENCE/task4/04_git_status.txt
+?? demo.pdf
+?? docs/
+?? kadra.pdf
+?? scripts/mcp-agentkit-server.mjs
