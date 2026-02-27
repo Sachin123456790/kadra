@@ -1,0 +1,21 @@
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+=== Deploy & Transfer on sepolia ===
+
+Error: Environment validation failed:
+  - SEPOLIA_RPC_URL: missing (Sepolia RPC endpoint URL)
+  - DEPLOYER_PRIVATE_KEY: missing (64-hex-char private key prefixed with 0x)
+  - TRANSFER_TARGET_ADDRESS: missing (Valid Ethereum address (0x + 40 hex chars))
+
+See .env.example for required variables.
+    at validateEnv (/Users/chinmay_shringi/Desktop/markus/lib/validate-env.js:20:11)
+    at main (/Users/chinmay_shringi/Desktop/markus/scripts/deploy.js:27:5)
+    at Object.<anonymous> (/Users/chinmay_shringi/Desktop/markus/scripts/deploy.js:108:1)
+    at Module._compile (node:internal/modules/cjs/loader:1734:14)
+    at Object..js (node:internal/modules/cjs/loader:1899:10)
+    at Module.load (node:internal/modules/cjs/loader:1469:32)
+    at Module._load (node:internal/modules/cjs/loader:1286:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:152:5)
