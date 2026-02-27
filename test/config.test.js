@@ -16,6 +16,12 @@ describe("Configuration and Simulation Data", function () {
       expect(config.networks).to.have.property("sepolia");
       expect(config.networks.sepolia.chainId).to.equal(11155111);
     });
+
+    it("Should not define mainnet or homestead network", function () {
+      const config = require("../hardhat.config");
+      expect(config.networks).to.not.have.property("mainnet");
+      expect(config.networks).to.not.have.property("homestead");
+    });
   });
 
   describe("Env validation", function () {

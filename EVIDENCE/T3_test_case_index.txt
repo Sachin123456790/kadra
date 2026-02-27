@@ -1,0 +1,86 @@
+test/sql-api.test.js:17:describe("SQL API - fetchTransactionHistory", function () {
+test/sql-api.test.js:23:  describe("Success response", function () {
+test/sql-api.test.js:24:    it("Should parse a valid transaction history response", async function () {
+test/sql-api.test.js:44:    it("Should handle empty transaction list", async function () {
+test/sql-api.test.js:56:  describe("4xx client errors", function () {
+test/sql-api.test.js:57:    it("Should throw on 400 bad request", async function () {
+test/sql-api.test.js:70:    it("Should throw on 404 not found", async function () {
+test/sql-api.test.js:82:    it("Should handle empty error body on 4xx", async function () {
+test/sql-api.test.js:102:  describe("5xx server errors", function () {
+test/sql-api.test.js:103:    it("Should throw on 500 internal server error", async function () {
+test/sql-api.test.js:116:    it("Should throw on 503 service unavailable", async function () {
+test/sql-api.test.js:129:  describe("Expired token / auth failure", function () {
+test/sql-api.test.js:130:    it("Should throw on 401 unauthorized (expired token)", async function () {
+test/sql-api.test.js:143:    it("Should throw on 403 forbidden", async function () {
+test/sql-api.test.js:156:  describe("Missing entity fallback", function () {
+test/sql-api.test.js:157:    it("Should return empty fallback for null entityId", async function () {
+test/sql-api.test.js:166:    it("Should return empty fallback for empty string entityId", async function () {
+test/sql-api.test.js:175:    it("Should return empty fallback for undefined entityId", async function () {
+test/sql-api.test.js:185:  describe("Non-string entityId types", function () {
+test/sql-api.test.js:186:    it("Should return empty fallback for numeric entityId", async function () {
+test/sql-api.test.js:195:    it("Should return empty fallback for object entityId", async function () {
+test/sql-api.test.js:205:  describe("Rate limiting and network errors", function () {
+test/sql-api.test.js:206:    it("Should throw on 429 too many requests", async function () {
+test/sql-api.test.js:218:    it("Should propagate network/fetch errors", async function () {
+test/sql-api.test.js:235:  describe("Response parsing edge cases", function () {
+test/sql-api.test.js:236:    it("Should return parsed data for zero-balance transaction list", async function () {
+test/sql-api.test.js:255:  describe("Request construction", function () {
+test/sql-api.test.js:256:    it("Should URL-encode entityId with special characters", async function () {
+test/sql-api.test.js:271:    it("Should send Authorization header with Bearer token", async function () {
+test/sql-api.test.js:287:  describe("Missing configuration", function () {
+test/sql-api.test.js:288:    it("Should throw when apiKey is not set", async function () {
+test/sql-api.test.js:301:    it("Should throw when endpoint is not set", async function () {
+test/config.test.js:7:describe("Configuration and Simulation Data", function () {
+test/config.test.js:8:  describe("Network config", function () {
+test/config.test.js:9:    it("Should target Sepolia network", function () {
+test/config.test.js:14:    it("Hardhat config should include sepolia network", function () {
+test/config.test.js:20:    it("Should not define mainnet or homestead network", function () {
+test/config.test.js:27:  describe("Env validation", function () {
+test/config.test.js:28:    it("Should throw when required vars are missing", function () {
+test/config.test.js:37:    it("Should throw for invalid private key format", function () {
+test/config.test.js:55:    it("Should pass with valid env vars", function () {
+test/config.test.js:75:  describe("SQL env validation", function () {
+test/config.test.js:76:    it("Should throw when SQL_API_KEY is missing", function () {
+test/config.test.js:93:    it("Should throw when SQL_API_ENDPOINT is missing", function () {
+test/config.test.js:110:    it("Should throw for invalid SQL_API_ENDPOINT format", function () {
+test/config.test.js:127:    it("Should pass with valid SQL env vars", function () {
+test/config.test.js:145:  describe("Legal entity simulation", function () {
+test/config.test.js:146:    it("Should load legal entity with required fields", function () {
+test/config.test.js:155:    it("Should have company metadata fields", function () {
+test/config.test.js:163:  describe("Bank account simulation", function () {
+test/config.test.js:164:    it("Should load bank accounts with required fields", function () {
+test/config.test.js:179:    it("Should filter verified accounts", function () {
+test/config.test.js:187:    it("Should have at least one verified account", function () {
+test/fetch.test.js:4:describe("Transaction History Fetch", function () {
+test/fetch.test.js:5:  describe("Hash validation", function () {
+test/fetch.test.js:8:    it("Should accept valid transaction hash", function () {
+test/fetch.test.js:13:    it("Should reject invalid transaction hash", function () {
+test/fetch.test.js:20:    it("Should reject hash with wrong length", function () {
+test/fetch.test.js:30:  describe("eth_getTransactionByHash", function () {
+test/fetch.test.js:31:    it("Should return null for nonexistent transaction", async function () {
+test/fetch.test.js:38:    it("Should return transaction data for real transaction", async function () {
+test/fetch.test.js:45:      await tx.wait();
+test/fetch.test.js:58:  describe("Response validation", function () {
+test/fetch.test.js:59:    it("Should validate required fields in transaction response", async function () {
+test/fetch.test.js:65:      await tx.wait();
+test/deploy.test.js:8:describe("Deploy and Transfer", function () {
+test/deploy.test.js:9:  describe("Mainnet guard", function () {
+test/deploy.test.js:10:    it("Should only allow testnet networks", function () {
+test/deploy.test.js:18:  describe("Simulation data availability", function () {
+test/deploy.test.js:19:    it("Should load legal entity for deploy context", function () {
+test/deploy.test.js:25:    it("Should have verified bank accounts for deploy context", function () {
+test/deploy.test.js:31:  describe("Local deploy and transfer (hardhat network)", function () {
+test/deploy.test.js:32:    it("Should deploy Lock and execute ETH transfer", async function () {
+test/deploy.test.js:51:      const receipt = await tx.wait();
+test/deploy.test.js:59:  describe("Invalid transaction inputs and reverts", function () {
+test/deploy.test.js:60:    it("Should revert Lock deploy with past unlock time", async function () {
+test/deploy.test.js:69:    it("Should revert Lock withdrawal from non-owner", async function () {
+test/deploy.test.js:84:    it("Should succeed with zero-value ETH transfer", async function () {
+test/deploy.test.js:91:      const receipt = await tx.wait();
+test/deploy.test.js:95:    it("Should revert transfer to zero address", async function () {
+test/deploy.test.js:107:  describe("Entity fallback handling", function () {
+test/deploy.test.js:108:    it("Should fail loadLegalEntity with missing data file", function () {
+test/deploy.test.js:120:    it("Should fail loadBankAccounts with malformed data", function () {
+test/deploy.test.js:133:    it("Should fail loadLegalEntity with missing required fields", function () {
+test/deploy.test.js:146:    it("Should fail loadLegalEntity with invalid wallet address format", function () {
+test/deploy.test.js:165:    it("Should fail loadBankAccounts with missing routing number", function () {

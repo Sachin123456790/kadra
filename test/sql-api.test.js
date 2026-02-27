@@ -252,6 +252,38 @@ describe("SQL API - fetchTransactionHistory", function () {
     });
   });
 
+  describe("Request construction", function () {
+    it("Should URL-encode entityId with special characters", async function () {
+      let capturedUrl;
+      const captureFetch = async (url) => {
+        capturedUrl = url;
+        return { status: 200, ok: true, json: async () => ({ transactions: [] }) };
+      };
+
+      await fetchTransactionHistory("entity/special&chars=yes", {
+        ...baseOpts,
+        fetchFn: captureFetch,
+      });
+
+      expect(capturedUrl).to.include("entityId=entity%2Fspecial%26chars%3Dyes");
+    });
+
+    it("Should send Authorization header with Bearer token", async function () {
+      let capturedHeaders;
+      const captureFetch = async (url, opts) => {
+        capturedHeaders = opts.headers;
+        return { status: 200, ok: true, json: async () => ({ transactions: [] }) };
+      };
+
+      await fetchTransactionHistory("entity-123", {
+        ...baseOpts,
+        fetchFn: captureFetch,
+      });
+
+      expect(capturedHeaders).to.have.property("Authorization", "Bearer test-key-123");
+    });
+  });
+
   describe("Missing configuration", function () {
     it("Should throw when apiKey is not set", async function () {
       try {
