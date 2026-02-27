@@ -1,0 +1,25 @@
+hardhat.config.js:8:    sepolia: {
+test/config.test.js:3:const { loadLegalEntity } = require("../lib/legal-entity");
+test/config.test.js:4:const { loadBankAccounts, getVerifiedAccounts } = require("../lib/bank-accounts");
+test/config.test.js:5:const { NETWORK, CHAIN_ID } = require("../lib/coinbase-sdk-helper");
+test/config.test.js:10:      expect(NETWORK).to.equal("sepolia");
+test/config.test.js:14:    it("Hardhat config should include sepolia network", function () {
+test/config.test.js:16:      expect(config.networks).to.have.property("sepolia");
+test/config.test.js:17:      expect(config.networks.sepolia.chainId).to.equal(11155111);
+test/config.test.js:55:      process.env.SEPOLIA_RPC_URL = "https://eth-sepolia.example.com/v2/key";
+test/config.test.js:69:  describe("Legal entity simulation", function () {
+test/config.test.js:70:    it("Should load legal entity with required fields", function () {
+test/config.test.js:71:      const entity = loadLegalEntity();
+test/config.test.js:72:      expect(entity).to.have.property("name").that.is.a("string").and.not.empty;
+test/config.test.js:73:      expect(entity).to.have.property("taxId").that.is.a("string").and.not.empty;
+test/config.test.js:74:      expect(entity).to.have.property("jurisdiction").that.is.a("string").and.not.empty;
+test/config.test.js:75:      expect(entity).to.have.property("walletAddress").that.matches(/^0x[0-9a-fA-F]{40}$/);
+test/config.test.js:76:      expect(entity).to.have.property("eoaAddress").that.matches(/^0x[0-9a-fA-F]{40}$/);
+test/config.test.js:80:      const entity = loadLegalEntity();
+test/config.test.js:81:      expect(entity.name).to.include("LLC");
+test/config.test.js:82:      expect(entity.taxId).to.match(/^EIN-/);
+test/config.test.js:83:      expect(entity.jurisdiction).to.match(/^US-/);
+test/config.test.js:88:    it("Should load bank accounts with required fields", function () {
+test/config.test.js:97:        expect(acct).to.have.property("bankName");
+.env.example:3:SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+.env.example:6:# Private key for testnet wallet (DO NOT use mainnet keys)

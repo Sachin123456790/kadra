@@ -1,0 +1,3 @@
+Selected network: Sepolia (chainId 11155111)
+Reason: Preferred per scope requirements. No pre-existing project convention to override.
+Configured in: hardhat.config.js (networks.sepolia) and lib/coinbase-sdk-helper.js (NETWORK constant)

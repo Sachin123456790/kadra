@@ -1,0 +1,27 @@
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+
+
+  Lock
+    ✔ Should set the right unlockTime (657ms)
+    ✔ Should set the right owner
+    ✔ Should revert with the right error if called too soon
+
+  Configuration and Simulation Data
+    Network config
+      ✔ Should target Sepolia network
+      ✔ Hardhat config should include sepolia network
+    Env validation
+      ✔ Should throw when required vars are missing
+      ✔ Should throw for invalid private key format
+      ✔ Should pass with valid env vars
+    Legal entity simulation
+      ✔ Should load legal entity with required fields
+      ✔ Should have company metadata fields
+    Bank account simulation
+      ✔ Should load bank accounts with required fields
+      ✔ Should filter verified accounts
+      ✔ Should have at least one verified account
+
+
+  13 passing (673ms)
+

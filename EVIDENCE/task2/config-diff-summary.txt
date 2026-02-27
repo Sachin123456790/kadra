@@ -1,0 +1,12 @@
+Files changed in Task 2:
+
+1. hardhat.config.js — Added Sepolia network config (RPC URL, accounts, chainId 11155111)
+2. .env.example — Expanded with all required env vars (testnet, wallet, Coinbase, entity, bank)
+3. package.json — Added npm scripts (test, compile, deploy:sepolia, fetch:sepolia)
+4. data/legal-entity.json — NEW: Legal entity simulation data (name, taxId, jurisdiction, wallet, EOA)
+5. data/bank-accounts.json — NEW: External bank account simulation data (2 accounts, 1 verified)
+6. lib/validate-env.js — NEW: Env validation with pattern matching and clear error messages
+7. lib/legal-entity.js — NEW: Legal entity loader with field validation
+8. lib/bank-accounts.js — NEW: Bank account loader with field and routing number validation
+9. lib/coinbase-sdk-helper.js — NEW: Coinbase SDK client factory targeting Sepolia
+10. test/config.test.js — NEW: 8 tests covering network config, env validation, entity, and bank data
