@@ -3,18 +3,18 @@
 ## Phase 1: Project scaffold and smart contract — COMPLETED
 
 - Hardhat project initialised with `@nomicfoundation/hardhat-toolbox`.
-- `Lock.sol` contract implemented (time-locked ETH with owner-only withdrawal).
-- `hardhat.config.js` configured for Sepolia with env-driven RPC and private key.
-- Basic `Lock.js` test covering deployment and withdrawal logic.
+- `contracts/Lock.sol` (23 LOC): Time-locked ETH contract with `constructor(uint _unlockTime) payable` and `withdraw()`. Validates future unlock time, enforces owner-only withdrawal.
+- `hardhat.config.js` (19 LOC): Configured for Sepolia with env-driven RPC URL and private key. `isValidPrivateKey()` guard prevents invalid key injection.
+- `test/Lock.js` (41 LOC, 3 tests): Verifies unlockTime, owner address, and early-withdrawal revert.
 
 ## Phase 2: Coinbase SDK and environment validation — COMPLETED
 
-- `lib/coinbase-sdk-helper.js`: SDK client factory for Sepolia, credential validation.
-- `lib/validate-env.js`: Reusable env validator with named variable sets (deploy, transfer, SQL).
+- `lib/coinbase-sdk-helper.js` (33 LOC): Exports `getCoinbaseClient()` which dynamically imports `@coinbase/coinbase-sdk` and returns configured client for Sepolia (chainId 11155111). Also exports `NETWORK` and `CHAIN_ID` constants.
+- `lib/validate-env.js` (64 LOC): Exports `validateEnv(requiredVars)` with pattern-based validation and descriptive error messages. Defines `DEPLOY_ENV_VARS` (RPC URL + private key), `TRANSFER_ENV_VARS` (+ target address), `SQL_ENV_VARS` (API key + endpoint).
 - `.env.example` pattern established for required variables.
-- `test/config.test.js`: Tests for Hardhat config network resolution and env validation.
+- `test/config.test.js` (186 LOC, 12 tests): Network config (Sepolia target, hardhat config), env validation (missing vars, invalid format, valid vars for deploy and SQL sets), legal entity simulation (required fields, company metadata), bank account simulation (required fields, verified filter).
 
 ## Phase 3: Deploy, transfer, and simulation data — COMPLETED
 
-- `scripts/deploy.js`: Deploys Lock, executes ETH transfer, saves evidence artifacts.
-- Mainnet guard: blocks non-allowlisted networks.
+- `scripts/deploy.js` (111 LOC): Deploys Lock contract with 1-year unlock time and 0.0001 ETH. Executes ETH transfer to second signer (local) or `TRANSFER_TARGET_ADDRESS` (live testnet). Saves tx hash and receipt JSON to `EVIDENCE/task3/`.
+- Mainnet guard (lines 9-19): `ALLOWED_NETWORKS = ["sepolia", "goerli", "hardhat", "localhost"]` — blocks non-allowlisted networks with `process.exitCode = 1`.

@@ -8,13 +8,13 @@ This directory contains architecture and design documentation for the **markus**
 |---|---|
 | `README.md` | This file — overview and navigation |
 | `DESIGN.md` | System design, component boundaries, data flows, risks |
-| `implementation-plan.md` | Phased implementation status and remaining work |
+| `implementation-plan.md` | Phased implementation status with concrete code references |
 
-## Project structure (summary)
+## Project structure with implementation evidence
 
 ```
-contracts/        Solidity smart contracts (Lock.sol)
-lib/              Shared Node.js modules (SDK helper, SQL API, env validation, simulation data)
-scripts/          Hardhat run scripts (deploy, fetch, MCP server)
-test/             Hardhat + Mocha test suite
-data/             Simulation fixtures (legal entity, bank accounts)
+contracts/
+  Lock.sol              23 LOC  Time-locked ETH with owner-only withdrawal (Solidity ^0.8.24)
+
+lib/
+  coinbase-sdk-helper.js  33 LOC  getCoinbaseClient() — SDK factory for Sepolia (chainId 11155111)

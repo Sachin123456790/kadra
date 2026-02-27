@@ -13,8 +13,8 @@ All runtime behaviour is configured through environment variables validated at s
 
 ## Testnet-only constraints and secret handling
 
-- **Mainnet guard**: `scripts/deploy.js` explicitly blocks execution on any network not in the allowlist (`sepolia`, `goerli`, `hardhat`, `localhost`).
+- **Mainnet guard**: `scripts/deploy.js:9-19` explicitly blocks execution on any network not in the allowlist (`sepolia`, `goerli`, `hardhat`, `localhost`). Verified by `test/deploy.test.js` "Should only allow testnet networks".
 - **Secret management**: Private keys (`DEPLOYER_PRIVATE_KEY`), API credentials (`COINBASE_API_KEY_NAME`, `COINBASE_API_KEY_SECRET`, `SQL_API_KEY`), and RPC URLs are loaded from `.env` via `dotenv`. No secrets are committed to the repository.
-- **Validation**: `lib/validate-env.js` checks presence and format of required variables before any operation. Separate validation sets exist for deploy (`DEPLOY_ENV_VARS`), transfer (`TRANSFER_ENV_VARS`), and SQL API (`SQL_ENV_VARS`).
+- **Validation**: `lib/validate-env.js` (64 LOC) checks presence and format of required variables before any operation. Separate validation sets exist for deploy (`DEPLOY_ENV_VARS`), transfer (`TRANSFER_ENV_VARS`), and SQL API (`SQL_ENV_VARS`). Tested by 12 cases in `test/config.test.js`.
 
 ## Coinbase SDK and Hardhat interaction boundaries
