@@ -1,0 +1,23 @@
+lib/validate-env.js:31:    name: "SEPOLIA_RPC_URL",
+lib/validate-env.js:53:    name: "SQL_API_KEY",
+test/config.test.js:23:      const saved = process.env.SEPOLIA_RPC_URL;
+test/config.test.js:24:      delete process.env.SEPOLIA_RPC_URL;
+test/config.test.js:28:      if (saved) process.env.SEPOLIA_RPC_URL = saved;
+test/config.test.js:33:        SEPOLIA_RPC_URL: process.env.SEPOLIA_RPC_URL,
+test/config.test.js:37:      process.env.SEPOLIA_RPC_URL = "https://example.com";
+test/config.test.js:51:        SEPOLIA_RPC_URL: process.env.SEPOLIA_RPC_URL,
+test/config.test.js:55:      process.env.SEPOLIA_RPC_URL = "https://eth-sepolia.example.com/v2/key";
+test/config.test.js:70:    it("Should throw when SQL_API_KEY is missing", function () {
+test/config.test.js:72:        SQL_API_KEY: process.env.SQL_API_KEY,
+test/config.test.js:76:      delete process.env.SQL_API_KEY;
+test/config.test.js:79:      expect(() => validateEnv(SQL_ENV_VARS)).to.throw("SQL_API_KEY");
+test/config.test.js:89:        SQL_API_KEY: process.env.SQL_API_KEY,
+test/config.test.js:93:      process.env.SQL_API_KEY = "some-key";
+test/config.test.js:106:        SQL_API_KEY: process.env.SQL_API_KEY,
+test/config.test.js:110:      process.env.SQL_API_KEY = "some-key";
+test/config.test.js:123:        SQL_API_KEY: process.env.SQL_API_KEY,
+test/config.test.js:127:      process.env.SQL_API_KEY = "test-api-key-123";
+.env.example:3:# Note: TESTNET_RPC is an alias for SEPOLIA_RPC_URL
+.env.example:4:SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+.env.example:5:TESTNET_RPC=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+.env.example:38:SQL_API_KEY=your_sql_api_key

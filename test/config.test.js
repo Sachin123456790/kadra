@@ -1,5 +1,5 @@
 const { expect } = require("chai");
-const { validateEnv, DEPLOY_ENV_VARS, TRANSFER_ENV_VARS } = require("../lib/validate-env");
+const { validateEnv, DEPLOY_ENV_VARS, TRANSFER_ENV_VARS, SQL_ENV_VARS } = require("../lib/validate-env");
 const { loadLegalEntity } = require("../lib/legal-entity");
 const { loadBankAccounts, getVerifiedAccounts } = require("../lib/bank-accounts");
 const { NETWORK, CHAIN_ID } = require("../lib/coinbase-sdk-helper");
@@ -59,6 +59,76 @@ describe("Configuration and Simulation Data", function () {
       expect(() => validateEnv(DEPLOY_ENV_VARS)).to.not.throw();
 
       // Restore
+      Object.entries(saved).forEach(([k, v]) => {
+        if (v) process.env[k] = v;
+        else delete process.env[k];
+      });
+    });
+  });
+
+  describe("SQL env validation", function () {
+    it("Should throw when SQL_API_KEY is missing", function () {
+      const saved = {
+        SQL_API_KEY: process.env.SQL_API_KEY,
+        SQL_API_ENDPOINT: process.env.SQL_API_ENDPOINT,
+      };
+
+      delete process.env.SQL_API_KEY;
+      process.env.SQL_API_ENDPOINT = "https://api.example.com";
+
+      expect(() => validateEnv(SQL_ENV_VARS)).to.throw("SQL_API_KEY");
+
+      Object.entries(saved).forEach(([k, v]) => {
+        if (v) process.env[k] = v;
+        else delete process.env[k];
+      });
+    });
+
+    it("Should throw when SQL_API_ENDPOINT is missing", function () {
+      const saved = {
+        SQL_API_KEY: process.env.SQL_API_KEY,
+        SQL_API_ENDPOINT: process.env.SQL_API_ENDPOINT,
+      };
+
+      process.env.SQL_API_KEY = "some-key";
+      delete process.env.SQL_API_ENDPOINT;
+
+      expect(() => validateEnv(SQL_ENV_VARS)).to.throw("SQL_API_ENDPOINT");
+
+      Object.entries(saved).forEach(([k, v]) => {
+        if (v) process.env[k] = v;
+        else delete process.env[k];
+      });
+    });
+
+    it("Should throw for invalid SQL_API_ENDPOINT format", function () {
+      const saved = {
+        SQL_API_KEY: process.env.SQL_API_KEY,
+        SQL_API_ENDPOINT: process.env.SQL_API_ENDPOINT,
+      };
+
+      process.env.SQL_API_KEY = "some-key";
+      process.env.SQL_API_ENDPOINT = "not-a-url";
+
+      expect(() => validateEnv(SQL_ENV_VARS)).to.throw("invalid format");
+
+      Object.entries(saved).forEach(([k, v]) => {
+        if (v) process.env[k] = v;
+        else delete process.env[k];
+      });
+    });
+
+    it("Should pass with valid SQL env vars", function () {
+      const saved = {
+        SQL_API_KEY: process.env.SQL_API_KEY,
+        SQL_API_ENDPOINT: process.env.SQL_API_ENDPOINT,
+      };
+
+      process.env.SQL_API_KEY = "test-api-key-123";
+      process.env.SQL_API_ENDPOINT = "https://sql-api.example.com";
+
+      expect(() => validateEnv(SQL_ENV_VARS)).to.not.throw();
+
       Object.entries(saved).forEach(([k, v]) => {
         if (v) process.env[k] = v;
         else delete process.env[k];

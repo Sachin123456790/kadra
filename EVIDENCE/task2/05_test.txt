@@ -1,8 +1,12 @@
-[dotenv@17.3.1] injecting env (0) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+
+> markus@1.0.0 test
+> npx hardhat test
+
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
 
 
   Lock
-    ✔ Should set the right unlockTime (657ms)
+    ✔ Should set the right unlockTime (227ms)
     ✔ Should set the right owner
     ✔ Should revert with the right error if called too soon
 
@@ -14,6 +18,11 @@
       ✔ Should throw when required vars are missing
       ✔ Should throw for invalid private key format
       ✔ Should pass with valid env vars
+    SQL env validation
+      ✔ Should throw when SQL_API_KEY is missing
+      ✔ Should throw when SQL_API_ENDPOINT is missing
+      ✔ Should throw for invalid SQL_API_ENDPOINT format
+      ✔ Should pass with valid SQL env vars
     Legal entity simulation
       ✔ Should load legal entity with required fields
       ✔ Should have company metadata fields
@@ -22,6 +31,25 @@
       ✔ Should filter verified accounts
       ✔ Should have at least one verified account
 
+  Deploy and Transfer
+    Mainnet guard
+      ✔ Should only allow testnet networks
+    Simulation data availability
+      ✔ Should load legal entity for deploy context
+      ✔ Should have verified bank accounts for deploy context
+    Local deploy and transfer (hardhat network)
+      ✔ Should deploy Lock and execute ETH transfer
 
-  13 passing (673ms)
+  Transaction History Fetch
+    Hash validation
+      ✔ Should accept valid transaction hash
+      ✔ Should reject invalid transaction hash
+    eth_getTransactionByHash
+      ✔ Should return null for nonexistent transaction
+      ✔ Should return transaction data for real transaction
+    Response validation
+      ✔ Should validate required fields in transaction response
+
+
+  26 passing (262ms)
 

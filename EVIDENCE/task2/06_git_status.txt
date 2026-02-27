@@ -1,9 +1,0 @@
- M .env.example
- M hardhat.config.js
- M package.json
-?? EVIDENCE/task2/
-?? data/
-?? demo.pdf
-?? kadra.pdf
-?? lib/
-?? test/config.test.js
