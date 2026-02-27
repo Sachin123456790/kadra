@@ -1,21 +1,27 @@
- D EVIDENCE/task4/01_pwd.txt
- D EVIDENCE/task4/02_npm_ci.txt
- D EVIDENCE/task4/03_compile.txt
- D EVIDENCE/task4/04_test.txt
- D EVIDENCE/task4/05_fetch.txt
- D EVIDENCE/task4/06_grep.txt
- D EVIDENCE/task4/07_git_status.txt
- D EVIDENCE/task4/edge-case-invalid-hash.log
- D EVIDENCE/task4/edge-case-no-history.log
- D EVIDENCE/task4/fetch-output.log
- D EVIDENCE/task4/final-gates-summary.md
+ M EVIDENCE/task1/02_ls_root.txt
+ M EVIDENCE/task1/03_ls_architecture.txt
+ M EVIDENCE/task1/05_file_list.txt
+ M EVIDENCE/task1/06_npm_ci.txt
+ M EVIDENCE/task1/07_compile.txt
+ M EVIDENCE/task1/08_test.txt
+ M EVIDENCE/task1/summary.md
+ M EVIDENCE/task2/01_dependency_audit.txt
+ M EVIDENCE/task2/02_config_grep.txt
+ M EVIDENCE/task2/03_env_grep.txt
+ M EVIDENCE/task2/04_compile.txt
+ M EVIDENCE/task2/05_test.txt
+ M EVIDENCE/task2/decisions.md
+ M EVIDENCE/task3/01_sql_path_check.txt
+ M EVIDENCE/task3/02_sql_grep.txt
+ M EVIDENCE/task3/03_targeted_tests.txt
+ M EVIDENCE/task3/04_full_tests.txt
+ M EVIDENCE/task3/notes.md
+ M EVIDENCE/task4/01_compile.txt
+ M EVIDENCE/task4/02_test.txt
+ M EVIDENCE/task4/03_safety_grep.txt
+ M EVIDENCE/task4/04_git_status.txt
  M package-lock.json
  M package.json
- M test/deploy.test.js
-?? EVIDENCE/task4/01_compile.txt
-?? EVIDENCE/task4/02_test.txt
-?? EVIDENCE/task4/03_safety_grep.txt
-?? EVIDENCE/task4/04_git_status.txt
 ?? demo.pdf
 ?? docs/
 ?? kadra.pdf

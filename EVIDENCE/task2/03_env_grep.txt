@@ -1,5 +1,3 @@
-lib/validate-env.js:31:    name: "SEPOLIA_RPC_URL",
-lib/validate-env.js:53:    name: "SQL_API_KEY",
 test/config.test.js:23:      const saved = process.env.SEPOLIA_RPC_URL;
 test/config.test.js:24:      delete process.env.SEPOLIA_RPC_URL;
 test/config.test.js:28:      if (saved) process.env.SEPOLIA_RPC_URL = saved;
@@ -21,3 +19,6 @@ test/config.test.js:127:      process.env.SQL_API_KEY = "test-api-key-123";
 .env.example:4:SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
 .env.example:5:TESTNET_RPC=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
 .env.example:38:SQL_API_KEY=your_sql_api_key
+lib/validate-env.js:31:    name: "SEPOLIA_RPC_URL",
+lib/validate-env.js:53:    name: "SQL_API_KEY",
+--- exit code: 0 ---

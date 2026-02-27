@@ -1,21 +1,12 @@
 test/Lock.js:30:  it("Should revert with the right error if called too soon", async function () {
 test/Lock.js:39:    await expect(lock.withdraw()).to.be.revertedWith("You can't withdraw yet");
-lib/coinbase-sdk-helper.js:6:const NETWORK = "sepolia";
-test/config.test.js:10:      expect(NETWORK).to.equal("sepolia");
-test/config.test.js:14:    it("Hardhat config should include sepolia network", function () {
-test/config.test.js:16:      expect(config.networks).to.have.property("sepolia");
-test/config.test.js:17:      expect(config.networks.sepolia.chainId).to.equal(11155111);
-test/config.test.js:31:    it("Should throw for invalid private key format", function () {
-test/config.test.js:40:      expect(() => validateEnv(DEPLOY_ENV_VARS)).to.throw("invalid format");
-test/config.test.js:55:      process.env.SEPOLIA_RPC_URL = "https://eth-sepolia.example.com/v2/key";
-test/config.test.js:104:    it("Should throw for invalid SQL_API_ENDPOINT format", function () {
-test/config.test.js:113:      expect(() => validateEnv(SQL_ENV_VARS)).to.throw("invalid format");
+scripts/deploy.js:8:// Allowed networks — mainnet is explicitly blocked
+scripts/deploy.js:9:const ALLOWED_NETWORKS = ["sepolia", "goerli", "hardhat", "localhost"];
 lib/sql-api.js:28:    console.log("fetchTransactionHistory: missing or invalid entityId, returning empty fallback");
 lib/sql-api.js:29:    return { transactions: [], entityId: null, fallback: true };
 lib/sql-api.js:43:    throw new Error(`SQL API auth failure (${response.status}): token may be expired or invalid`);
+lib/coinbase-sdk-helper.js:6:const NETWORK = "sepolia";
 test/fetch.test.js:13:    it("Should reject invalid transaction hash", function () {
-lib/validate-env.js:3: * Throws with a clear message listing all missing/invalid variables.
-lib/validate-env.js:15:      errors.push(`  - ${name}: invalid format (${description})`);
 test/sql-api.test.js:61:          fetchFn: mockFetch(400, "invalid entityId format"),
 test/sql-api.test.js:66:        expect(err.message).to.include("invalid entityId format");
 test/sql-api.test.js:139:        expect(err.message).to.include("token may be expired or invalid");
@@ -26,8 +17,6 @@ test/sql-api.test.js:166:    it("Should return empty fallback for empty string e
 test/sql-api.test.js:172:      expect(result).to.deep.equal({ transactions: [], entityId: null, fallback: true });
 test/sql-api.test.js:175:    it("Should return empty fallback for undefined entityId", async function () {
 test/sql-api.test.js:181:      expect(result).to.deep.equal({ transactions: [], entityId: null, fallback: true });
-scripts/deploy.js:8:// Allowed networks — mainnet is explicitly blocked
-scripts/deploy.js:9:const ALLOWED_NETWORKS = ["sepolia", "goerli", "hardhat", "localhost"];
 test/deploy.test.js:11:      const allowed = ["sepolia", "goerli", "hardhat", "localhost"];
 test/deploy.test.js:12:      expect(allowed).to.not.include("mainnet");
 test/deploy.test.js:14:      expect(allowed).to.include("sepolia");
@@ -40,6 +29,17 @@ test/deploy.test.js:84:    it("Should succeed with zero-value ETH transfer", asy
 test/deploy.test.js:95:    it("Should revert transfer to zero address", async function () {
 test/deploy.test.js:103:      ).to.not.be.reverted;
 test/deploy.test.js:107:  describe("Entity fallback handling", function () {
+lib/validate-env.js:3: * Throws with a clear message listing all missing/invalid variables.
+lib/validate-env.js:15:      errors.push(`  - ${name}: invalid format (${description})`);
+test/config.test.js:10:      expect(NETWORK).to.equal("sepolia");
+test/config.test.js:14:    it("Hardhat config should include sepolia network", function () {
+test/config.test.js:16:      expect(config.networks).to.have.property("sepolia");
+test/config.test.js:17:      expect(config.networks.sepolia.chainId).to.equal(11155111);
+test/config.test.js:31:    it("Should throw for invalid private key format", function () {
+test/config.test.js:40:      expect(() => validateEnv(DEPLOY_ENV_VARS)).to.throw("invalid format");
+test/config.test.js:55:      process.env.SEPOLIA_RPC_URL = "https://eth-sepolia.example.com/v2/key";
+test/config.test.js:104:    it("Should throw for invalid SQL_API_ENDPOINT format", function () {
+test/config.test.js:113:      expect(() => validateEnv(SQL_ENV_VARS)).to.throw("invalid format");
 scripts/fetch.js:8: * Handles edge cases: invalid hash, no history (null result).
 scripts/fetch.js:11: *   npx hardhat run scripts/fetch.js --network sepolia
 scripts/fetch.js:12: *   TX_HASH=0x... npx hardhat run scripts/fetch.js --network sepolia
@@ -51,3 +51,4 @@ scripts/fetch.js:70:      console.log(`  Unexpected: got result for zero hash:`,
 scripts/fetch.js:89:    const msg = `Provided TX_HASH is invalid: "${txHash}"`;
 scripts/fetch.js:148:      if (sqlResult.fallback) {
 scripts/fetch.js:149:        console.log("  Note: returned fallback (missing entity)");
+--- exit code: 0 ---

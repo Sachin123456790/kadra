@@ -2,11 +2,11 @@
 > markus@1.0.0 test
 > npx hardhat test
 
-[dotenv@17.3.1] injecting env (17) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
 
 
   Lock
-    ✔ Should set the right unlockTime (670ms)
+    ✔ Should set the right unlockTime (718ms)
     ✔ Should set the right owner
     ✔ Should revert with the right error if called too soon
 
@@ -18,6 +18,11 @@
       ✔ Should throw when required vars are missing
       ✔ Should throw for invalid private key format
       ✔ Should pass with valid env vars
+    SQL env validation
+      ✔ Should throw when SQL_API_KEY is missing
+      ✔ Should throw when SQL_API_ENDPOINT is missing
+      ✔ Should throw for invalid SQL_API_ENDPOINT format
+      ✔ Should pass with valid SQL env vars
     Legal entity simulation
       ✔ Should load legal entity with required fields
       ✔ Should have company metadata fields
@@ -34,6 +39,15 @@
       ✔ Should have verified bank accounts for deploy context
     Local deploy and transfer (hardhat network)
       ✔ Should deploy Lock and execute ETH transfer
+    Invalid transaction inputs and reverts
+      ✔ Should revert Lock deploy with past unlock time
+      ✔ Should revert Lock withdrawal from non-owner
+      ✔ Should succeed with zero-value ETH transfer
+      ✔ Should revert transfer to zero address
+    Entity fallback handling
+      ✔ Should fail loadLegalEntity with missing data file
+      ✔ Should fail loadBankAccounts with malformed data
+      ✔ Should fail loadLegalEntity with missing required fields
 
   Transaction History Fetch
     Hash validation
@@ -45,6 +59,32 @@
     Response validation
       ✔ Should validate required fields in transaction response
 
+  SQL API - fetchTransactionHistory
+    Success response
+      ✔ Should parse a valid transaction history response
+      ✔ Should handle empty transaction list
+    4xx client errors
+      ✔ Should throw on 400 bad request
+      ✔ Should throw on 404 not found
+      ✔ Should handle empty error body on 4xx
+    5xx server errors
+      ✔ Should throw on 500 internal server error
+      ✔ Should throw on 503 service unavailable
+    Expired token / auth failure
+      ✔ Should throw on 401 unauthorized (expired token)
+      ✔ Should throw on 403 forbidden
+    Missing entity fallback
+fetchTransactionHistory: missing or invalid entityId, returning empty fallback
+      ✔ Should return empty fallback for null entityId
+fetchTransactionHistory: missing or invalid entityId, returning empty fallback
+      ✔ Should return empty fallback for empty string entityId
+fetchTransactionHistory: missing or invalid entityId, returning empty fallback
+      ✔ Should return empty fallback for undefined entityId
+    Missing configuration
+      ✔ Should throw when apiKey is not set
+      ✔ Should throw when endpoint is not set
 
-  22 passing (696ms)
 
+  47 passing (758ms)
+
+--- exit code: 0 ---

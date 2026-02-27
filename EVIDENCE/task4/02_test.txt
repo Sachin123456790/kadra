@@ -6,7 +6,7 @@
 
 
   Lock
-    ✔ Should set the right unlockTime (232ms)
+    ✔ Should set the right unlockTime (718ms)
     ✔ Should set the right owner
     ✔ Should revert with the right error if called too soon
 
@@ -85,5 +85,6 @@ fetchTransactionHistory: missing or invalid entityId, returning empty fallback
       ✔ Should throw when endpoint is not set
 
 
-  47 passing (274ms)
+  47 passing (758ms)
 
+--- exit code: 0 ---

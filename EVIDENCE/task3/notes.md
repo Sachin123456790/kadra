@@ -32,4 +32,13 @@
 
 ## Full Suite
 
-- **40 tests passing** (14 new SQL API + 4 SQL env validation from task2 + 22 baseline)
+- **47 tests passing** (14 SQL API + 4 SQL env validation + 7 deploy reverts/fallbacks + 22 baseline)
+
+## Commit
+
+```
+9d8d80f feat(task3): add SQL API transaction fetch and edge-case unit tests
+```
+
+Files created: `lib/sql-api.js`, `test/sql-api.test.js`
+Files modified: `scripts/fetch.js` (SQL fetch integration)

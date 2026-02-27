@@ -1,8 +1,2 @@
-21:  "dependencies": {
-22-    "@coinbase/agentkit": "^0.2.0",
-23-    "@coinbase/agentkit-model-context-protocol": "^0.2.0",
-24-    "@coinbase/coinbase-sdk": "^0.25.0",
-25-    "@modelcontextprotocol/sdk": "^1.17.4",
-26-    "dotenv": "^17.3.1"
-27-  }
-28-}
+--- exit code: 1 ---
+NOTE: @coinbase/wallet-sdk, @types/pg, and pg not present. @nomicfoundation/hardhat-toolbox (not toolchain) is the actual dep.

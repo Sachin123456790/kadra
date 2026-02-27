@@ -2,11 +2,11 @@
 > markus@1.0.0 test
 > npx hardhat test
 
-[dotenv@17.3.1] injecting env (20) from .env -- tip: 🛡️ auth for agents: https://vestauth.com
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
 
 
   Lock
-    ✔ Should set the right unlockTime (182ms)
+    ✔ Should set the right unlockTime (718ms)
     ✔ Should set the right owner
     ✔ Should revert with the right error if called too soon
 
@@ -39,6 +39,15 @@
       ✔ Should have verified bank accounts for deploy context
     Local deploy and transfer (hardhat network)
       ✔ Should deploy Lock and execute ETH transfer
+    Invalid transaction inputs and reverts
+      ✔ Should revert Lock deploy with past unlock time
+      ✔ Should revert Lock withdrawal from non-owner
+      ✔ Should succeed with zero-value ETH transfer
+      ✔ Should revert transfer to zero address
+    Entity fallback handling
+      ✔ Should fail loadLegalEntity with missing data file
+      ✔ Should fail loadBankAccounts with malformed data
+      ✔ Should fail loadLegalEntity with missing required fields
 
   Transaction History Fetch
     Hash validation
@@ -76,5 +85,6 @@ fetchTransactionHistory: missing or invalid entityId, returning empty fallback
       ✔ Should throw when endpoint is not set
 
 
-  40 passing (213ms)
+  47 passing (758ms)
 
+--- exit code: 0 ---

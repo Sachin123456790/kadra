@@ -28,4 +28,4 @@
 
 - 4 new SQL env validation tests added to config.test.js
 - Tests cover: missing SQL_API_KEY, missing SQL_API_ENDPOINT, invalid endpoint format, valid vars
-- All 26 tests pass
+- Full suite: 47 tests pass (includes tests from later tasks)

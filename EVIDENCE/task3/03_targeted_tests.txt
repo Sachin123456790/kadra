@@ -2,7 +2,7 @@
 > markus@1.0.0 test
 > npx hardhat test --grep SQL|sql|fetch|transaction
 
-[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
 
 
   Configuration and Simulation Data
@@ -12,12 +12,19 @@
       ✔ Should throw for invalid SQL_API_ENDPOINT format
       ✔ Should pass with valid SQL env vars
 
+  Deploy and Transfer
+    Invalid transaction inputs and reverts
+      ✔ Should revert Lock deploy with past unlock time (212ms)
+      ✔ Should revert Lock withdrawal from non-owner
+      ✔ Should succeed with zero-value ETH transfer
+      ✔ Should revert transfer to zero address
+
   Transaction History Fetch
     Hash validation
       ✔ Should accept valid transaction hash
       ✔ Should reject invalid transaction hash
     eth_getTransactionByHash
-      ✔ Should return null for nonexistent transaction (212ms)
+      ✔ Should return null for nonexistent transaction
       ✔ Should return transaction data for real transaction
     Response validation
       ✔ Should validate required fields in transaction response
@@ -48,5 +55,6 @@ fetchTransactionHistory: missing or invalid entityId, returning empty fallback
       ✔ Should throw when endpoint is not set
 
 
-  23 passing (240ms)
+  27 passing (239ms)
 
+--- exit code: 0 ---
