@@ -1,0 +1,7 @@
+scripts/mcp-agentkit-server.mjs:67:  console.error(error);
+scripts/fetch.js:134:      console.error(`  ${msg}`);
+scripts/fetch.js:152:      console.error(`  SQL API error: ${err.message}`);
+scripts/fetch.js:162:  console.error(error);
+scripts/deploy.js:16:    console.error(`BLOCKED: Network "${networkName}" is not allowed. Only testnet networks are permitted.`);
+scripts/deploy.js:17:    console.error(`Allowed networks: ${ALLOWED_NETWORKS.join(", ")}`);
+scripts/deploy.js:109:  console.error(error);

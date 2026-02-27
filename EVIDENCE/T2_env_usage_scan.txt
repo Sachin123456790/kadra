@@ -1,0 +1,25 @@
+hardhat.config.js:2:require("dotenv").config();
+hardhat.config.js:12:      url: process.env.SEPOLIA_RPC_URL || process.env.TESTNET_RPC || "",
+hardhat.config.js:13:      accounts: isValidPrivateKey(process.env.DEPLOYER_PRIVATE_KEY)
+hardhat.config.js:14:        ? [process.env.DEPLOYER_PRIVATE_KEY]
+scripts/mcp-agentkit-server.mjs:9:import dotenv from "dotenv";
+scripts/mcp-agentkit-server.mjs:11:dotenv.config();
+scripts/mcp-agentkit-server.mjs:15:    process.env.CDP_API_KEY_NAME || process.env.COINBASE_API_KEY_NAME;
+scripts/mcp-agentkit-server.mjs:17:    process.env.CDP_API_KEY_PRIVATE_KEY || process.env.COINBASE_API_KEY_SECRET;
+scripts/mcp-agentkit-server.mjs:21:      "Missing credentials. Set CDP_API_KEY_NAME/CDP_API_KEY_PRIVATE_KEY or COINBASE_API_KEY_NAME/COINBASE_API_KEY_SECRET in .env."
+scripts/deploy.js:57:    targetAddress = process.env.TRANSFER_TARGET_ADDRESS;
+scripts/fetch.js:35:  let txHash = process.env.TX_HASH;
+scripts/fetch.js:141:  if (process.env.SQL_API_KEY && process.env.SQL_API_ENDPOINT) {
+scripts/fetch.js:144:      const entityId = process.env.LEGAL_ENTITY_NAME || "unknown";
+scripts/fetch.js:155:    console.log("\n--- SQL API: SKIPPED (SQL_API_KEY or SQL_API_ENDPOINT not set) ---");
+lib/coinbase-sdk-helper.js:11: * Requires COINBASE_API_KEY_NAME and COINBASE_API_KEY_SECRET in env.
+lib/coinbase-sdk-helper.js:16:  const apiKeyName = process.env.COINBASE_API_KEY_NAME;
+lib/coinbase-sdk-helper.js:17:  const apiKeySecret = process.env.COINBASE_API_KEY_SECRET;
+lib/coinbase-sdk-helper.js:21:      "Missing Coinbase SDK credentials. Set COINBASE_API_KEY_NAME and COINBASE_API_KEY_SECRET in .env"
+lib/validate-env.js:9:    const value = process.env[name];
+lib/validate-env.js:53:    name: "SQL_API_KEY",
+lib/sql-api.js:3: * Uses HTTP fetch with env-driven config (SQL_API_KEY, SQL_API_ENDPOINT).
+lib/sql-api.js:11: * @param {string} [options.apiKey] - Override SQL_API_KEY
+lib/sql-api.js:17:  const apiKey = "apiKey" in options ? options.apiKey : process.env.SQL_API_KEY;
+lib/sql-api.js:18:  const endpoint = "endpoint" in options ? options.endpoint : process.env.SQL_API_ENDPOINT;
+lib/sql-api.js:22:    throw new Error("SQL_API_KEY is not configured");
