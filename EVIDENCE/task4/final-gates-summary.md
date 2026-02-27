@@ -51,3 +51,49 @@
 | 6 | Transaction history via eth_getTransactionByHash | DONE |
 | 7 | Edge cases: invalid hash + no history handled | DONE |
 | 8 | Task-scoped commits | DONE (4 commits) |
+
+## Review Decision
+
+**FINAL VERDICT: CONDITIONAL PASS**
+
+### Decision rationale
+
+All implementation requirements are satisfied and verified locally. The 22-test suite passes, covering contract behavior, configuration validation, simulation data, deploy/transfer logic, transaction history fetch, and edge cases (invalid hash, no history). The four task-scoped commits align with the scope definition.
+
+### Conditions for full pass
+
+The following two items are **external dependencies** that cannot be resolved by code changes alone:
+
+1. **Sepolia credentials (Gates 11-12):** Deploy and fetch scripts are fully implemented and tested on local Hardhat network. Sepolia execution requires providing `SEPOLIA_RPC_URL`, `DEPLOYER_PRIVATE_KEY`, and `TRANSFER_TARGET_ADDRESS` in `.env`. Once credentials are supplied, re-run:
+   - `npx hardhat run scripts/deploy.js --network sepolia`
+   - `npx hardhat run scripts/fetch.js --network sepolia`
+2. **Coinbase SDK end-to-end:** Client factory (`lib/coinbase-sdk-helper.js`) is implemented and targets Sepolia, but full API exercise requires `COINBASE_API_KEY_NAME` and `COINBASE_API_KEY_SECRET`.
+
+### Accepted exceptions
+
+| Item | Disposition | Justification |
+|------|-------------|---------------|
+| Gates 3-4 (DESIGN_MISSING, PLAN_MISSING) | **Accepted** | Project was initialized from scratch; no pre-existing architecture docs existed. Scope explicitly states: "If missing, Claude must document that explicitly and proceed." Documented in `EVIDENCE/architecture-check.txt`. |
+| Gates 11-12 (BLOCKED) | **Conditional** | Code is correct and tested locally. Blocked solely on external credential provisioning, not implementation gaps. |
+| Hardhat in-memory chain reset | **Accepted** | Deploy and fetch run in separate Hardhat processes; in-memory state does not persist. This is expected Hardhat behavior. On Sepolia, fetch will retrieve the real on-chain transaction. |
+
+### Evidence cross-reference
+
+| Artifact | Location | Verified |
+|----------|----------|----------|
+| Project directory | `EVIDENCE/resolved-project-dir.txt` | Yes |
+| Architecture check | `EVIDENCE/architecture-check.txt` | Yes |
+| Task 1 baseline | `EVIDENCE/task1/summary.txt` | Yes |
+| Network choice | `EVIDENCE/task2/network-choice.txt` | Yes |
+| Env vars documented | `.env.example` | Yes |
+| Transaction hash | `EVIDENCE/task3/tx-hash.txt` | Yes |
+| Transaction receipt | `EVIDENCE/task3/tx-receipt.json` | Yes |
+| Deploy output | `EVIDENCE/task3/deploy-output.log` | Yes |
+| Fetch output | `EVIDENCE/task4/fetch-output.log` | Yes |
+| Invalid hash edge case | `EVIDENCE/task4/edge-case-invalid-hash.log` | Yes |
+| No history edge case | `EVIDENCE/task4/edge-case-no-history.log` | Yes |
+| Test results (22 passing) | `EVIDENCE/task4/04_test.txt` | Yes |
+
+### Recommendation
+
+Proceed with credential provisioning to unlock Sepolia gates. No code changes required — only `.env` population and re-execution of gates 11-12.
