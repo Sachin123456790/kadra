@@ -1,0 +1,7 @@
+$ test -f docs/architecture/DESIGN.md; echo DESIGN_MD=$?
+DESIGN_MD=1
+
+$ test -f docs/architecture/implementation-plan.md; echo IMPLEMENTATION_PLAN_MD=$?
+IMPLEMENTATION_PLAN_MD=1
+
+Note: Both architecture docs are MISSING. The docs/architecture/ directory exists but is empty.

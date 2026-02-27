@@ -1,0 +1,48 @@
+$ ls -la docs docs/architecture lib scripts test data
+
+data:
+total 16
+drwxr-xr-x@  4 chinmay_shringi  staff  128 Feb 26 21:01 .
+drwxr-xr-x@ 21 chinmay_shringi  staff  672 Feb 26 20:41 ..
+-rw-r--r--@  1 chinmay_shringi  staff  539 Feb 26 21:01 bank-accounts.json
+-rw-r--r--@  1 chinmay_shringi  staff  406 Feb 26 21:01 legal-entity.json
+
+docs:
+total 8
+drwxr-xr-x@  4 chinmay_shringi  staff   128 Feb 26 20:26 .
+drwxr-xr-x@ 21 chinmay_shringi  staff   672 Feb 26 20:41 ..
+drwxr-xr-x@  2 chinmay_shringi  staff    64 Feb 26 19:31 architecture
+-rw-r--r--@  1 chinmay_shringi  staff  1129 Feb 26 20:28 mcp-setup.md
+
+docs/architecture:
+total 0
+drwxr-xr-x@ 2 chinmay_shringi  staff   64 Feb 26 19:31 .
+drwxr-xr-x@ 4 chinmay_shringi  staff  128 Feb 26 20:26 ..
+
+lib:
+total 40
+drwxr-xr-x@  7 chinmay_shringi  staff   224 Feb 26 20:44 .
+drwxr-xr-x@ 21 chinmay_shringi  staff   672 Feb 26 20:41 ..
+-rw-r--r--@  1 chinmay_shringi  staff  1444 Feb 26 19:35 bank-accounts.js
+-rw-r--r--@  1 chinmay_shringi  staff   864 Feb 26 19:35 coinbase-sdk-helper.js
+-rw-r--r--@  1 chinmay_shringi  staff  1078 Feb 26 19:35 legal-entity.js
+-rw-r--r--@  1 chinmay_shringi  staff  2200 Feb 26 20:44 sql-api.js
+-rw-r--r--@  1 chinmay_shringi  staff  1626 Feb 26 20:42 validate-env.js
+
+scripts:
+total 40
+drwxr-xr-x@  5 chinmay_shringi  staff   160 Feb 26 20:43 .
+drwxr-xr-x@ 21 chinmay_shringi  staff   672 Feb 26 20:41 ..
+-rw-r--r--@  1 chinmay_shringi  staff  4355 Feb 26 19:37 deploy.js
+-rw-r--r--@  1 chinmay_shringi  staff  6520 Feb 26 20:43 fetch.js
+-rw-r--r--@  1 chinmay_shringi  staff  1948 Feb 26 20:28 mcp-agentkit-server.mjs
+
+test:
+total 64
+drwxr-xr-x@  7 chinmay_shringi  staff   224 Feb 26 20:45 .
+drwxr-xr-x@ 21 chinmay_shringi  staff   672 Feb 26 20:41 ..
+-rw-r--r--@  1 chinmay_shringi  staff  6501 Feb 26 20:42 config.test.js
+-rw-r--r--@  1 chinmay_shringi  staff  5193 Feb 26 20:45 deploy.test.js
+-rw-r--r--@  1 chinmay_shringi  staff  2544 Feb 26 19:39 fetch.test.js
+-rw-r--r--@  1 chinmay_shringi  staff  1412 Feb 26 19:33 Lock.js
+-rw-r--r--@  1 chinmay_shringi  staff  6769 Feb 26 20:43 sql-api.test.js

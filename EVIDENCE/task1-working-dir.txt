@@ -1,0 +1,5 @@
+$ pwd
+/Users/chinmay_shringi/Desktop/markus
+
+$ git rev-parse --show-toplevel
+/Users/chinmay_shringi/Desktop/markus
