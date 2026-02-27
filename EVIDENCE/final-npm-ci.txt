@@ -1,0 +1,7 @@
+$ npm ci
+
+added 750 packages, and audited 751 packages in 11s
+150 packages are looking for funding
+37 vulnerabilities (15 low, 18 moderate, 4 high)
+
+Result: PASS (clean install succeeded)

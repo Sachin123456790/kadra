@@ -1,0 +1,11 @@
+$ npm test
+
+  55 passing (812ms)
+
+  Lock: 3 passing
+  Configuration and Simulation Data: 14 passing
+  Deploy and Transfer: 13 passing
+  Transaction History Fetch: 6 passing
+  SQL API - fetchTransactionHistory: 19 passing
+
+Result: PASS (55 tests, 0 failures)

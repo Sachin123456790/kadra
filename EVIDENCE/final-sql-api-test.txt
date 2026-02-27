@@ -1,0 +1,16 @@
+$ npx hardhat test test/sql-api.test.js
+
+  SQL API - fetchTransactionHistory
+    Success response: 2 passing
+    4xx client errors: 3 passing
+    5xx server errors: 2 passing
+    Expired token / auth failure: 2 passing
+    Missing entity fallback: 3 passing
+    Non-string entityId types: 2 passing
+    Rate limiting and network errors: 2 passing
+    Response parsing edge cases: 1 passing
+    Missing configuration: 2 passing
+
+  19 passing (13ms)
+
+Result: PASS
