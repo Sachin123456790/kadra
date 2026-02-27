@@ -2,7 +2,7 @@
 > markus@1.0.0 test
 > npx hardhat test --grep SQL|sql|fetch|transaction
 
-[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+[dotenv@17.3.1] injecting env (20) from .env -- tip: 🛡️ auth for agents: https://vestauth.com
 
 
   Configuration and Simulation Data
@@ -14,7 +14,7 @@
 
   Deploy and Transfer
     Invalid transaction inputs and reverts
-      ✔ Should revert Lock deploy with past unlock time (212ms)
+      ✔ Should revert Lock deploy with past unlock time (222ms)
       ✔ Should revert Lock withdrawal from non-owner
       ✔ Should succeed with zero-value ETH transfer
       ✔ Should revert transfer to zero address
@@ -55,6 +55,6 @@ fetchTransactionHistory: missing or invalid entityId, returning empty fallback
       ✔ Should throw when endpoint is not set
 
 
-  27 passing (239ms)
+  27 passing (248ms)
 
---- exit code: 0 ---
+EXIT CODE: 

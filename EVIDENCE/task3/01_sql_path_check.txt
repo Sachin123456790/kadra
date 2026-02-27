@@ -1,18 +1,3 @@
-=== SQL API module ===
-Path: lib/sql-api.js
-Exists: yes
-Lines:       59
-
-=== Test file ===
-Path: test/sql-api.test.js
-Exists: yes
-Lines:      212
-
-=== SQL integration in fetch.js ===
-4:const { fetchTransactionHistory } = require("../lib/sql-api");
-141:  if (process.env.SQL_API_KEY && process.env.SQL_API_ENDPOINT) {
-145:      const sqlResult = await fetchTransactionHistory(entityId);
-155:    console.log("\n--- SQL API: SKIPPED (SQL_API_KEY or SQL_API_ENDPOINT not set) ---");
-
-=== Module exports ===
-59:module.exports = { fetchTransactionHistory };
+=== SQL path check ===
+lib/sql-api.js: EXISTS (59 lines)
+src/utils/sqlApi.ts: NOT PRESENT (mapped to lib/sql-api.js per JS convention)
