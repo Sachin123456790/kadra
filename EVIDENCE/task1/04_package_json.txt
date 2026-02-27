@@ -4,18 +4,25 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npx hardhat test",
+    "compile": "npx hardhat compile",
+    "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia",
+    "fetch:sepolia": "npx hardhat run scripts/fetch.js --network sepolia",
+    "mcp:server": "node scripts/mcp-agentkit-server.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^7.0.0",
-    "hardhat": "^3.1.10"
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
+    "hardhat": "^2.28.6"
   },
   "dependencies": {
+    "@coinbase/agentkit": "^0.2.0",
+    "@coinbase/agentkit-model-context-protocol": "^0.2.0",
     "@coinbase/coinbase-sdk": "^0.25.0",
+    "@modelcontextprotocol/sdk": "^1.17.4",
     "dotenv": "^17.3.1"
   }
 }
