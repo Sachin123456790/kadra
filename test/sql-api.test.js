@@ -182,6 +182,76 @@ describe("SQL API - fetchTransactionHistory", function () {
     });
   });
 
+  describe("Non-string entityId types", function () {
+    it("Should return empty fallback for numeric entityId", async function () {
+      const result = await fetchTransactionHistory(12345, {
+        ...baseOpts,
+        fetchFn: mockFetch(200, {}),
+      });
+
+      expect(result).to.deep.equal({ transactions: [], entityId: null, fallback: true });
+    });
+
+    it("Should return empty fallback for object entityId", async function () {
+      const result = await fetchTransactionHistory({ id: "abc" }, {
+        ...baseOpts,
+        fetchFn: mockFetch(200, {}),
+      });
+
+      expect(result).to.deep.equal({ transactions: [], entityId: null, fallback: true });
+    });
+  });
+
+  describe("Rate limiting and network errors", function () {
+    it("Should throw on 429 too many requests", async function () {
+      try {
+        await fetchTransactionHistory("entity-123", {
+          ...baseOpts,
+          fetchFn: mockFetch(429, "rate limit exceeded"),
+        });
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.message).to.include("SQL API client error (429)");
+      }
+    });
+
+    it("Should propagate network/fetch errors", async function () {
+      const failingFetch = async () => {
+        throw new Error("ECONNREFUSED: connection refused");
+      };
+
+      try {
+        await fetchTransactionHistory("entity-123", {
+          ...baseOpts,
+          fetchFn: failingFetch,
+        });
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect(err.message).to.include("ECONNREFUSED");
+      }
+    });
+  });
+
+  describe("Response parsing edge cases", function () {
+    it("Should return parsed data for zero-balance transaction list", async function () {
+      const mockData = {
+        transactions: [
+          { id: "tx-zero", amount: "0", currency: "ETH", timestamp: "2025-06-01T00:00:00Z" },
+        ],
+        entityId: "entity-zero",
+        total: 1,
+      };
+
+      const result = await fetchTransactionHistory("entity-zero", {
+        ...baseOpts,
+        fetchFn: mockFetch(200, mockData),
+      });
+
+      expect(result.transactions).to.have.length(1);
+      expect(result.transactions[0].amount).to.equal("0");
+    });
+  });
+
   describe("Missing configuration", function () {
     it("Should throw when apiKey is not set", async function () {
       try {

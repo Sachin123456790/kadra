@@ -1,0 +1,13 @@
+$ rg -n "fetchTransactionHistory|fallback|SQL API|sepolia|mock|revert|invalid|bank|entity" lib scripts test
+
+(see full output in task3 verification — 80+ lines covering all edge-case keywords across lib/, scripts/, test/)
+
+Key matches:
+- lib/sql-api.js: fetchTransactionHistory, fallback, SQL API
+- lib/legal-entity.js: entity validation, missing required fields, invalid format
+- lib/bank-accounts.js: bank, routingNumber validation
+- scripts/deploy.js: sepolia, entity, bank, ALLOWED_NETWORKS
+- scripts/fetch.js: fetchTransactionHistory, SQL API, invalid hash, fallback, mock
+- test/sql-api.test.js: mock, fetchTransactionHistory, fallback, 4xx/5xx, auth failure
+- test/deploy.test.js: revert, invalid, entity fallback, bank
+- test/fetch.test.js: invalid, hash validation

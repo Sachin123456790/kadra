@@ -142,5 +142,47 @@ describe("Deploy and Transfer", function () {
         fs.writeFileSync(origPath, origContent);
       }
     });
+
+    it("Should fail loadLegalEntity with invalid wallet address format", function () {
+      const origPath = path.join(__dirname, "..", "data", "legal-entity.json");
+      const origContent = fs.readFileSync(origPath, "utf8");
+
+      const badEntity = {
+        name: "Test LLC",
+        taxId: "EIN-00-0000000",
+        jurisdiction: "US-DE",
+        walletAddress: "INVALID_ADDRESS",
+        eoaAddress: "0x1234567890abcdef1234567890abcdef12345678",
+      };
+      fs.writeFileSync(origPath, JSON.stringify(badEntity));
+      try {
+        expect(() => loadLegalEntity()).to.throw("Invalid walletAddress format");
+      } finally {
+        fs.writeFileSync(origPath, origContent);
+      }
+    });
+
+    it("Should fail loadBankAccounts with missing routing number", function () {
+      const origPath = path.join(__dirname, "..", "data", "bank-accounts.json");
+      const origContent = fs.readFileSync(origPath, "utf8");
+
+      const badData = {
+        accounts: [{
+          id: "bad-acct",
+          holder: "Test",
+          routingNumber: "123",
+          accountNumber: "999",
+          bankName: "Test Bank",
+          type: "checking",
+          currency: "USD",
+        }],
+      };
+      fs.writeFileSync(origPath, JSON.stringify(badData));
+      try {
+        expect(() => loadBankAccounts()).to.throw("routingNumber must be 9 digits");
+      } finally {
+        fs.writeFileSync(origPath, origContent);
+      }
+    });
   });
 });

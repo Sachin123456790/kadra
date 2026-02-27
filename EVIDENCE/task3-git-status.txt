@@ -1,0 +1,9 @@
+$ git status --short
+
+M test/deploy.test.js
+M test/fetch.test.js
+M test/sql-api.test.js
+?? demo.pdf
+?? docs/
+?? kadra.pdf
+?? scripts/mcp-agentkit-server.mjs

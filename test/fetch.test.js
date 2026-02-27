@@ -16,6 +16,15 @@ describe("Transaction History Fetch", function () {
       expect(TX_HASH_PATTERN.test("")).to.be.false;
       expect(TX_HASH_PATTERN.test("0x" + "g".repeat(64))).to.be.false;
     });
+
+    it("Should reject hash with wrong length", function () {
+      // Too short (32 hex chars instead of 64)
+      expect(TX_HASH_PATTERN.test("0x" + "a".repeat(32))).to.be.false;
+      // Too long (128 hex chars)
+      expect(TX_HASH_PATTERN.test("0x" + "a".repeat(128))).to.be.false;
+      // Missing 0x prefix
+      expect(TX_HASH_PATTERN.test("a".repeat(64))).to.be.false;
+    });
   });
 
   describe("eth_getTransactionByHash", function () {

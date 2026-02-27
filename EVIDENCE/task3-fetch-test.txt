@@ -1,0 +1,14 @@
+$ npx hardhat test test/fetch.test.js
+
+  Transaction History Fetch
+    Hash validation
+      ✔ Should accept valid transaction hash
+      ✔ Should reject invalid transaction hash
+      ✔ Should reject hash with wrong length
+    eth_getTransactionByHash
+      ✔ Should return null for nonexistent transaction (159ms)
+      ✔ Should return transaction data for real transaction
+    Response validation
+      ✔ Should validate required fields in transaction response
+
+  6 passing (171ms)
