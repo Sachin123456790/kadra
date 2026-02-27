@@ -1,0 +1,31 @@
+Task 1 Summary: Project Directory Verification and Baseline
+============================================================
+
+Project path: /Users/chinmay_shringi/Desktop/markus
+Status: VERIFIED — Hardhat project initialized and baseline passing
+
+Initial state:
+- Directory contained only demo.pdf and kadra.pdf (no code repo)
+- No Hardhat projects found elsewhere on Desktop
+
+Actions taken:
+- Initialized npm project (package.json)
+- Installed hardhat@^2.22.0, @nomicfoundation/hardhat-toolbox@hh2, dotenv, @coinbase/coinbase-sdk
+- Created baseline contract (Lock.sol), test, deploy/fetch placeholder scripts
+- Created .env.example and .gitignore
+
+Build system: npm + Hardhat v2
+Solidity compiler: 0.8.24
+Test command: npx hardhat test
+Compile command: npx hardhat compile
+
+Architecture docs:
+- DESIGN.md: MISSING
+- implementation-plan.md: MISSING
+
+Baseline results:
+- npm ci: SUCCESS (171 packages)
+- npx hardhat compile: SUCCESS (1 file compiled)
+- npx hardhat test: SUCCESS (3 passing)
+
+Blockers: None. Ready for Task 2.
