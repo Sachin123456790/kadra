@@ -1,0 +1,24 @@
+$ npx hardhat test test/config.test.js
+
+  Configuration and Simulation Data
+    Network config
+      ✔ Should target Sepolia network
+      ✔ Hardhat config should include sepolia network
+    Env validation
+      ✔ Should throw when required vars are missing
+      ✔ Should throw for invalid private key format
+      ✔ Should pass with valid env vars
+    SQL env validation
+      ✔ Should throw when SQL_API_KEY is missing
+      ✔ Should throw when SQL_API_ENDPOINT is missing
+      ✔ Should throw for invalid SQL_API_ENDPOINT format
+      ✔ Should pass with valid SQL env vars
+    Legal entity simulation
+      ✔ Should load legal entity with required fields
+      ✔ Should have company metadata fields
+    Bank account simulation
+      ✔ Should load bank accounts with required fields
+      ✔ Should filter verified accounts
+      ✔ Should have at least one verified account
+
+  14 passing (9ms)

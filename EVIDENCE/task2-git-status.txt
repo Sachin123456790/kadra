@@ -1,0 +1,8 @@
+$ git status --short
+
+ M package-lock.json
+ M package.json
+?? demo.pdf
+?? docs/
+?? kadra.pdf
+?? scripts/mcp-agentkit-server.mjs

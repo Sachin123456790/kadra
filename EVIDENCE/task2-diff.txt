@@ -1,0 +1,25 @@
+$ git diff -- package.json
+
+diff --git a/package.json b/package.json
+index 65ef804..bf3927b 100644
+--- a/package.json
++++ b/package.json
+@@ -7,7 +7,8 @@
+     "test": "npx hardhat test",
+     "compile": "npx hardhat compile",
+     "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia",
+-    "fetch:sepolia": "npx hardhat run scripts/fetch.js --network sepolia"
++    "fetch:sepolia": "npx hardhat run scripts/fetch.js --network sepolia",
++    "mcp:server": "node scripts/mcp-agentkit-server.mjs"
+   },
+...
+   "dependencies": {
++    "@coinbase/agentkit": "^0.2.0",
++    "@coinbase/agentkit-model-context-protocol": "^0.2.0",
+     "@coinbase/coinbase-sdk": "^0.25.0",
++    "@modelcontextprotocol/sdk": "^1.17.4",
+     "dotenv": "^17.3.1"
+   }
+
+Note: package-lock.json also updated with resolved dependency tree.
+Note: .env.example, hardhat.config.js, lib/validate-env.js had NO changes (already aligned).
