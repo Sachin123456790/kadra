@@ -1,5 +1,6 @@
 $ wc -c docs/architecture/*
-No matches found: docs/architecture/*
 
-Result: No architecture documentation files exist. All three required docs
-(README.md, DESIGN.md, implementation-plan.md) are missing.
+    3931 docs/architecture/DESIGN.md
+    2405 docs/architecture/implementation-plan.md
+    1321 docs/architecture/README.md
+    7657 total

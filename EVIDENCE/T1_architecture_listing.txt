@@ -1,7 +1,10 @@
 $ ls -la docs/architecture
 
-total 0
-drwxr-xr-x  2 chinmay_shringi  staff   64 Feb 26 19:31 .
-drwxr-xr-x  4 chinmay_shringi  staff  128 Feb 26 20:26 ..
+total 24
+drwxr-xr-x  5 chinmay_shringi  staff   160 .
+drwxr-xr-x  4 chinmay_shringi  staff   128 ..
+-rw-r--r--  1 chinmay_shringi  staff  3931 DESIGN.md
+-rw-r--r--  1 chinmay_shringi  staff  2405 implementation-plan.md
+-rw-r--r--  1 chinmay_shringi  staff  1321 README.md
 
-Result: Directory exists but contains no files. Architecture docs gap confirmed.
+Result: All three architecture docs exist and are non-empty.
