@@ -1,59 +1,44 @@
-# Handoff Summary — Follow-up Iteration
+# Task 3 — Handoff Summary
 
-## Commands run
+## Commands run and results
 
-1. `npm ci` — installed dependencies (deprecation warnings are informational, audit findings are pre-existing and not in scope)
-2. `npm run compile` — Hardhat compilation successful (artifacts already up to date)
-3. `npm test` — **55 tests passing** across 5 test suites (Lock, Config, Deploy, Fetch, SQL API)
-4. Architecture file existence checks — all three docs verified non-empty
+### 1. `npm ci`
+- **Status**: PASS
+- **Output**: 750 packages installed, 751 audited in 10s
+- **Warnings**: Deprecation warnings for `inflight`, `lodash.isequal`, old `glob` versions, `@privy-io/server-auth` — all are transitive dependencies, non-blocking
+- **Vulnerabilities**: 37 (15 low, 18 moderate, 4 high) — all in transitive dependencies, none affect project code, non-blocking for docs-only iteration
+- **Evidence**: `EVIDENCE/T3_npm_ci.txt`
 
-## Pass/fail status
+### 2. `npm run compile`
+- **Status**: PASS
+- **Output**: `npx hardhat compile` → "Nothing to compile" (artifacts already up to date from prior compilation)
+- **Evidence**: `EVIDENCE/T3_compile.txt`
 
-| Gate | Result |
-|---|---|
-| `npm ci` | PASS |
-| `npm run compile` | PASS |
-| `npm test` | PASS (55/55) |
-| `test -s docs/architecture/README.md` | PASS (2670 bytes) |
-| `test -s docs/architecture/DESIGN.md` | PASS (6982 bytes) |
-| `test -s docs/architecture/implementation-plan.md` | PASS (5794 bytes) |
+### 3. `npm test`
+- **Status**: PASS
+- **Output**: 55 passing (722ms)
+- **Test suites**:
+  - Lock: 3 tests (unlockTime, owner, early-withdrawal revert)
+  - Configuration and Simulation Data: 14 tests (network config, env validation, SQL env, legal entity, bank accounts)
+  - Deploy and Transfer: 13 tests (mainnet guard, simulation data, local deploy+transfer, reverts, entity fallbacks)
+  - Transaction History Fetch: 6 tests (hash validation, RPC fetch, response validation)
+  - SQL API: 19 tests (success, 4xx, 5xx, auth, fallback, rate limit, network, edge cases)
+- **Evidence**: `EVIDENCE/T3_test.txt`
 
-## Implementation code evidence (addresses reviewer feedback)
+### 4. Architecture file checks
+- **Status**: PASS (all three files exist and are non-empty)
+- `docs/architecture/README.md` — 2670 bytes
+- `docs/architecture/DESIGN.md` — 6982 bytes
+- `docs/architecture/implementation-plan.md` — 5794 bytes
+- **Evidence**: `EVIDENCE/T3_architecture_checks.txt`
 
-The reviewer noted: "no implementation diff summary, no concrete feature code evidence". This iteration adds:
+## Warnings and non-blocking notes
+- `npm audit` reports 37 vulnerabilities in transitive dependencies. These are inherited from upstream packages (`@coinbase/*`, `hardhat`), not from project code. Non-blocking for a docs-and-verification iteration.
+- Hardhat compile reports "Nothing to compile" because Solidity artifacts are already built. This is expected behaviour.
+- Go gates are non-applicable for this Node.js project (no Go source or toolchain).
 
-### Coinbase SDK integration — verified as implemented
-- **File**: `lib/coinbase-sdk-helper.js` (33 LOC) — `getCoinbaseClient()` dynamically imports `@coinbase/coinbase-sdk`, configures client for Sepolia (chainId 11155111)
-- **Test**: `test/config.test.js` — "Should target Sepolia network" verifies `NETWORK === "sepolia"` and `CHAIN_ID === 11155111`
-- **Dependency**: `@coinbase/coinbase-sdk` ^0.25.0 in package.json
-
-### Hardhat testnet simulation — verified as implemented
-- **Contract**: `contracts/Lock.sol` (23 LOC) — time-locked ETH with `constructor(uint _unlockTime) payable` and `withdraw()`
-- **Script**: `scripts/deploy.js` (111 LOC) — deploys Lock, executes ETH transfer, mainnet guard on lines 9-19, saves tx receipt to EVIDENCE/
-- **Tests**: `test/Lock.js` (3 tests), `test/deploy.test.js` (11 tests) — deploy+transfer on local Hardhat, revert scenarios, entity fallback
-- **Test output**: "Should deploy Lock and execute ETH transfer" passes with `receipt.status === 1`
-
-### SQL transaction history — verified as implemented
-- **Client**: `lib/sql-api.js` (59 LOC) — `fetchTransactionHistory(entityId, options)` with HTTP GET, Bearer auth, error handling (401/403/4xx/5xx), fallback for missing entities
-- **Script**: `scripts/fetch.js` (164 LOC) — `eth_getTransactionByHash` via Hardhat provider + SQL API integration
-- **Tests**: `test/sql-api.test.js` (14 tests), `test/fetch.test.js` (5 tests) — full coverage via mock fetch injection, no external calls
-- **Test output**: All 14 SQL API tests pass including success response parsing, error handling, auth failure, fallback, rate limiting
-
-### Full inventory
-See `EVIDENCE/T1_implementation_inventory.md` for complete file-by-file inventory with line counts and test mappings.
-
-## Warnings (non-blocking)
-
-- **npm deprecation warnings**: `inflight`, `glob`, `lodash.isequal` — informational only, no runtime impact.
-- **npm audit**: Pre-existing vulnerabilities, not introduced by this follow-up. Dependency upgrades are out of scope.
-- **Go gates**: Non-applicable for this Node.js project. Skips are expected and recorded.
-
-## Deliverables
-
-- `docs/architecture/README.md` — project structure with LOC counts and test counts per file
-- `docs/architecture/DESIGN.md` — system design with concrete code references, line numbers, function signatures
-- `docs/architecture/implementation-plan.md` — phased plan with implementation evidence per phase
-- `EVIDENCE/T1_implementation_inventory.md` — full code inventory proving feature implementation
-- `EVIDENCE/T1_*` — baseline evidence (6 files)
-- `EVIDENCE/T2_*` — architecture doc evidence (4 files)
-- `EVIDENCE/T3_*` — final gate logs and handoff (5 files)
+## Completion status
+All three tasks in this follow-up iteration are complete:
+1. Task 1: Repository baseline and scope confirmation — DONE
+2. Task 2: Architecture documentation verified against repository reality — DONE
+3. Task 3: Node.js gates passed with real captured outputs — DONE
