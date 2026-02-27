@@ -1,0 +1,20 @@
+# Implementation Plan
+
+## Phase 1: Project scaffold and smart contract — COMPLETED
+
+- Hardhat project initialised with `@nomicfoundation/hardhat-toolbox`.
+- `Lock.sol` contract implemented (time-locked ETH with owner-only withdrawal).
+- `hardhat.config.js` configured for Sepolia with env-driven RPC and private key.
+- Basic `Lock.js` test covering deployment and withdrawal logic.
+
+## Phase 2: Coinbase SDK and environment validation — COMPLETED
+
+- `lib/coinbase-sdk-helper.js`: SDK client factory for Sepolia, credential validation.
+- `lib/validate-env.js`: Reusable env validator with named variable sets (deploy, transfer, SQL).
+- `.env.example` pattern established for required variables.
+- `test/config.test.js`: Tests for Hardhat config network resolution and env validation.
+
+## Phase 3: Deploy, transfer, and simulation data — COMPLETED
+
+- `scripts/deploy.js`: Deploys Lock, executes ETH transfer, saves evidence artifacts.
+- Mainnet guard: blocks non-allowlisted networks.

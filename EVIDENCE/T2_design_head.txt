@@ -1,0 +1,20 @@
+# Design Document
+
+## System overview
+
+Markus is a Node.js/Hardhat project that:
+
+1. **Deploys and interacts with Solidity contracts** on the Sepolia testnet via Hardhat.
+2. **Integrates the Coinbase SDK** for off-chain wallet and account operations.
+3. **Queries a SQL data API** for transaction history, with env-driven configuration.
+4. **Exposes an MCP server** (`scripts/mcp-agentkit-server.mjs`) for AI-agent interaction through the Coinbase AgentKit.
+
+All runtime behaviour is configured through environment variables validated at startup by `lib/validate-env.js`.
+
+## Testnet-only constraints and secret handling
+
+- **Mainnet guard**: `scripts/deploy.js` explicitly blocks execution on any network not in the allowlist (`sepolia`, `goerli`, `hardhat`, `localhost`).
+- **Secret management**: Private keys (`DEPLOYER_PRIVATE_KEY`), API credentials (`COINBASE_API_KEY_NAME`, `COINBASE_API_KEY_SECRET`, `SQL_API_KEY`), and RPC URLs are loaded from `.env` via `dotenv`. No secrets are committed to the repository.
+- **Validation**: `lib/validate-env.js` checks presence and format of required variables before any operation. Separate validation sets exist for deploy (`DEPLOY_ENV_VARS`), transfer (`TRANSFER_ENV_VARS`), and SQL API (`SQL_ENV_VARS`).
+
+## Coinbase SDK and Hardhat interaction boundaries

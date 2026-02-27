@@ -1,0 +1,3 @@
+docs/architecture/DESIGN.md
+docs/architecture/implementation-plan.md
+docs/architecture/README.md
