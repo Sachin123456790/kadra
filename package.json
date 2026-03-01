@@ -23,6 +23,7 @@
     "@coinbase/agentkit-model-context-protocol": "^0.2.0",
     "@coinbase/coinbase-sdk": "^0.25.0",
     "@modelcontextprotocol/sdk": "^1.17.4",
+    "@openzeppelin/contracts": "^5.4.0",
     "dotenv": "^17.3.1"
   }
 }

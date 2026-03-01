@@ -1,4 +1,0 @@
-Architecture file existence checks:
-PASS: docs/architecture/README.md exists and is non-empty (    2670 bytes)
-PASS: docs/architecture/DESIGN.md exists and is non-empty (    6982 bytes)
-PASS: docs/architecture/implementation-plan.md exists and is non-empty (    5794 bytes)

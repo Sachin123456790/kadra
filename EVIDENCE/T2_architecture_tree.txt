@@ -1,3 +1,0 @@
-docs/architecture/DESIGN.md (    6982 bytes)
-docs/architecture/implementation-plan.md (    5794 bytes)
-docs/architecture/README.md (    2670 bytes)

@@ -1,0 +1,67 @@
+[
+  {
+    "id": "sub-001",
+    "investorId": "investor-A",
+    "investorName": "Alpha Capital Partners",
+    "walletAddress": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "allocationPercent": 20,
+    "lpaHash": "0x0ddb6fb4f00624ebd1ad28563737bed32d1b967ed3cf22c99391031fd541a474",
+    "fundName": "Kadra Demo Fund I",
+    "capitalCommitted": "1000000",
+    "status": "settled",
+    "createdAt": "2026-03-01T19:48:04.600Z",
+    "settledAt": "2026-03-01T19:48:04.600Z"
+  },
+  {
+    "id": "sub-002",
+    "investorId": "investor-B",
+    "investorName": "Beta Ventures LLC",
+    "walletAddress": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    "allocationPercent": 20,
+    "lpaHash": "0x0ddb6fb4f00624ebd1ad28563737bed32d1b967ed3cf22c99391031fd541a474",
+    "fundName": "Kadra Demo Fund I",
+    "capitalCommitted": "1000000",
+    "status": "settled",
+    "createdAt": "2026-03-01T19:48:04.600Z",
+    "settledAt": "2026-03-01T19:48:04.601Z"
+  },
+  {
+    "id": "sub-003",
+    "investorId": "investor-C",
+    "investorName": "Gamma Real Estate Trust",
+    "walletAddress": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+    "allocationPercent": 20,
+    "lpaHash": "0x0ddb6fb4f00624ebd1ad28563737bed32d1b967ed3cf22c99391031fd541a474",
+    "fundName": "Kadra Demo Fund I",
+    "capitalCommitted": "1000000",
+    "status": "settled",
+    "createdAt": "2026-03-01T19:48:04.600Z",
+    "settledAt": "2026-03-01T19:48:04.602Z"
+  },
+  {
+    "id": "sub-004",
+    "investorId": "investor-D",
+    "investorName": "Delta Institutional Fund",
+    "walletAddress": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+    "allocationPercent": 20,
+    "lpaHash": "0x0ddb6fb4f00624ebd1ad28563737bed32d1b967ed3cf22c99391031fd541a474",
+    "fundName": "Kadra Demo Fund I",
+    "capitalCommitted": "1000000",
+    "status": "settled",
+    "createdAt": "2026-03-01T19:48:04.600Z",
+    "settledAt": "2026-03-01T19:48:04.602Z"
+  },
+  {
+    "id": "sub-005",
+    "investorId": "investor-E",
+    "investorName": "Epsilon Family Office",
+    "walletAddress": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
+    "allocationPercent": 20,
+    "lpaHash": "0x0ddb6fb4f00624ebd1ad28563737bed32d1b967ed3cf22c99391031fd541a474",
+    "fundName": "Kadra Demo Fund I",
+    "capitalCommitted": "1000000",
+    "status": "settled",
+    "createdAt": "2026-03-01T19:48:04.600Z",
+    "settledAt": "2026-03-01T19:48:04.603Z"
+  }
+]

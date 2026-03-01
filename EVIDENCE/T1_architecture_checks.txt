@@ -1,9 +1,0 @@
-=== Architecture Docs Check ===
-
-DESIGN.md: DESIGN_OK (exists and non-empty)
-
-implementation-plan.md: PLAN_OK (exists and non-empty)
-
-=== Sizes ===
--rw-r--r--@ 1 chinmay_shringi  staff  6982 Feb 26 21:24 docs/architecture/DESIGN.md
--rw-r--r--@ 1 chinmay_shringi  staff  5794 Feb 26 21:25 docs/architecture/implementation-plan.md

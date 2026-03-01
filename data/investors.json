@@ -1,0 +1,9 @@
+{
+  "investors": [
+    { "id": "investor-A", "name": "Alpha Capital Partners", "email": "alpha@example.com", "walletIndex": 1 },
+    { "id": "investor-B", "name": "Beta Ventures LLC", "email": "beta@example.com", "walletIndex": 2 },
+    { "id": "investor-C", "name": "Gamma Real Estate Trust", "email": "gamma@example.com", "walletIndex": 3 },
+    { "id": "investor-D", "name": "Delta Institutional Fund", "email": "delta@example.com", "walletIndex": 4 },
+    { "id": "investor-E", "name": "Epsilon Family Office", "email": "epsilon@example.com", "walletIndex": 5 }
+  ]
+}

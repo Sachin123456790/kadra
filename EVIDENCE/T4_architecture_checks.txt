@@ -1,3 +1,0 @@
-=== Architecture Docs Check ===
-DESIGN.md: DESIGN_OK
-implementation-plan.md: PLAN_OK

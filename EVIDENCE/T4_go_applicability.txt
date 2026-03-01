@@ -1,1 +1,0 @@
-GO_ABSENT - Go gates skipped (Node.js project)

@@ -1,4 +1,0 @@
-    6982 docs/architecture/DESIGN.md
-    5794 docs/architecture/implementation-plan.md
-    2670 docs/architecture/README.md
-   15446 total
