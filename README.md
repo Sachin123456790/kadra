@@ -4,7 +4,7 @@ Programmable infrastructure layer for private real estate funds. Replaces manual
 
 ## Prerequisites
 
-- **Node.js** >= 18
+- **Node.js** >= 20
 - **npm** >= 9
 
 ## Project Structure
