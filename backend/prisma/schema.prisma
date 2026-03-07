@@ -1,0 +1,793 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────
+// 1. funds
+// ─────────────────────────────────────────────────────────
+model Fund {
+  id               String   @id @default(uuid())
+  code             String   @unique
+  name             String
+  legalForm        String   @default("LP") @map("legal_form") // LP | LLC | OTHER
+  jurisdictionCode String?  @map("jurisdiction_code")
+  baseCurrency     String   @default("USD") @map("base_currency") @db.Char(3)
+  status           String   @default("DRAFT") // DRAFT | ACTIVE | CLOSED
+  metadata         Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz()
+  createdBy        String?  @map("created_by")
+  updatedBy        String?  @map("updated_by")
+  rowVersion       Int      @default(1) @map("row_version")
+
+  // Relations
+  eligibilities       InvestorFundEligibility[]
+  documents           Document[]
+  subscriptions       Subscription[]
+  tokenContracts      TokenContract[]
+  tokenPositionEvents TokenPositionEvent[]
+  tokenPositions      TokenPosition[]
+  ownershipSnapshots  OwnershipSnapshot[]
+  transferRequests    TransferRequest[]
+  transferEvents      TransferEvent[]
+  capitalAccounts     CapitalAccount[]
+  waterfallConfigs    WaterfallConfig[]
+  distributionRuns    DistributionRun[]
+  auditExports        AuditExport[]
+  systemEventLogs     SystemEventLog[]
+
+  @@map("funds")
+}
+
+// ─────────────────────────────────────────────────────────
+// 2. investors
+// ─────────────────────────────────────────────────────────
+model Investor {
+  id                   String    @id @default(uuid())
+  externalRef          String?   @unique @map("external_ref")
+  legalName            String    @map("legal_name")
+  email                String?
+  verificationStatus   String    @default("UNKNOWN") @map("verification_status") // UNKNOWN | VERIFIED | REVOKED
+  verificationProvider String?   @map("verification_provider")
+  verifiedAt           DateTime? @map("verified_at") @db.Timestamptz()
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz()
+  createdBy            String?   @map("created_by")
+  updatedBy            String?   @map("updated_by")
+  rowVersion           Int       @default(1) @map("row_version")
+
+  // Relations
+  wallets              Wallet[]
+  eligibilities        InvestorFundEligibility[]
+  subscriptions        Subscription[]
+  capitalAccounts      CapitalAccount[]
+  ownershipSnapshotRows OwnershipSnapshotRow[]
+  distributionLineItems DistributionLineItem[]
+
+  @@map("investors")
+}
+
+// ─────────────────────────────────────────────────────────
+// 3. wallets
+// ─────────────────────────────────────────────────────────
+model Wallet {
+  id           String    @id @default(uuid())
+  investorId   String    @map("investor_id")
+  chainId      Int       @map("chain_id")
+  address      String
+  addressNorm  String    @map("address_norm") // lower(address), set in application code
+  isPrimary    Boolean   @default(false) @map("is_primary")
+  walletStatus String    @default("ACTIVE") @map("wallet_status") // ACTIVE | INACTIVE | BLOCKED
+  label        String?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  investor     Investor  @relation(fields: [investorId], references: [id])
+  eligibilities InvestorFundEligibility[]
+  subscriptions Subscription[]
+  tokenPositions TokenPosition[]
+  ownershipSnapshotRows OwnershipSnapshotRow[]
+  fromTransferRequests TransferRequest[] @relation("fromWallet")
+  toTransferRequests   TransferRequest[] @relation("toWallet")
+  distributionLineItems DistributionLineItem[]
+
+  @@unique([chainId, addressNorm], name: "chainId_addressNorm")
+  // Partial unique: one primary wallet per investor+chain (where is_primary and deleted_at is null)
+  // Cannot be expressed in Prisma; enforce in application code or raw SQL migration
+  @@index([investorId, chainId])
+  @@map("wallets")
+}
+
+// ─────────────────────────────────────────────────────────
+// 4. investor_fund_eligibility
+// ─────────────────────────────────────────────────────────
+model InvestorFundEligibility {
+  id                String    @id @default(uuid())
+  fundId            String    @map("fund_id")
+  investorId        String    @map("investor_id")
+  walletId          String    @map("wallet_id")
+  eligibilityStatus String    @default("NOT_SET") @map("eligibility_status") // NOT_SET | ELIGIBLE | REVOKED
+  effectiveAt       DateTime? @map("effective_at") @db.Timestamptz()
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz()
+  reason            String?
+  source            String    @default("MANUAL")
+  metadata          Json      @default("{}")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  fund     Fund     @relation(fields: [fundId], references: [id])
+  investor Investor @relation(fields: [investorId], references: [id])
+  wallet   Wallet   @relation(fields: [walletId], references: [id])
+
+  // Partial unique: unique (fund_id, wallet_id) where deleted_at is null
+  // Prisma doesn't support partial unique; use composite unique as approximation
+  @@unique([fundId, walletId], name: "fundId_walletId_deletedAt_null")
+  @@index([fundId, eligibilityStatus])
+  @@map("investor_fund_eligibility")
+}
+
+// ─────────────────────────────────────────────────────────
+// 5. documents
+// ─────────────────────────────────────────────────────────
+model Document {
+  id               String    @id @default(uuid())
+  fundId           String    @map("fund_id")
+  documentType     String    @map("document_type") // MASTER_LPA | SUBSCRIPTION_RECORD | PAYMENT_RECEIPT | OTHER
+  storageProvider  String    @default("LOCAL_FS") @map("storage_provider") // LOCAL_FS | S3
+  storageKey       String    @map("storage_key")
+  originalFilename String    @map("original_filename")
+  mimeType         String    @map("mime_type")
+  byteSize         BigInt    @map("byte_size")
+  uploadedBy       String?   @map("uploaded_by")
+  uploadedAt       DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz()
+  parseStatus      String    @default("QUEUED") @map("parse_status") // QUEUED | PROCESSING | COMPLETED | FAILED
+  linkedEntityType String?   @map("linked_entity_type")
+  linkedEntityId   String?   @map("linked_entity_id")
+  metadata         Json      @default("{}")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  fund              Fund               @relation(fields: [fundId], references: [id])
+  hashes            DocumentHash[]
+  extractedFields   ExtractedDocumentField[]
+  governedSubscriptions Subscription[] @relation("governingDocument")
+  settlementEvidence SettlementEvidence[]
+
+  @@index([fundId, documentType, uploadedAt(sort: Desc)])
+  @@map("documents")
+}
+
+// ─────────────────────────────────────────────────────────
+// 6. document_hashes
+// ─────────────────────────────────────────────────────────
+model DocumentHash {
+  id                String    @id @default(uuid())
+  documentId        String    @map("document_id")
+  hashAlgorithm     String    @default("SHA256") @map("hash_algorithm") // SHA256
+  hashHex           String    @map("hash_hex") @db.Char(64)
+  isPrimary         Boolean   @default(true) @map("is_primary")
+  computedAt        DateTime  @default(now()) @map("computed_at") @db.Timestamptz()
+  anchoredOnchain   Boolean   @default(false) @map("anchored_onchain")
+  anchorChainId     Int?      @map("anchor_chain_id")
+  anchorTxHash      String?   @map("anchor_tx_hash")
+  anchorBlockNumber BigInt?   @map("anchor_block_number")
+  anchorConfirmedAt DateTime? @map("anchor_confirmed_at") @db.Timestamptz()
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  document          Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  governedSubscriptions Subscription[] @relation("governingHash")
+  settlementEvidence SettlementEvidence[]
+  waterfallConfigs  WaterfallConfig[]
+
+  @@unique([hashAlgorithm, hashHex])
+  // Partial unique: unique (document_id) where is_primary — enforce in application code
+  @@index([anchorTxHash])
+  @@map("document_hashes")
+}
+
+// ─────────────────────────────────────────────────────────
+// 7. extracted_document_fields
+// ─────────────────────────────────────────────────────────
+model ExtractedDocumentField {
+  id                String    @id @default(uuid())
+  documentId        String    @map("document_id")
+  extractionRunRef  String    @map("extraction_run_ref")
+  fieldName         String    @map("field_name")
+  fieldPath         String?   @map("field_path")
+  fieldValueText    String?   @map("field_value_text")
+  fieldValueNumeric Decimal?  @map("field_value_numeric") @db.Decimal(30, 10)
+  fieldValueDate    DateTime? @map("field_value_date") @db.Date
+  fieldValueJson    Json?     @map("field_value_json")
+  normalizedValue   String?   @map("normalized_value")
+  confidence        Decimal?  @db.Decimal(5, 4)
+  sourcePage        Int?      @map("source_page")
+  sourceBbox        Json?     @map("source_bbox")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, fieldName])
+  @@index([extractionRunRef])
+  @@map("extracted_document_fields")
+}
+
+// ─────────────────────────────────────────────────────────
+// 8. subscriptions
+// ─────────────────────────────────────────────────────────
+model Subscription {
+  id                   String    @id @default(uuid())
+  subscriptionRef      String    @unique @map("subscription_ref")
+  fundId               String    @map("fund_id")
+  investorId           String    @map("investor_id")
+  walletId             String    @map("wallet_id")
+  governingDocumentId  String    @map("governing_document_id")
+  governingHashId      String    @map("governing_hash_id")
+  allocationPct        Decimal   @map("allocation_pct") @db.Decimal(9, 6)
+  committedAmount      Decimal   @map("committed_amount") @db.Decimal(20, 2)
+  currency             String    @default("USD") @db.Char(3)
+  status               String    @default("PENDING") // DRAFT | PENDING | SETTLED | REJECTED | CLOSED
+  pendingReason        String?   @map("pending_reason")
+  settledAt            DateTime? @map("settled_at") @db.Timestamptz()
+  rejectedAt           DateTime? @map("rejected_at") @db.Timestamptz()
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  fund               Fund         @relation(fields: [fundId], references: [id])
+  investor           Investor     @relation(fields: [investorId], references: [id])
+  wallet             Wallet       @relation(fields: [walletId], references: [id])
+  governingDocument  Document     @relation("governingDocument", fields: [governingDocumentId], references: [id])
+  governingHash      DocumentHash @relation("governingHash", fields: [governingHashId], references: [id])
+  settlementRecords  SettlementRecord[]
+  tokenPositionEvents TokenPositionEvent[]
+
+  @@index([fundId, status])
+  @@index([investorId, status])
+  @@index([walletId])
+  @@map("subscriptions")
+}
+
+// ─────────────────────────────────────────────────────────
+// 9. settlement_records
+// ─────────────────────────────────────────────────────────
+model SettlementRecord {
+  id                     String    @id @default(uuid())
+  subscriptionId         String    @map("subscription_id")
+  status                 String    @default("REQUESTED") // REQUESTED | VERIFYING | PASSED | FAILED
+  validatorVersion       String?   @map("validator_version")
+  expectedAmount         Decimal   @map("expected_amount") @db.Decimal(20, 2)
+  receivedAmount         Decimal?  @map("received_amount") @db.Decimal(20, 2)
+  expectedCurrency       String    @default("USD") @map("expected_currency") @db.Char(3)
+  receivedCurrency       String?   @map("received_currency") @db.Char(3)
+  checkAmountMatch       Boolean?  @map("check_amount_match")
+  checkInvestorMatch     Boolean?  @map("check_investor_match")
+  checkReferenceMatch    Boolean?  @map("check_reference_match")
+  checkHashMatch         Boolean?  @map("check_hash_match")
+  checkNoDoubleSettlement Boolean? @map("check_no_double_settlement")
+  failureReasonCode      String?  @map("failure_reason_code") // AMOUNT_MISMATCH | INVESTOR_MISMATCH | REFERENCE_MISMATCH | HASH_MISMATCH | DOUBLE_SETTLEMENT | UNKNOWN
+  failureReasonText      String?  @map("failure_reason_text")
+  validatedAt            DateTime? @map("validated_at") @db.Timestamptz()
+  validatedBy            String?   @map("validated_by")
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  evidence     SettlementEvidence[]
+
+  @@index([subscriptionId, status, createdAt(sort: Desc)])
+  // Partial unique: unique (subscription_id) where status = 'PASSED' — enforce in application code
+  @@map("settlement_records")
+}
+
+// ─────────────────────────────────────────────────────────
+// 10. settlement_evidence
+// ─────────────────────────────────────────────────────────
+model SettlementEvidence {
+  id                 String   @id @default(uuid())
+  settlementRecordId String   @map("settlement_record_id")
+  evidenceType       String   @map("evidence_type") // PAYMENT_DOCUMENT | WIRE_RECEIPT | TX_PROOF | MANUAL_ATTESTATION
+  documentId         String?  @map("document_id")
+  documentHashId     String?  @map("document_hash_id")
+  externalReference  String?  @map("external_reference")
+  providedBy         String?  @map("provided_by")
+  providedAt         DateTime @default(now()) @map("provided_at") @db.Timestamptz()
+  notes              String?
+  metadata           Json     @default("{}")
+
+  // Relations
+  settlementRecord SettlementRecord @relation(fields: [settlementRecordId], references: [id], onDelete: Cascade)
+  document         Document?        @relation(fields: [documentId], references: [id])
+  documentHash     DocumentHash?    @relation(fields: [documentHashId], references: [id])
+
+  @@index([settlementRecordId, evidenceType])
+  @@map("settlement_evidence")
+}
+
+// ─────────────────────────────────────────────────────────
+// 11. token_contracts
+// ─────────────────────────────────────────────────────────
+model TokenContract {
+  id                        String    @id @default(uuid())
+  fundId                    String    @map("fund_id")
+  chainId                   Int       @map("chain_id")
+  contractAddress           String    @map("contract_address")
+  contractAddressNorm       String    @map("contract_address_norm") // lower(contract_address), set in application code
+  tokenStandard             String    @default("ERC-3643") @map("token_standard")
+  deploymentStatus          String    @default("NOT_DEPLOYED") @map("deployment_status") // NOT_DEPLOYED | DEPLOYING | DEPLOYED | FAILED
+  deploymentTxHash          String?   @map("deployment_tx_hash")
+  deployedBlockNumber       BigInt?   @map("deployed_block_number")
+  deployedAt                DateTime? @map("deployed_at") @db.Timestamptz()
+  identityRegistryAddress   String?   @map("identity_registry_address")
+  transferRestrictionsEnabled Boolean @default(true) @map("transfer_restrictions_enabled")
+  metadata                  Json      @default("{}")
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt                 DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  fund                Fund               @relation(fields: [fundId], references: [id])
+  tokenPositionEvents TokenPositionEvent[]
+  tokenPositions      TokenPosition[]
+  ownershipSnapshots  OwnershipSnapshot[]
+  transferRequests    TransferRequest[]
+  transferEvents      TransferEvent[]
+
+  @@unique([chainId, contractAddressNorm])
+  // Partial unique: unique (fund_id, chain_id) where deleted_at is null — enforce in app code
+  @@index([fundId, chainId])
+  @@map("token_contracts")
+}
+
+// ─────────────────────────────────────────────────────────
+// 12. token_position_events
+// ─────────────────────────────────────────────────────────
+model TokenPositionEvent {
+  id                       String   @id @default(uuid())
+  fundId                   String   @map("fund_id")
+  tokenContractId          String   @map("token_contract_id")
+  chainId                  Int      @map("chain_id")
+  blockNumber              BigInt   @map("block_number")
+  blockTimestamp            DateTime @map("block_timestamp") @db.Timestamptz()
+  txHash                   String   @map("tx_hash")
+  logIndex                 Int      @map("log_index")
+  eventType                String   @map("event_type") // MINT | TRANSFER | BURN | ADJUSTMENT | SYNC
+  fromWalletAddress        String?  @map("from_wallet_address")
+  toWalletAddress          String?  @map("to_wallet_address")
+  tokenAmount              Decimal  @map("token_amount") @db.Decimal(38, 18)
+  relatedSubscriptionId    String?  @map("related_subscription_id")
+  relatedTransferRequestId String?  @map("related_transfer_request_id")
+  ingestStatus             String   @default("CONFIRMED") @map("ingest_status") // PENDING | CONFIRMED | REORGED
+  rawEvent                 Json     @map("raw_event")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  fund                   Fund           @relation(fields: [fundId], references: [id])
+  tokenContract          TokenContract  @relation(fields: [tokenContractId], references: [id])
+  relatedSubscription    Subscription?  @relation(fields: [relatedSubscriptionId], references: [id])
+  relatedTransferRequest TransferRequest? @relation(fields: [relatedTransferRequestId], references: [id])
+  tokenPositions         TokenPosition[] @relation("lastEvent")
+
+  @@unique([chainId, txHash, logIndex])
+  @@index([tokenContractId, blockNumber(sort: Desc), logIndex(sort: Desc)])
+  @@index([fundId, blockTimestamp(sort: Desc)])
+  @@index([toWalletAddress])
+  @@index([fromWalletAddress])
+  @@map("token_position_events")
+}
+
+// ─────────────────────────────────────────────────────────
+// 13. token_positions
+// ─────────────────────────────────────────────────────────
+model TokenPosition {
+  id                  String    @id @default(uuid())
+  fundId              String    @map("fund_id")
+  tokenContractId     String    @map("token_contract_id")
+  walletId            String?   @map("wallet_id")
+  walletAddress       String    @map("wallet_address")
+  walletAddressNorm   String    @map("wallet_address_norm") // lower(wallet_address), set in application code
+  settledTokenBalance Decimal   @default(0) @map("settled_token_balance") @db.Decimal(38, 18)
+  lastEventId         String?   @map("last_event_id")
+  asOfBlockNumber     BigInt?   @map("as_of_block_number")
+  asOfTimestamp       DateTime? @map("as_of_timestamp") @db.Timestamptz()
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  fund          Fund               @relation(fields: [fundId], references: [id])
+  tokenContract TokenContract      @relation(fields: [tokenContractId], references: [id])
+  wallet        Wallet?            @relation(fields: [walletId], references: [id])
+  lastEvent     TokenPositionEvent? @relation("lastEvent", fields: [lastEventId], references: [id])
+
+  @@unique([tokenContractId, walletAddressNorm])
+  @@index([fundId, settledTokenBalance(sort: Desc)])
+  @@map("token_positions")
+}
+
+// ─────────────────────────────────────────────────────────
+// 14. ownership_snapshots
+// ─────────────────────────────────────────────────────────
+model OwnershipSnapshot {
+  id               String    @id @default(uuid())
+  fundId           String    @map("fund_id")
+  tokenContractId  String?   @map("token_contract_id")
+  snapshotType     String    @default("ON_DEMAND") @map("snapshot_type") // ON_DEMAND | RUN_START | RUN_END | SCHEDULED
+  asOfBlockNumber  BigInt?   @map("as_of_block_number")
+  asOfTimestamp    DateTime  @map("as_of_timestamp") @db.Timestamptz()
+  source           String    @default("EVENTS_REBUILD")
+  generatedBy      String?   @map("generated_by")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  fund             Fund              @relation(fields: [fundId], references: [id])
+  tokenContract    TokenContract?    @relation(fields: [tokenContractId], references: [id])
+  rows             OwnershipSnapshotRow[]
+  distributionRuns DistributionRun[]
+
+  @@index([fundId, asOfTimestamp(sort: Desc)])
+  @@map("ownership_snapshots")
+}
+
+// ─────────────────────────────────────────────────────────
+// 15. ownership_snapshot_rows
+// ─────────────────────────────────────────────────────────
+model OwnershipSnapshotRow {
+  id                   String   @id @default(uuid())
+  snapshotId           String   @map("snapshot_id")
+  investorId           String?  @map("investor_id")
+  walletId             String?  @map("wallet_id")
+  walletAddress        String   @map("wallet_address")
+  settledTokenBalance  Decimal  @default(0) @map("settled_token_balance") @db.Decimal(38, 18)
+  ownershipPct         Decimal? @map("ownership_pct") @db.Decimal(9, 6)
+  pendingAllocationPct Decimal? @map("pending_allocation_pct") @db.Decimal(9, 6)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  snapshot OwnershipSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  investor Investor?         @relation(fields: [investorId], references: [id])
+  wallet   Wallet?           @relation(fields: [walletId], references: [id])
+
+  // Partial unique: unique (snapshot_id, lower(wallet_address)) — approximated
+  @@unique([snapshotId, walletAddress])
+  @@index([snapshotId, ownershipPct(sort: Desc)])
+  @@map("ownership_snapshot_rows")
+}
+
+// ─────────────────────────────────────────────────────────
+// 16. transfer_requests
+// ─────────────────────────────────────────────────────────
+model TransferRequest {
+  id                 String    @id @default(uuid())
+  fundId             String    @map("fund_id")
+  tokenContractId    String    @map("token_contract_id")
+  requestedBy        String?   @map("requested_by")
+  correlationId      String?   @map("correlation_id")
+  fromWalletId       String?   @map("from_wallet_id")
+  fromWalletAddress  String    @map("from_wallet_address")
+  toWalletId         String?   @map("to_wallet_id")
+  toWalletAddress    String    @map("to_wallet_address")
+  tokenAmount        Decimal   @map("token_amount") @db.Decimal(38, 18)
+  requestStatus      String    @default("REQUESTED") @map("request_status") // REQUESTED | PRECHECK_FAILED | SUBMITTED | MINED | CHAIN_REVERTED
+  precheckPassed     Boolean?  @map("precheck_passed")
+  precheckReasonCode String?   @map("precheck_reason_code") // RECIPIENT_NOT_ELIGIBLE | SENDER_NOT_ELIGIBLE | INSUFFICIENT_BALANCE | CONTRACT_REVERT | UNKNOWN
+  precheckReasonText String?   @map("precheck_reason_text")
+  submittedTxHash    String?   @map("submitted_tx_hash")
+  submittedAt        DateTime? @map("submitted_at") @db.Timestamptz()
+  finalizedAt        DateTime? @map("finalized_at") @db.Timestamptz()
+  metadata           Json      @default("{}")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  fund            Fund           @relation(fields: [fundId], references: [id])
+  tokenContract   TokenContract  @relation(fields: [tokenContractId], references: [id])
+  fromWallet      Wallet?        @relation("fromWallet", fields: [fromWalletId], references: [id])
+  toWallet        Wallet?        @relation("toWallet", fields: [toWalletId], references: [id])
+  transferEvents  TransferEvent[]
+  tokenPositionEvents TokenPositionEvent[]
+
+  // Partial unique: unique (correlation_id) where correlation_id is not null — approximated
+  @@unique([correlationId])
+  @@index([fundId, requestStatus, createdAt(sort: Desc)])
+  @@index([submittedTxHash])
+  @@map("transfer_requests")
+}
+
+// ─────────────────────────────────────────────────────────
+// 17. transfer_events
+// ─────────────────────────────────────────────────────────
+model TransferEvent {
+  id                String    @id @default(uuid())
+  transferRequestId String?   @map("transfer_request_id")
+  fundId            String    @map("fund_id")
+  tokenContractId   String?   @map("token_contract_id")
+  eventKind         String    @map("event_kind") // REQUESTED | PRECHECK_FAILED | SUBMITTED | MINED | CHAIN_REVERTED | INDEXED
+  txHash            String?   @map("tx_hash")
+  blockNumber       BigInt?   @map("block_number")
+  blockTimestamp    DateTime? @map("block_timestamp") @db.Timestamptz()
+  reasonCode        String?   @map("reason_code") // RECIPIENT_NOT_ELIGIBLE | SENDER_NOT_ELIGIBLE | INSUFFICIENT_BALANCE | CONTRACT_REVERT | UNKNOWN
+  reasonText        String?   @map("reason_text")
+  payload           Json      @default("{}") @db.JsonB
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  transferRequest TransferRequest? @relation(fields: [transferRequestId], references: [id], onDelete: Cascade)
+  fund            Fund             @relation(fields: [fundId], references: [id])
+  tokenContract   TokenContract?   @relation(fields: [tokenContractId], references: [id])
+
+  @@index([transferRequestId, createdAt])
+  @@index([fundId, createdAt(sort: Desc)])
+  @@index([txHash])
+  @@map("transfer_events")
+}
+
+// ─────────────────────────────────────────────────────────
+// 18. capital_accounts
+// ─────────────────────────────────────────────────────────
+model CapitalAccount {
+  id                   String    @id @default(uuid())
+  fundId               String    @map("fund_id")
+  investorId           String    @map("investor_id")
+  openingBalance       Decimal   @default(0) @map("opening_balance") @db.Decimal(20, 2)
+  initialContribution  Decimal   @default(0) @map("initial_contribution") @db.Decimal(20, 2)
+  contributedAt        DateTime? @map("contributed_at") @db.Timestamptz()
+  capitalReturned      Decimal   @default(0) @map("capital_returned") @db.Decimal(20, 2)
+  accruedPref          Decimal   @default(0) @map("accrued_pref") @db.Decimal(20, 2)
+  residualAllocation   Decimal   @default(0) @map("residual_allocation") @db.Decimal(20, 2)
+  endingCapitalBalance Decimal   @default(0) @map("ending_capital_balance") @db.Decimal(20, 2)
+  asOfDate             DateTime  @map("as_of_date") @db.Date
+  isCurrent            Boolean   @default(true) @map("is_current")
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  fund                  Fund                   @relation(fields: [fundId], references: [id])
+  investor              Investor               @relation(fields: [investorId], references: [id])
+  distributionLineItems DistributionLineItem[]
+
+  // Partial unique: unique (fund_id, investor_id) where is_current and deleted_at is null — approximated
+  @@unique([fundId, investorId, isCurrent])
+  @@index([fundId, asOfDate(sort: Desc)])
+  @@map("capital_accounts")
+}
+
+// ─────────────────────────────────────────────────────────
+// 19. waterfall_configs
+// ─────────────────────────────────────────────────────────
+model WaterfallConfig {
+  id                        String    @id @default(uuid())
+  fundId                    String    @map("fund_id")
+  version                   String
+  isActive                  Boolean   @default(false) @map("is_active")
+  derivedFromDocumentHashId String?   @map("derived_from_document_hash_id")
+  calculationBasis          String    @default("IRR") @map("calculation_basis") // IRR | MULTIPLE
+  distributionFrequency     String    @default("QUARTERLY") @map("distribution_frequency") // MONTHLY | QUARTERLY | ANNUAL | MANUAL
+  catchUpEnabled            Boolean   @default(false) @map("catch_up_enabled")
+  gpPromotePct              Decimal?  @map("gp_promote_pct") @db.Decimal(9, 6)
+  prefReturnPct             Decimal?  @map("pref_return_pct") @db.Decimal(9, 6)
+  rulesJson                 Json      @map("rules_json")
+  effectiveAt               DateTime  @default(now()) @map("effective_at") @db.Timestamptz()
+  retiredAt                 DateTime? @map("retired_at") @db.Timestamptz()
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt                 DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  fund                    Fund          @relation(fields: [fundId], references: [id])
+  derivedFromDocumentHash DocumentHash? @relation(fields: [derivedFromDocumentHashId], references: [id])
+  tiers                   WaterfallTier[]
+  distributionRuns        DistributionRun[]
+
+  @@unique([fundId, version], name: "fundId_version")
+  // Partial unique: unique (fund_id) where is_active and deleted_at is null — enforce in app code
+  @@map("waterfall_configs")
+}
+
+// ─────────────────────────────────────────────────────────
+// 20. waterfall_tiers
+// ─────────────────────────────────────────────────────────
+model WaterfallTier {
+  id               String  @id @default(uuid())
+  waterfallConfigId String @map("waterfall_config_id")
+  tierOrder        Int     @map("tier_order") @db.SmallInt
+  tierName         String  @map("tier_name")
+  hurdleType       String  @default("NONE") @map("hurdle_type") // NONE | IRR | MULTIPLE | PERCENT
+  hurdleValue      Decimal? @map("hurdle_value") @db.Decimal(18, 6)
+  lpSharePct       Decimal @map("lp_share_pct") @db.Decimal(9, 6)
+  gpSharePct       Decimal @map("gp_share_pct") @db.Decimal(9, 6)
+  catchUp          Boolean @default(false) @map("catch_up")
+  rulesJson        Json    @default("{}") @map("rules_json")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  waterfallConfig WaterfallConfig @relation(fields: [waterfallConfigId], references: [id], onDelete: Cascade)
+
+  @@unique([waterfallConfigId, tierOrder])
+  @@map("waterfall_tiers")
+}
+
+// ─────────────────────────────────────────────────────────
+// 21. distribution_runs
+// ─────────────────────────────────────────────────────────
+model DistributionRun {
+  id                  String    @id @default(uuid())
+  fundId              String    @map("fund_id")
+  waterfallConfigId   String    @map("waterfall_config_id")
+  ownershipSnapshotId String    @map("ownership_snapshot_id")
+  runStatus           String    @default("QUEUED") @map("run_status") // QUEUED | RUNNING | COMPLETED | FAILED
+  asOfTimestamp       DateTime  @map("as_of_timestamp") @db.Timestamptz()
+  triggeredBy         String?   @map("triggered_by")
+  startedAt           DateTime? @map("started_at") @db.Timestamptz()
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz()
+  totalGrossAmount    Decimal?  @map("total_gross_amount") @db.Decimal(20, 2)
+  totalNetAmount      Decimal?  @map("total_net_amount") @db.Decimal(20, 2)
+  currency            String    @default("USD") @db.Char(3)
+  failureReason       String?   @map("failure_reason")
+  metadata            Json      @default("{}")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  fund              Fund              @relation(fields: [fundId], references: [id])
+  waterfallConfig   WaterfallConfig   @relation(fields: [waterfallConfigId], references: [id])
+  ownershipSnapshot OwnershipSnapshot @relation(fields: [ownershipSnapshotId], references: [id])
+  lineItems         DistributionLineItem[]
+
+  @@index([fundId, runStatus, createdAt(sort: Desc)])
+  @@map("distribution_runs")
+}
+
+// ─────────────────────────────────────────────────────────
+// 22. distribution_line_items
+// ─────────────────────────────────────────────────────────
+model DistributionLineItem {
+  id                    String  @id @default(uuid())
+  distributionRunId     String  @map("distribution_run_id")
+  investorId            String  @map("investor_id")
+  walletId              String? @map("wallet_id")
+  capitalAccountId      String? @map("capital_account_id")
+  grossAmount           Decimal @map("gross_amount") @db.Decimal(20, 2)
+  netAmount             Decimal @map("net_amount") @db.Decimal(20, 2)
+  currency              String  @default("USD") @db.Char(3)
+  ownershipPctUsed      Decimal? @map("ownership_pct_used") @db.Decimal(9, 6)
+  prefAmount            Decimal @default(0) @map("pref_amount") @db.Decimal(20, 2)
+  returnOfCapitalAmount Decimal @default(0) @map("return_of_capital_amount") @db.Decimal(20, 2)
+  promoteAmount         Decimal @default(0) @map("promote_amount") @db.Decimal(20, 2)
+  tierBreakdown         Json    @default("{}") @map("tier_breakdown")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  distributionRun DistributionRun @relation(fields: [distributionRunId], references: [id], onDelete: Cascade)
+  investor        Investor        @relation(fields: [investorId], references: [id])
+  wallet          Wallet?         @relation(fields: [walletId], references: [id])
+  capitalAccount  CapitalAccount? @relation(fields: [capitalAccountId], references: [id])
+
+  @@unique([distributionRunId, investorId, walletId])
+  @@index([distributionRunId, grossAmount(sort: Desc)])
+  @@map("distribution_line_items")
+}
+
+// ─────────────────────────────────────────────────────────
+// 23. audit_exports
+// ─────────────────────────────────────────────────────────
+model AuditExport {
+  id                      String    @id @default(uuid())
+  fundId                  String    @map("fund_id")
+  exportType              String    @default("AUDIT_PACKET") @map("export_type") // AUDIT_PACKET | CAP_TABLE | EVENT_LOG | DISTRIBUTION_REPORT
+  status                  String    @default("QUEUED") // QUEUED | BUILDING | READY | FAILED | EXPIRED
+  requestedBy             String?   @map("requested_by")
+  requestedAt             DateTime  @default(now()) @map("requested_at") @db.Timestamptz()
+  startedAt               DateTime? @map("started_at") @db.Timestamptz()
+  completedAt             DateTime? @map("completed_at") @db.Timestamptz()
+  expiresAt               DateTime? @map("expires_at") @db.Timestamptz()
+  artifactStorageProvider String    @default("LOCAL_FS") @map("artifact_storage_provider") // LOCAL_FS | S3
+  artifactPath            String?   @map("artifact_path")
+  manifestJson            Json      @default("{}") @map("manifest_json")
+  checksumSha256          String?   @map("checksum_sha256") @db.Char(64)
+  errorMessage            String?   @map("error_message")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  fund Fund @relation(fields: [fundId], references: [id])
+
+  @@index([fundId, status, requestedAt(sort: Desc)])
+  @@map("audit_exports")
+}
+
+// ─────────────────────────────────────────────────────────
+// 24. system_event_log
+// ─────────────────────────────────────────────────────────
+model SystemEventLog {
+  id              BigInt   @id @default(autoincrement())
+  eventId         String   @unique @default(uuid()) @map("event_id")
+  eventType       String   @map("event_type")
+  eventVersion    Int      @default(1) @map("event_version")
+  aggregateType   String   @map("aggregate_type")
+  aggregateId     String?  @map("aggregate_id")
+  fundId          String?  @map("fund_id")
+  sourceContext   String   @map("source_context")
+  correlationId   String?  @map("correlation_id")
+  causationId     String?  @map("causation_id")
+  idempotencyKey  String?  @map("idempotency_key")
+  payloadJson     Json     @map("payload_json")
+  metadataJson    Json     @default("{}") @map("metadata_json")
+  chainId         Int?     @map("chain_id")
+  txHash          String?  @map("tx_hash")
+  blockNumber     BigInt?  @map("block_number")
+  occurredAt      DateTime @map("occurred_at") @db.Timestamptz()
+  recordedAt      DateTime @default(now()) @map("recorded_at") @db.Timestamptz()
+  isReplayed      Boolean  @default(false) @map("is_replayed")
+
+  // Relations
+  fund Fund? @relation(fields: [fundId], references: [id])
+
+  // Partial unique: unique (idempotency_key) where idempotency_key is not null — approximated
+  @@unique([idempotencyKey])
+  @@index([eventType, occurredAt(sort: Desc)])
+  @@index([aggregateType, aggregateId, occurredAt(sort: Desc)])
+  @@index([fundId, occurredAt(sort: Desc)])
+  @@index([txHash])
+  @@map("system_event_log")
+}
+
+// ─────────────────────────────────────────────────────────
+// 25. jobs
+// ─────────────────────────────────────────────────────────
+model Job {
+  id           String    @id @default(uuid())
+  jobType      String    @map("job_type")
+  payload      Json      @default("{}")
+  status       String    @default("QUEUED") // QUEUED | RUNNING | COMPLETED | FAILED
+  priority     Int       @default(0)
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3) @map("max_attempts")
+  lastError    String?   @map("last_error")
+  lockedBy     String?   @map("locked_by")
+  lockedAt     DateTime? @map("locked_at") @db.Timestamptz()
+  scheduledAt  DateTime  @default(now()) @map("scheduled_at") @db.Timestamptz()
+  startedAt    DateTime? @map("started_at") @db.Timestamptz()
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz()
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([status, priority(sort: Desc), scheduledAt])
+  @@index([jobType, status])
+  @@map("jobs")
+}
+
+// ─────────────────────────────────────────────────────────
+// 26. jobs_dead_letter
+// ─────────────────────────────────────────────────────────
+model JobDeadLetter {
+  id           String   @id @default(uuid())
+  originalJobId String  @map("original_job_id")
+  jobType      String   @map("job_type")
+  payload      Json     @default("{}")
+  attempts     Int      @default(0)
+  lastError    String?  @map("last_error")
+  failedAt     DateTime @map("failed_at") @db.Timestamptz()
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([jobType, failedAt(sort: Desc)])
+  @@map("jobs_dead_letter")
+}

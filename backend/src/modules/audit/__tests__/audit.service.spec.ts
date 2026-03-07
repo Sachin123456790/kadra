@@ -1,0 +1,180 @@
+import { AuditService } from '../audit.service';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { NotFoundError } from '../../../common/errors';
+
+// Mock fs module
+jest.mock('fs/promises', () => ({
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  writeFile: jest.fn().mockResolvedValue(undefined),
+}));
+
+const mockPrisma = () => ({
+  fund: {
+    findUnique: jest.fn(),
+  },
+  auditExport: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    update: jest.fn(),
+  },
+  investor: {
+    findMany: jest.fn(),
+  },
+  subscription: {
+    findMany: jest.fn(),
+  },
+  document: {
+    findMany: jest.fn(),
+  },
+  documentHash: {
+    findMany: jest.fn(),
+  },
+  transferRequest: {
+    findMany: jest.fn(),
+  },
+  tokenPosition: {
+    findMany: jest.fn(),
+  },
+  distributionRun: {
+    findMany: jest.fn(),
+  },
+});
+
+describe('AuditService', () => {
+  let service: AuditService;
+  let prisma: ReturnType<typeof mockPrisma>;
+
+  const fundId = 'fund-1';
+  const exportId = 'export-1';
+  const mockFund = { id: fundId, name: 'Kadra Demo Fund I', status: 'ACTIVE' };
+
+  beforeEach(() => {
+    prisma = mockPrisma();
+    service = new AuditService(prisma as unknown as PrismaService);
+  });
+
+  describe('requestExport', () => {
+    it('creates export and builds artifacts', async () => {
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.auditExport.create.mockResolvedValue({
+        id: exportId,
+        fundId,
+        status: 'QUEUED',
+      });
+      prisma.auditExport.findUniqueOrThrow.mockResolvedValue({
+        id: exportId,
+        fundId,
+        status: 'QUEUED',
+      });
+      prisma.auditExport.update.mockResolvedValue({
+        id: exportId,
+        status: 'READY',
+      });
+
+      // Mock data gathering calls
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.investor.findMany.mockResolvedValue([]);
+      prisma.subscription.findMany.mockResolvedValue([]);
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.documentHash.findMany.mockResolvedValue([]);
+      prisma.transferRequest.findMany.mockResolvedValue([]);
+      prisma.tokenPosition.findMany.mockResolvedValue([]);
+      prisma.distributionRun.findMany.mockResolvedValue([]);
+
+      const result = await service.requestExport(fundId, {});
+
+      expect(result.auditExportId).toBe(exportId);
+      expect(result.status).toBe('READY');
+      expect(prisma.auditExport.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            fundId,
+            exportType: 'AUDIT_PACKET',
+            status: 'QUEUED',
+          }),
+        }),
+      );
+      // Verify buildExport set status to BUILDING then READY
+      expect(prisma.auditExport.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: exportId },
+          data: expect.objectContaining({ status: 'BUILDING' }),
+        }),
+      );
+      expect(prisma.auditExport.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: exportId },
+          data: expect.objectContaining({ status: 'READY' }),
+        }),
+      );
+    });
+
+    it('throws NotFoundError for missing fund', async () => {
+      prisma.fund.findUnique.mockResolvedValue(null);
+
+      await expect(service.requestExport('nonexistent', {})).rejects.toThrow(
+        NotFoundError,
+      );
+    });
+  });
+
+  describe('getExportStatus', () => {
+    it('returns correct status for READY export', async () => {
+      const requestedAt = new Date('2025-01-01T00:00:00Z');
+      const completedAt = new Date('2025-01-01T00:01:00Z');
+
+      prisma.auditExport.findUnique.mockResolvedValue({
+        id: exportId,
+        status: 'READY',
+        exportType: 'AUDIT_PACKET',
+        artifactStorageProvider: 'LOCAL_FS',
+        artifactPath: '/tmp/exports/export-1',
+        checksumSha256: 'abc123',
+        requestedAt,
+        completedAt,
+      });
+
+      const result = await service.getExportStatus(exportId);
+
+      expect(result.auditExportId).toBe(exportId);
+      expect(result.status).toBe('READY');
+      expect(result.exportType).toBe('AUDIT_PACKET');
+      expect(result.artifact).toEqual({
+        storageProvider: 'LOCAL_FS',
+        path: '/tmp/exports/export-1',
+        checksumSha256: 'abc123',
+      });
+      expect(result.requestedAt).toBe(requestedAt.toISOString());
+      expect(result.completedAt).toBe(completedAt.toISOString());
+    });
+
+    it('returns null artifact for non-READY export', async () => {
+      prisma.auditExport.findUnique.mockResolvedValue({
+        id: exportId,
+        status: 'BUILDING',
+        exportType: 'AUDIT_PACKET',
+        artifactStorageProvider: 'LOCAL_FS',
+        artifactPath: null,
+        checksumSha256: null,
+        requestedAt: new Date('2025-01-01T00:00:00Z'),
+        completedAt: null,
+      });
+
+      const result = await service.getExportStatus(exportId);
+
+      expect(result.auditExportId).toBe(exportId);
+      expect(result.status).toBe('BUILDING');
+      expect(result.artifact).toBeNull();
+      expect(result.completedAt).toBeNull();
+    });
+
+    it('throws NotFoundError for missing export', async () => {
+      prisma.auditExport.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.getExportStatus('nonexistent'),
+      ).rejects.toThrow(NotFoundError);
+    });
+  });
+});

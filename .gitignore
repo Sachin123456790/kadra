@@ -6,3 +6,15 @@ typechain-types
 coverage
 coverage.json
 CLAUDE.md
+.DS_Store
+docs/claude/
+
+# Backend
+backend/dist
+backend/node_modules
+backend/coverage
+
+# Frontend
+frontend/node_modules
+frontend/dist
+frontend/.next
