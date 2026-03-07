@@ -156,34 +156,36 @@ export class OwnershipService {
       }
     }
 
-    // Delete existing positions for this contract and recreate
-    await this.prisma.tokenPosition.deleteMany({
-      where: { tokenContractId: contract.id },
-    });
-
+    // Delete existing positions for this contract and recreate atomically
     let positionsRebuilt = 0;
-    for (const [walletAddressNorm, data] of balanceMap.entries()) {
-      if (data.balance <= 0) continue;
-
-      const wallet = await this.prisma.wallet.findFirst({
-        where: { addressNorm: walletAddressNorm },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tokenPosition.deleteMany({
+        where: { tokenContractId: contract.id },
       });
 
-      await this.prisma.tokenPosition.create({
-        data: {
-          fundId,
-          tokenContractId: contract.id,
-          walletId: wallet?.id ?? null,
-          walletAddress: wallet?.address ?? walletAddressNorm,
-          walletAddressNorm,
-          settledTokenBalance: data.balance,
-          lastEventId: data.lastEventId,
-          asOfBlockNumber: data.blockNumber,
-          asOfTimestamp: data.blockTimestamp,
-        },
-      });
-      positionsRebuilt++;
-    }
+      for (const [walletAddressNorm, data] of balanceMap.entries()) {
+        if (data.balance <= 0) continue;
+
+        const wallet = await tx.wallet.findFirst({
+          where: { addressNorm: walletAddressNorm },
+        });
+
+        await tx.tokenPosition.create({
+          data: {
+            fundId,
+            tokenContractId: contract.id,
+            walletId: wallet?.id ?? null,
+            walletAddress: wallet?.address ?? walletAddressNorm,
+            walletAddressNorm,
+            settledTokenBalance: data.balance,
+            lastEventId: data.lastEventId,
+            asOfBlockNumber: data.blockNumber,
+            asOfTimestamp: data.blockTimestamp,
+          },
+        });
+        positionsRebuilt++;
+      }
+    });
 
     // Create a snapshot recording this rebuild
     const snapshot = await this.createSnapshot(fundId, 'ON_DEMAND');

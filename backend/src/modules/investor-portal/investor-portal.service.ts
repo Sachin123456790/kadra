@@ -265,7 +265,10 @@ export class InvestorPortalService {
    */
   async getMyDistributions(investorId: string, fundId: string) {
     const lineItems = await this.prisma.distributionLineItem.findMany({
-      where: { investorId },
+      where: {
+        investorId,
+        distributionRun: { fundId },
+      },
       include: {
         distributionRun: {
           select: {
@@ -283,12 +286,7 @@ export class InvestorPortalService {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Filter to only line items belonging to runs in this fund
-    const filtered = lineItems.filter(
-      (li) => li.distributionRun.fundId === fundId,
-    );
-
-    return filtered.map((li) => ({
+    return lineItems.map((li) => ({
       id: li.id,
       grossAmount: li.grossAmount.toString(),
       netAmount: li.netAmount.toString(),

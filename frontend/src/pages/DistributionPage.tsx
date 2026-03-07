@@ -13,7 +13,7 @@ const fmt = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", c
 
 const columns: Column<DistributionLineItem>[] = [
   { key: "investorName", header: "Investor", render: (r) => r.investorName ?? "—" },
-  { key: "ownershipPctUsed", header: "Ownership %", render: (r) => `${r.ownershipPctUsed.toFixed(1)}%` },
+  { key: "ownershipPctUsed", header: "Ownership %", render: (r) => `${Number(r.ownershipPctUsed).toFixed(1)}%` },
   { key: "grossAmount", header: "Gross Allocation", render: (r) => fmt(parseFloat(r.grossAmount)) },
   { key: "netAmount", header: "Net Amount", render: (r) => fmt(parseFloat(r.netAmount)) },
 ];

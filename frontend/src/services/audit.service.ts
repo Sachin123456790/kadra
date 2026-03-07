@@ -13,9 +13,9 @@ export interface AuditExportDetail {
     storageProvider: string;
     path: string;
     checksumSha256: string;
-  };
+  } | null;
   requestedAt: string;
-  completedAt: string;
+  completedAt: string | null;
 }
 
 export function createAuditExport(fundId: string) {

@@ -160,7 +160,7 @@ export class AuthService {
     }
 
     if (!this.adminSignupSecret) {
-      return;
+      throw new ValidationError('Admin signup is not enabled');
     }
 
     if (providedSecret !== this.adminSignupSecret) {

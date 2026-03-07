@@ -218,6 +218,12 @@ export class SettlementsService {
       where: { id: subscriptionId },
     });
     if (!subscription) throw new NotFoundError('Subscription', subscriptionId);
+    if (subscription.status !== 'PENDING') {
+      throw new ConflictError(
+        'SUBSCRIPTION_NOT_PENDING',
+        'Subscription is not in PENDING status',
+      );
+    }
 
     const record = await this.prisma.settlementRecord.findUnique({
       where: { id: settlementRecordId },

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQueries, useMutation } from '@tanstack/react-query';
 import { DEFAULT_FUND_CODE, QUERY_KEYS } from '@/config/constants';
 import { createAuditExport, getAuditExport } from '@/services';
 import type { AuditExportDetail } from '@/services/audit.service';
@@ -40,14 +40,6 @@ export default function AuditPage() {
     },
   });
 
-  // Fetch details for each export ID we've created
-  const exportQueries = exportIds.map((id) => ({
-    queryKey: QUERY_KEYS.auditExport(id),
-    queryFn: () => getAuditExport(id).then(r => r.data),
-    enabled: !!id,
-  }));
-
-  // We use individual useQuery calls via a wrapper component to respect hooks rules
   return (
     <div>
       <PageHeader
@@ -87,24 +79,23 @@ export default function AuditPage() {
 
 /** Renders the table by fetching details for each export ID */
 function AuditExportTable({ exportIds }: { exportIds: string[] }) {
-  const results = exportIds.map((id) => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useQuery({
+  const results = useQueries({
+    queries: exportIds.map((id) => ({
       queryKey: QUERY_KEYS.auditExport(id),
-      queryFn: () => getAuditExport(id).then(r => r.data),
-      refetchInterval: (query) => {
+      queryFn: () => getAuditExport(id).then((r) => r.data),
+      refetchInterval: (query: { state: { data?: { status?: string } } }) => {
         const status = query.state.data?.status;
         return status === 'QUEUED' || status === 'BUILDING' ? 3000 : false;
       },
-    });
+    })),
   });
 
-  const isLoading = results.some(r => r.isLoading);
+  const isLoading = results.some((r) => r.isLoading);
   if (isLoading) return <div className="p-6">Loading...</div>;
 
   const exports = results
-    .map(r => r.data)
-    .filter((d): d is AuditExportDetail => !!d);
+    .map((r) => r.data)
+    .filter((d): d is NonNullable<typeof d> => d != null);
 
   return (
     <DataTable columns={columns} data={exports} getRowId={(r) => r.auditExportId} />

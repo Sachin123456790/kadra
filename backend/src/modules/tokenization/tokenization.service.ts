@@ -379,37 +379,39 @@ export class TokenizationService {
         },
       });
 
-      // Update positions
-      if (position) {
-        await this.prisma.tokenPosition.update({
-          where: { id: position.id },
-          data: { settledTokenBalance: { decrement: amount } },
-        });
-      }
+      // Update positions atomically
+      await this.prisma.$transaction(async (tx) => {
+        if (position) {
+          await tx.tokenPosition.update({
+            where: { id: position.id },
+            data: { settledTokenBalance: { decrement: amount } },
+          });
+        }
 
-      const recipientPosition = await this.prisma.tokenPosition.findFirst({
-        where: {
-          tokenContractId: contract.id,
-          walletAddressNorm: input.toWalletAddress.toLowerCase(),
-        },
-      });
-      if (recipientPosition) {
-        await this.prisma.tokenPosition.update({
-          where: { id: recipientPosition.id },
-          data: { settledTokenBalance: { increment: amount } },
-        });
-      } else {
-        await this.prisma.tokenPosition.create({
-          data: {
-            fundId,
+        const recipientPosition = await tx.tokenPosition.findFirst({
+          where: {
             tokenContractId: contract.id,
-            walletId: recipientWallet?.id,
-            walletAddress: input.toWalletAddress,
             walletAddressNorm: input.toWalletAddress.toLowerCase(),
-            settledTokenBalance: amount,
           },
         });
-      }
+        if (recipientPosition) {
+          await tx.tokenPosition.update({
+            where: { id: recipientPosition.id },
+            data: { settledTokenBalance: { increment: amount } },
+          });
+        } else {
+          await tx.tokenPosition.create({
+            data: {
+              fundId,
+              tokenContractId: contract.id,
+              walletId: recipientWallet?.id,
+              walletAddress: input.toWalletAddress,
+              walletAddressNorm: input.toWalletAddress.toLowerCase(),
+              settledTokenBalance: amount,
+            },
+          });
+        }
+      });
 
       return {
         transferRequestId: transferRequest.id,

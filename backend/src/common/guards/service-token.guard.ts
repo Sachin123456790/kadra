@@ -13,7 +13,9 @@ export class ServiceTokenGuard implements CanActivate {
     const token = request.headers['x-service-token'] as string;
     const expected = process.env.CRON_SERVICE_TOKEN;
 
-    if (!expected) return true; // No guard in dev if not configured
+    if (!expected) {
+      throw new UnauthorizedException('Service token not configured');
+    }
     if (!token || token !== expected) {
       throw new UnauthorizedException('Invalid or missing service token');
     }

@@ -17,6 +17,13 @@ export default function LoginPage() {
       : ROUTES.INVESTOR_DASHBOARD;
   }
 
+  function isSafeRedirect(path: string, role: string): boolean {
+    const isInvestorPath = path.startsWith('/investor');
+    const userIsAdmin = (ADMIN_ROLES as readonly string[]).includes(role);
+    if (userIsAdmin) return !isInvestorPath;
+    return isInvestorPath;
+  }
+
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,8 +32,9 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate(fromState ?? getDefaultRoute(user?.role), { replace: true });
+    if (isAuthenticated && user?.role) {
+      const safeFrom = fromState && isSafeRedirect(fromState, user.role) ? fromState : null;
+      navigate(safeFrom ?? getDefaultRoute(user.role), { replace: true });
     }
   }, [fromState, isAuthenticated, navigate, user?.role]);
 
@@ -53,7 +61,10 @@ export default function LoginPage() {
           : await loginRequest(payload);
 
       login(response.data.accessToken, response.data.user);
-      const destination = fromState ?? getDefaultRoute(response.data.user.role);
+      const userRole = response.data.user.role;
+      const destination = (fromState && isSafeRedirect(fromState, userRole))
+        ? fromState
+        : getDefaultRoute(userRole);
       navigate(destination, { replace: true });
     } catch (err) {
       if (err instanceof ApiRequestError) {
