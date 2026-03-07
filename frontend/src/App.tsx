@@ -15,6 +15,11 @@ import TransfersPage from "./pages/TransfersPage";
 import CapTablePage from "./pages/CapTablePage";
 import DistributionPage from "./pages/DistributionPage";
 import AuditPage from "./pages/AuditPage";
+import InvestorDashboard from "./pages/InvestorDashboard";
+import InvestorSubscriptions from "./pages/InvestorSubscriptions";
+import InvestorCapTable from "./pages/InvestorCapTable";
+import InvestorDistributions from "./pages/InvestorDistributions";
+import InvestorTransfers from "./pages/InvestorTransfers";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
@@ -52,6 +57,12 @@ const App = () => (
                       <Route path="/cap-table" element={<CapTablePage />} />
                       <Route path="/distribution" element={<DistributionPage />} />
                       <Route path="/audit" element={<AuditPage />} />
+                      {/* Investor routes */}
+                      <Route path="/investor" element={<InvestorDashboard />} />
+                      <Route path="/investor/subscriptions" element={<InvestorSubscriptions />} />
+                      <Route path="/investor/cap-table" element={<InvestorCapTable />} />
+                      <Route path="/investor/distributions" element={<InvestorDistributions />} />
+                      <Route path="/investor/transfers" element={<InvestorTransfers />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </AppLayout>

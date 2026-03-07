@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { ROUTES } from "@/config/constants";
+import { ROUTES, ADMIN_ROLES } from "@/config/constants";
 import { ApiRequestError } from "@/services/api-client";
 import { login as loginRequest, signup as signupRequest } from "@/services/auth.service";
 
 export default function LoginPage() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? ROUTES.OVERVIEW;
+  const fromState = (location.state as { from?: { pathname: string } })?.from?.pathname;
+
+  function getDefaultRoute(role?: string) {
+    return role && (ADMIN_ROLES as readonly string[]).includes(role)
+      ? ROUTES.OVERVIEW
+      : ROUTES.INVESTOR_DASHBOARD;
+  }
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -20,9 +26,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(from, { replace: true });
+      navigate(fromState ?? getDefaultRoute(user?.role), { replace: true });
     }
-  }, [from, isAuthenticated, navigate]);
+  }, [fromState, isAuthenticated, navigate, user?.role]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +53,8 @@ export default function LoginPage() {
           : await loginRequest(payload);
 
       login(response.data.accessToken, response.data.user);
-      navigate(from, { replace: true });
+      const destination = fromState ?? getDefaultRoute(response.data.user.role);
+      navigate(destination, { replace: true });
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setError(err.message);

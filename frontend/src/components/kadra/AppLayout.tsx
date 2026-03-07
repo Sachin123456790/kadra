@@ -16,8 +16,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "@/hooks/useAuth";
+import { ADMIN_ROLES } from "@/config/constants";
 
-const navItems = [
+const adminNavItems = [
   { label: "Overview", path: "/", icon: LayoutDashboard },
   { label: "Investors", path: "/investors", icon: Users },
   { label: "Subscriptions", path: "/subscriptions", icon: FileText },
@@ -26,6 +27,14 @@ const navItems = [
   { label: "Cap Table", path: "/cap-table", icon: PieChart },
   { label: "Distribution", path: "/distribution", icon: Coins },
   { label: "Audit & Exports", path: "/audit", icon: Shield },
+];
+
+const investorNavItems = [
+  { label: "Dashboard", path: "/investor", icon: LayoutDashboard },
+  { label: "My Subscriptions", path: "/investor/subscriptions", icon: FileText },
+  { label: "Cap Table", path: "/investor/cap-table", icon: PieChart },
+  { label: "Distributions", path: "/investor/distributions", icon: Coins },
+  { label: "My Transfers", path: "/investor/transfers", icon: ArrowLeftRight },
 ];
 
 const mockNotifications = [
@@ -40,6 +49,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, toggle } = useTheme();
   const { user, logout } = useAuth();
+  const isAdmin = user?.role && (ADMIN_ROLES as readonly string[]).includes(user.role);
+  const navItems = isAdmin ? adminNavItems : investorNavItems;
+  const homeRoute = isAdmin ? "/" : "/investor";
 
   const unreadCount = mockNotifications.filter((n) => n.unread).length;
   const initials = user?.email
@@ -54,7 +66,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <button className="lg:hidden text-topbar-foreground" onClick={() => setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <Link to="/" className="text-lg font-bold text-topbar-foreground tracking-tight">Kadra</Link>
+          <Link to={homeRoute} className="text-lg font-bold text-topbar-foreground tracking-tight">Kadra</Link>
         </div>
 
         <div className="hidden sm:flex items-center bg-topbar-foreground/10 rounded-md px-3 py-1.5 w-72">

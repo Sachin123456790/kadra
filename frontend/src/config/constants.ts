@@ -31,7 +31,14 @@ export const QUERY_KEYS = {
   auditExport: (exportId: string) => ['audit-export', exportId] as const,
   documentHashes: (docId: string) => ['document', docId, 'hashes'] as const,
   documentParseStatus: (docId: string) => ['document', docId, 'parse-status'] as const,
+  investorDashboard: (fundId: string) => ['investor', fundId, 'dashboard'] as const,
+  investorSubscriptions: (fundId: string) => ['investor', fundId, 'subscriptions'] as const,
+  investorCapTable: (fundId: string) => ['investor', fundId, 'cap-table'] as const,
+  investorDistributions: (fundId: string) => ['investor', fundId, 'distributions'] as const,
+  investorTransfers: (fundId: string) => ['investor', fundId, 'transfers'] as const,
 } as const;
+
+export const ADMIN_ROLES = ['admin', 'platform_admin', 'fund_admin', 'operations_analyst'] as const;
 
 export const ROUTES = {
   LOGIN: '/login',
@@ -43,4 +50,9 @@ export const ROUTES = {
   CAP_TABLE: '/cap-table',
   DISTRIBUTION: '/distribution',
   AUDIT: '/audit',
+  INVESTOR_DASHBOARD: '/investor',
+  INVESTOR_SUBSCRIPTIONS: '/investor/subscriptions',
+  INVESTOR_CAP_TABLE: '/investor/cap-table',
+  INVESTOR_DISTRIBUTIONS: '/investor/distributions',
+  INVESTOR_TRANSFERS: '/investor/transfers',
 } as const;
