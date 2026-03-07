@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, FileText, Landmark, ArrowLeftRight,
   PieChart, Coins, Shield, Search, Menu, X,
-  Sun, Moon, Bell, LogOut, User, HelpCircle, ChevronDown,
+  Sun, Moon, Bell, LogOut, User, HelpCircle, ChevronDown, Wallet,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -35,6 +35,7 @@ const investorNavItems = [
   { label: "Cap Table", path: "/investor/cap-table", icon: PieChart },
   { label: "Distributions", path: "/investor/distributions", icon: Coins },
   { label: "My Transfers", path: "/investor/transfers", icon: ArrowLeftRight },
+  { label: "Profile & Wallets", path: "/investor/profile", icon: Wallet },
 ];
 
 const mockNotifications = [
@@ -145,9 +146,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer gap-2">
-                <User className="h-4 w-4" />
-                Profile
+              <DropdownMenuItem className="cursor-pointer gap-2" asChild>
+                <Link to={isAdmin ? "#" : "/investor/profile"}>
+                  <User className="h-4 w-4" />
+                  Profile
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer gap-2">
                 <HelpCircle className="h-4 w-4" />

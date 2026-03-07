@@ -14,3 +14,5 @@ export * from './audit.service';
 export * from './auth.service';
 
 export * from './investor-portal.service';
+
+export * from './wallet-profile.service';

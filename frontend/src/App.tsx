@@ -21,6 +21,7 @@ import InvestorSubscriptions from "./pages/InvestorSubscriptions";
 import InvestorCapTable from "./pages/InvestorCapTable";
 import InvestorDistributions from "./pages/InvestorDistributions";
 import InvestorTransfers from "./pages/InvestorTransfers";
+import InvestorProfile from "./pages/InvestorProfile";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
@@ -65,6 +66,7 @@ const App = () => (
                       <Route path="/investor/cap-table" element={<RoleGuard allow="investor"><InvestorCapTable /></RoleGuard>} />
                       <Route path="/investor/distributions" element={<RoleGuard allow="investor"><InvestorDistributions /></RoleGuard>} />
                       <Route path="/investor/transfers" element={<RoleGuard allow="investor"><InvestorTransfers /></RoleGuard>} />
+                      <Route path="/investor/profile" element={<RoleGuard allow="investor"><InvestorProfile /></RoleGuard>} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </AppLayout>

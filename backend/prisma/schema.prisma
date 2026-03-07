@@ -70,6 +70,7 @@ model Investor {
   capitalAccounts      CapitalAccount[]
   ownershipSnapshotRows OwnershipSnapshotRow[]
   distributionLineItems DistributionLineItem[]
+  walletLinkChallenges  WalletLinkChallenge[]
 
   @@map("investors")
 }
@@ -105,6 +106,33 @@ model Wallet {
   // Cannot be expressed in Prisma; enforce in application code or raw SQL migration
   @@index([investorId, chainId])
   @@map("wallets")
+}
+
+// ─────────────────────────────────────────────────────────
+// 3b. wallet_link_challenges
+// ─────────────────────────────────────────────────────────
+model WalletLinkChallenge {
+  id               String    @id @default(uuid())
+  authUserId       String    @map("auth_user_id")
+  investorId       String?   @map("investor_id")
+  chainId          Int       @map("chain_id")
+  walletAddress    String    @map("wallet_address")
+  walletAddressNorm String   @map("wallet_address_norm")
+  nonce            String    @unique
+  message          String
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz()
+  usedAt           DateTime? @map("used_at") @db.Timestamptz()
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  createdIp        String?   @map("created_ip")
+  createdUserAgent String?   @map("created_user_agent")
+
+  // Relations
+  investor         Investor? @relation(fields: [investorId], references: [id])
+
+  @@index([authUserId, createdAt(sort: Desc)])
+  @@index([walletAddressNorm, chainId])
+  @@index([expiresAt])
+  @@map("wallet_link_challenges")
 }
 
 // ─────────────────────────────────────────────────────────

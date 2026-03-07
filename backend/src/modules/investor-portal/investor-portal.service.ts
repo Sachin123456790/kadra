@@ -1,10 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError } from '../../common/errors';
+import { SignatureVerificationService } from './signature-verification.service';
 
 @Injectable()
 export class InvestorPortalService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly signatureService: SignatureVerificationService,
+  ) {}
 
   /**
    * Resolve an investor record from the authenticated user's email.
@@ -309,6 +313,193 @@ export class InvestorPortalService {
         currency: li.distributionRun.currency,
       },
     }));
+  }
+
+  async getMyProfile(email: string) {
+    const investor = await this.resolveInvestor(email);
+    const walletCount = await this.prisma.wallet.count({
+      where: { investorId: investor.id, deletedAt: null },
+    });
+    return {
+      investorId: investor.id,
+      legalName: investor.legalName,
+      email: investor.email,
+      verificationStatus: investor.verificationStatus,
+      walletCount,
+    };
+  }
+
+  async listMyWallets(email: string) {
+    const investor = await this.resolveInvestor(email);
+    const wallets = await this.prisma.wallet.findMany({
+      where: { investorId: investor.id, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+    });
+    return wallets.map((w) => ({
+      walletId: w.id,
+      address: w.address,
+      chainId: w.chainId,
+      isPrimary: w.isPrimary,
+      walletStatus: w.walletStatus,
+      label: w.label,
+    }));
+  }
+
+  async createWalletLinkChallenge(
+    authUserId: string,
+    email: string,
+    input: { address: string; chainId: number },
+  ) {
+    const investor = await this.resolveInvestor(email);
+    const addressNorm = input.address.toLowerCase();
+
+    // Check if wallet already linked to another investor
+    const existing = await this.prisma.wallet.findFirst({
+      where: { addressNorm, chainId: input.chainId, deletedAt: null },
+    });
+    if (existing && existing.investorId !== investor.id) {
+      throw new ConflictException('This wallet is already linked to another account');
+    }
+
+    const nonce = this.signatureService.generateNonce();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
+
+    const message = this.signatureService.buildChallengeMessage({
+      appName: 'Kadra',
+      authUserId,
+      walletAddress: input.address,
+      chainId: input.chainId,
+      nonce,
+      issuedAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+    });
+
+    const challenge = await this.prisma.walletLinkChallenge.create({
+      data: {
+        authUserId,
+        investorId: investor.id,
+        chainId: input.chainId,
+        walletAddress: input.address,
+        walletAddressNorm: addressNorm,
+        nonce,
+        message,
+        expiresAt,
+      },
+    });
+
+    return {
+      challengeId: challenge.id,
+      nonce: challenge.nonce,
+      message: challenge.message,
+      expiresAt: challenge.expiresAt.toISOString(),
+    };
+  }
+
+  async verifyWalletLink(
+    authUserId: string,
+    email: string,
+    input: {
+      challengeId: string;
+      address: string;
+      chainId: number;
+      signature: string;
+    },
+  ) {
+    const investor = await this.resolveInvestor(email);
+
+    const challenge = await this.prisma.walletLinkChallenge.findUnique({
+      where: { id: input.challengeId },
+    });
+
+    if (!challenge) {
+      throw new BadRequestException('Challenge not found');
+    }
+    if (challenge.authUserId !== authUserId) {
+      throw new BadRequestException('Challenge does not belong to this account');
+    }
+    if (challenge.usedAt) {
+      throw new BadRequestException('Challenge has already been used');
+    }
+    if (new Date() > challenge.expiresAt) {
+      throw new BadRequestException('Challenge has expired. Please request a new one.');
+    }
+    if (challenge.walletAddressNorm !== input.address.toLowerCase()) {
+      throw new BadRequestException('Address does not match challenge');
+    }
+    if (challenge.chainId !== input.chainId) {
+      throw new BadRequestException('Chain ID does not match challenge');
+    }
+
+    // Verify signature
+    const isValid = this.signatureService.isValidSignature(
+      challenge.message,
+      input.signature,
+      input.address,
+    );
+    if (!isValid) {
+      throw new BadRequestException(
+        'Signature verification failed. The recovered address does not match.',
+      );
+    }
+
+    // Mark challenge as used and create/update wallet in a transaction
+    const addressNorm = input.address.toLowerCase();
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.walletLinkChallenge.update({
+        where: { id: challenge.id },
+        data: { usedAt: new Date() },
+      });
+
+      // Check if wallet already exists for this investor
+      const existingWallet = await tx.wallet.findFirst({
+        where: {
+          addressNorm,
+          chainId: input.chainId,
+          investorId: investor.id,
+          deletedAt: null,
+        },
+      });
+
+      if (existingWallet) {
+        return existingWallet;
+      }
+
+      // Check for duplicate across investors
+      const duplicateWallet = await tx.wallet.findFirst({
+        where: { addressNorm, chainId: input.chainId, deletedAt: null },
+      });
+      if (duplicateWallet) {
+        throw new ConflictException(
+          'This wallet is already linked to another account',
+        );
+      }
+
+      // Determine if this should be primary (first wallet = primary)
+      const walletCount = await tx.wallet.count({
+        where: { investorId: investor.id, deletedAt: null },
+      });
+
+      return tx.wallet.create({
+        data: {
+          investorId: investor.id,
+          chainId: input.chainId,
+          address: input.address,
+          addressNorm,
+          isPrimary: walletCount === 0,
+          walletStatus: 'ACTIVE',
+          label: walletCount === 0 ? 'Primary' : null,
+        },
+      });
+    });
+
+    return {
+      walletId: result.id,
+      investorId: investor.id,
+      address: result.address,
+      chainId: result.chainId,
+      walletStatus: result.walletStatus,
+    };
   }
 
   /**

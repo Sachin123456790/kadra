@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { InvestorPortalService } from './investor-portal.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
@@ -6,6 +6,7 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/auth/auth.types';
 import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
+import { CreateChallengeDto, VerifyWalletDto } from './investor-portal.dto';
 
 const DEFAULT_FUND_CODE = 'KADRA-DEMO-001';
 
@@ -85,6 +86,57 @@ export class InvestorPortalController {
       fundIdOrCode || DEFAULT_FUND_CODE,
     );
     const data = await this.portalService.getMyTransfers(investor.id, fundId);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Get('me/profile')
+  async getMyProfile(@CurrentUser() user: AuthenticatedUser) {
+    const data = await this.portalService.getMyProfile(user.email);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Get('me/wallets')
+  async getMyWallets(@CurrentUser() user: AuthenticatedUser) {
+    const data = await this.portalService.listMyWallets(user.email);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Post('me/wallet-link/challenge')
+  async createChallenge(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateChallengeDto,
+  ) {
+    const data = await this.portalService.createWalletLinkChallenge(
+      user.id,
+      user.email,
+      { address: dto.address, chainId: dto.chainId },
+    );
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Post('me/wallets/verify')
+  async verifyWallet(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: VerifyWalletDto,
+  ) {
+    const data = await this.portalService.verifyWalletLink(user.id, user.email, {
+      challengeId: dto.challengeId,
+      address: dto.address,
+      chainId: dto.chainId,
+      signature: dto.signature,
+    });
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },

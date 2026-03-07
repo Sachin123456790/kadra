@@ -36,6 +36,8 @@ export const QUERY_KEYS = {
   investorCapTable: (fundId: string) => ['investor', fundId, 'cap-table'] as const,
   investorDistributions: (fundId: string) => ['investor', fundId, 'distributions'] as const,
   investorTransfers: (fundId: string) => ['investor', fundId, 'transfers'] as const,
+  investorProfile: () => ['investor', 'profile'] as const,
+  investorWallets: () => ['investor', 'wallets'] as const,
 } as const;
 
 export const ADMIN_ROLES = ['admin', 'platform_admin', 'fund_admin', 'operations_analyst'] as const;
@@ -55,4 +57,5 @@ export const ROUTES = {
   INVESTOR_CAP_TABLE: '/investor/cap-table',
   INVESTOR_DISTRIBUTIONS: '/investor/distributions',
   INVESTOR_TRANSFERS: '/investor/transfers',
+  INVESTOR_PROFILE: '/investor/profile',
 } as const;
