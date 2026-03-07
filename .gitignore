@@ -1,5 +1,5 @@
 node_modules
-.env
+*.env
 cache
 artifacts
 typechain-types
@@ -13,6 +13,8 @@ docs/claude/
 backend/dist
 backend/node_modules
 backend/coverage
+backend/storage
+backend/supabase
 
 # Frontend
 frontend/node_modules
