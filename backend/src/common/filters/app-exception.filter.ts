@@ -21,7 +21,13 @@ export class AppExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       code = 'HTTP_ERROR';
-      message = exception.message;
+      const response = exception.getResponse();
+      if (typeof response === 'object' && response !== null && 'message' in response) {
+        const msgs = (response as Record<string, unknown>).message;
+        message = Array.isArray(msgs) ? msgs.join('; ') : String(msgs);
+      } else {
+        message = exception.message;
+      }
     }
 
     reply.status(statusCode).send({
