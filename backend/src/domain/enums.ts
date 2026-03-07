@@ -4,7 +4,7 @@ export enum VerificationStatus { UNKNOWN = 'UNKNOWN', VERIFIED = 'VERIFIED', REV
 export enum WalletStatus { ACTIVE = 'ACTIVE', INACTIVE = 'INACTIVE', BLOCKED = 'BLOCKED' }
 export enum EligibilityStatus { NOT_SET = 'NOT_SET', ELIGIBLE = 'ELIGIBLE', REVOKED = 'REVOKED' }
 export enum DocumentType { MASTER_LPA = 'MASTER_LPA', SUBSCRIPTION_RECORD = 'SUBSCRIPTION_RECORD', PAYMENT_RECEIPT = 'PAYMENT_RECEIPT', OTHER = 'OTHER' }
-export enum StorageProvider { LOCAL_FS = 'LOCAL_FS', S3 = 'S3' }
+export enum StorageProvider { LOCAL_FS = 'LOCAL_FS', S3 = 'S3', SUPABASE = 'SUPABASE' }
 export enum ParseStatus { QUEUED = 'QUEUED', PROCESSING = 'PROCESSING', COMPLETED = 'COMPLETED', FAILED = 'FAILED' }
 export enum HashAlgorithm { SHA256 = 'SHA256' }
 export enum SubscriptionStatus { DRAFT = 'DRAFT', PENDING = 'PENDING', SETTLED = 'SETTLED', REJECTED = 'REJECTED', CLOSED = 'CLOSED' }
