@@ -1,0 +1,46 @@
+// Single source of truth for all configuration constants.
+// Only VITE_API_URL is read from env; everything else is hardcoded.
+
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '/api/v1';
+
+export const AUTH_TOKEN_KEY = 'kadra_auth_token';
+export const AUTH_USER_KEY = 'kadra_auth_user';
+
+export const FUND_ID_KEY = 'kadra_active_fund_id';
+
+// Default fund for demo — matches seed data
+export const DEFAULT_FUND_CODE = 'KADRA-DEMO-001';
+
+export const HTTP_STATUS = {
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+} as const;
+
+export const QUERY_KEYS = {
+  fundOverview: (fundId: string) => ['fund', fundId, 'overview'] as const,
+  investors: (fundId: string) => ['fund', fundId, 'investors'] as const,
+  subscriptions: (fundId: string) => ['fund', fundId, 'subscriptions'] as const,
+  capTable: (fundId: string) => ['fund', fundId, 'cap-table'] as const,
+  waterfallConfig: (fundId: string) => ['fund', fundId, 'waterfall'] as const,
+  ownershipHistory: (fundId: string) => ['fund', fundId, 'ownership-history'] as const,
+  failedTransfers: (fundId: string) => ['fund', fundId, 'transfers', 'failed'] as const,
+  successfulTransfers: (fundId: string) => ['fund', fundId, 'transfers', 'successful'] as const,
+  auditExport: (exportId: string) => ['audit-export', exportId] as const,
+  documentHashes: (docId: string) => ['document', docId, 'hashes'] as const,
+  documentParseStatus: (docId: string) => ['document', docId, 'parse-status'] as const,
+} as const;
+
+export const ROUTES = {
+  LOGIN: '/login',
+  OVERVIEW: '/',
+  INVESTORS: '/investors',
+  SUBSCRIPTIONS: '/subscriptions',
+  SETTLEMENT: '/settlement',
+  TRANSFERS: '/transfers',
+  CAP_TABLE: '/cap-table',
+  DISTRIBUTION: '/distribution',
+  AUDIT: '/audit',
+} as const;
