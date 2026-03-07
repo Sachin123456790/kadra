@@ -11,6 +11,7 @@ import { OwnershipModule } from './modules/ownership/ownership.module';
 import { DistributionModule } from './modules/distribution/distribution.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { JobsModule } from './modules/jobs/jobs.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -27,6 +28,7 @@ import { HealthController } from './health.controller';
     DistributionModule,
     AuditModule,
     JobsModule,
+    AuthModule,
   ],
   controllers: [HealthController],
 })

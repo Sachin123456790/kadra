@@ -1,10 +1,16 @@
-import { Controller, Post, Get, Param, Body } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, UseGuards } from '@nestjs/common';
 import { AuditService } from './audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
+import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/auth/roles.decorator';
+import { ADMIN_ROLES } from '../../common/auth/auth.types';
 
 @Controller('admin')
+@UseGuards(SupabaseAuthGuard, RolesGuard)
+@Roles(...ADMIN_ROLES)
 export class AuditController {
   constructor(
     private readonly auditService: AuditService,

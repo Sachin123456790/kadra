@@ -1,10 +1,15 @@
-import { Controller, Post, Get, Param, Body } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, UseGuards } from '@nestjs/common';
 import { TokenizationService } from './tokenization.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
+import { Roles } from '../../common/auth/roles.decorator';
+import { ADMIN_ROLES } from '../../common/auth/auth.types';
+import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 
 @Controller()
+@UseGuards(SupabaseAuthGuard, RolesGuard)
 export class TokenizationController {
   constructor(
     private readonly tokenizationService: TokenizationService,
@@ -12,6 +17,7 @@ export class TokenizationController {
   ) {}
 
   @Post('admin/subscriptions/:subscriptionId/token-mint')
+  @Roles(...ADMIN_ROLES)
   async mintTokens(@Param('subscriptionId') subscriptionId: string) {
     const data =
       await this.tokenizationService.mintForSubscription(subscriptionId);
@@ -22,6 +28,7 @@ export class TokenizationController {
   }
 
   @Post('investor/funds/:fundId/transfers')
+  @Roles('investor', ...ADMIN_ROLES)
   async initiateTransfer(
     @Param('fundId') fundIdOrCode: string,
     @Body()
@@ -41,6 +48,7 @@ export class TokenizationController {
   }
 
   @Get('transfers/:transferRequestId/validation')
+  @Roles('investor', ...ADMIN_ROLES)
   async getTransferValidation(
     @Param('transferRequestId') transferRequestId: string,
   ) {
@@ -53,6 +61,7 @@ export class TokenizationController {
   }
 
   @Get('admin/funds/:fundId/transfers/failed')
+  @Roles(...ADMIN_ROLES)
   async getFailedTransfers(@Param('fundId') fundIdOrCode: string) {
     const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.tokenizationService.getFailedTransfers(fundId);
@@ -67,6 +76,7 @@ export class TokenizationController {
   }
 
   @Get('admin/funds/:fundId/transfers/successful')
+  @Roles(...ADMIN_ROLES)
   async getSuccessfulTransfers(@Param('fundId') fundIdOrCode: string) {
     const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.tokenizationService.getSuccessfulTransfers(fundId);

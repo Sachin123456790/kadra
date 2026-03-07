@@ -1,11 +1,17 @@
-import { Controller, Get, Post, Put, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { IdentityService } from './identity.service';
 import { CreateInvestorDto, LinkWalletDto } from './identity.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
+import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/auth/roles.decorator';
+import { ADMIN_ROLES } from '../../common/auth/auth.types';
 
 @Controller('admin/funds')
+@UseGuards(SupabaseAuthGuard, RolesGuard)
+@Roles(...ADMIN_ROLES)
 export class IdentityController {
   constructor(
     private readonly identityService: IdentityService,
@@ -42,6 +48,8 @@ export class IdentityController {
 }
 
 @Controller('admin/investors')
+@UseGuards(SupabaseAuthGuard, RolesGuard)
+@Roles(...ADMIN_ROLES)
 export class InvestorController {
   constructor(private readonly identityService: IdentityService) {}
 

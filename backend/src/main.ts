@@ -14,6 +14,7 @@ async function bootstrap() {
   await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB
 
   app.setGlobalPrefix('api/v1');
+  app.enableCors();
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalFilters(new AppExceptionFilter());
 

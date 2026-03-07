@@ -10,3 +10,5 @@ export * from './ownership.service';
 export * from './distribution.service';
 export * from './documents.service';
 export * from './audit.service';
+
+export * from './auth.service';
