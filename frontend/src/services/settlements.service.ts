@@ -42,3 +42,28 @@ export function confirmSettlement(
     { settlementRecordId },
   );
 }
+
+export function uploadPaymentEvidence(
+  subscriptionId: string,
+  body: {
+    paymentDocumentId: string;
+    declaredAmount: string;
+    declaredCurrency: string;
+    declaredReference: string;
+  },
+) {
+  return post<{ paymentEvidenceId: string }>(
+    `/admin/subscriptions/${subscriptionId}/payment-evidence`,
+    body,
+  );
+}
+
+export function overrideSettlement(
+  settlementRecordId: string,
+  body: { action: string; reason: string },
+) {
+  return post<{ status: string }>(
+    `/admin/settlements/${settlementRecordId}/override`,
+    body,
+  );
+}

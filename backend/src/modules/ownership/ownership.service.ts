@@ -111,6 +111,89 @@ export class OwnershipService {
     }));
   }
 
+  async rebuildProjection(fundId: string) {
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    const contract = await this.prisma.tokenContract.findFirst({
+      where: { fundId, deploymentStatus: 'DEPLOYED', deletedAt: null },
+    });
+
+    if (!contract) {
+      return { positionsRebuilt: 0, snapshotId: null };
+    }
+
+    // Fetch all position events for the contract, ordered chronologically
+    const events = await this.prisma.tokenPositionEvent.findMany({
+      where: { tokenContractId: contract.id, ingestStatus: 'CONFIRMED' },
+      orderBy: [{ blockNumber: 'asc' }, { logIndex: 'asc' }],
+    });
+
+    // Rebuild balances from events
+    const balanceMap = new Map<string, { balance: number; lastEventId: string; blockNumber: bigint | null; blockTimestamp: Date }>();
+
+    for (const event of events) {
+      const amount = Number(event.tokenAmount);
+
+      if (event.fromWalletAddress) {
+        const fromNorm = event.fromWalletAddress.toLowerCase();
+        const existing = balanceMap.get(fromNorm) ?? { balance: 0, lastEventId: event.id, blockNumber: event.blockNumber, blockTimestamp: event.blockTimestamp };
+        existing.balance -= amount;
+        existing.lastEventId = event.id;
+        existing.blockNumber = event.blockNumber;
+        existing.blockTimestamp = event.blockTimestamp;
+        balanceMap.set(fromNorm, existing);
+      }
+
+      if (event.toWalletAddress) {
+        const toNorm = event.toWalletAddress.toLowerCase();
+        const existing = balanceMap.get(toNorm) ?? { balance: 0, lastEventId: event.id, blockNumber: event.blockNumber, blockTimestamp: event.blockTimestamp };
+        existing.balance += amount;
+        existing.lastEventId = event.id;
+        existing.blockNumber = event.blockNumber;
+        existing.blockTimestamp = event.blockTimestamp;
+        balanceMap.set(toNorm, existing);
+      }
+    }
+
+    // Delete existing positions for this contract and recreate
+    await this.prisma.tokenPosition.deleteMany({
+      where: { tokenContractId: contract.id },
+    });
+
+    let positionsRebuilt = 0;
+    for (const [walletAddressNorm, data] of balanceMap.entries()) {
+      if (data.balance <= 0) continue;
+
+      const wallet = await this.prisma.wallet.findFirst({
+        where: { addressNorm: walletAddressNorm },
+      });
+
+      await this.prisma.tokenPosition.create({
+        data: {
+          fundId,
+          tokenContractId: contract.id,
+          walletId: wallet?.id ?? null,
+          walletAddress: wallet?.address ?? walletAddressNorm,
+          walletAddressNorm,
+          settledTokenBalance: data.balance,
+          lastEventId: data.lastEventId,
+          asOfBlockNumber: data.blockNumber,
+          asOfTimestamp: data.blockTimestamp,
+        },
+      });
+      positionsRebuilt++;
+    }
+
+    // Create a snapshot recording this rebuild
+    const snapshot = await this.createSnapshot(fundId, 'ON_DEMAND');
+
+    return {
+      positionsRebuilt,
+      snapshotId: snapshot.snapshotId,
+    };
+  }
+
   async createSnapshot(fundId: string, type: string = 'ON_DEMAND') {
     const capTable = await this.getCapTable(fundId);
     const contract = await this.prisma.tokenContract.findFirst({

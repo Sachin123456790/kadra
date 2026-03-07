@@ -34,6 +34,63 @@ export class DistributionService {
     };
   }
 
+  async getDistributionRun(fundId: string, runId: string) {
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    const run = await this.prisma.distributionRun.findUnique({
+      where: { id: runId },
+    });
+    if (!run) throw new NotFoundError('DistributionRun', runId);
+    if (run.fundId !== fundId) {
+      throw new ConflictError(
+        'RUN_FUND_MISMATCH',
+        'Distribution run does not belong to this fund',
+      );
+    }
+
+    const lineItems = await this.prisma.distributionLineItem.findMany({
+      where: { distributionRunId: runId },
+      include: {
+        investor: true,
+        wallet: true,
+      },
+      orderBy: { grossAmount: 'desc' },
+    });
+
+    return {
+      run: {
+        distributionRunId: run.id,
+        fundId: run.fundId,
+        waterfallConfigId: run.waterfallConfigId,
+        ownershipSnapshotId: run.ownershipSnapshotId,
+        runStatus: run.runStatus,
+        asOfTimestamp: run.asOfTimestamp.toISOString(),
+        startedAt: run.startedAt?.toISOString() ?? null,
+        completedAt: run.completedAt?.toISOString() ?? null,
+        totalGrossAmount: run.totalGrossAmount ? Number(run.totalGrossAmount).toFixed(2) : null,
+        totalNetAmount: run.totalNetAmount ? Number(run.totalNetAmount).toFixed(2) : null,
+        currency: run.currency,
+        failureReason: run.failureReason,
+      },
+      lineItems: lineItems.map((li) => ({
+        lineItemId: li.id,
+        investorId: li.investorId,
+        investorName: li.investor?.legalName ?? null,
+        walletId: li.walletId,
+        walletAddress: li.wallet?.address ?? null,
+        grossAmount: Number(li.grossAmount).toFixed(2),
+        netAmount: Number(li.netAmount).toFixed(2),
+        currency: li.currency,
+        ownershipPctUsed: li.ownershipPctUsed ? Number(li.ownershipPctUsed) : null,
+        prefAmount: Number(li.prefAmount).toFixed(2),
+        returnOfCapitalAmount: Number(li.returnOfCapitalAmount).toFixed(2),
+        promoteAmount: Number(li.promoteAmount).toFixed(2),
+        tierBreakdown: li.tierBreakdown,
+      })),
+    };
+  }
+
   async previewDistribution(
     fundId: string,
     input: {

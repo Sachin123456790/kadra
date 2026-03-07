@@ -6,6 +6,50 @@ import { NotFoundError } from '../../common/errors';
 export class FundService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async createFund(input: {
+    code: string;
+    name: string;
+    legalForm?: string;
+    jurisdictionCode?: string;
+    baseCurrency?: string;
+  }) {
+    const fund = await this.prisma.fund.create({
+      data: {
+        code: input.code,
+        name: input.name,
+        legalForm: input.legalForm ?? 'LP',
+        jurisdictionCode: input.jurisdictionCode ?? null,
+        baseCurrency: input.baseCurrency ?? 'USD',
+        status: 'ACTIVE',
+        metadata: {},
+      },
+    });
+
+    return {
+      fundId: fund.id,
+      code: fund.code,
+      status: fund.status,
+    };
+  }
+
+  async getFundDetails(fundId: string) {
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    return {
+      fundId: fund.id,
+      code: fund.code,
+      name: fund.name,
+      legalForm: fund.legalForm,
+      jurisdictionCode: fund.jurisdictionCode,
+      baseCurrency: fund.baseCurrency,
+      status: fund.status,
+      metadata: fund.metadata,
+      createdAt: fund.createdAt.toISOString(),
+      updatedAt: fund.updatedAt.toISOString(),
+    };
+  }
+
   async getFundOverview(fundId: string) {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);

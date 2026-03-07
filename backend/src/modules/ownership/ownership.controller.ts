@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body } from '@nestjs/common';
 import { OwnershipService } from './ownership.service';
+import { RebuildProjectionDto } from './ownership.dto';
 import { randomUUID } from 'crypto';
 
 @Controller('admin/funds')
@@ -36,6 +37,20 @@ export class OwnershipController {
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString(), count: data.length },
+    };
+  }
+}
+
+@Controller('admin/projections')
+export class ProjectionController {
+  constructor(private readonly ownershipService: OwnershipService) {}
+
+  @Post('rebuild')
+  async rebuildProjection(@Body() body: RebuildProjectionDto) {
+    const data = await this.ownershipService.rebuildProjection(body.fundId);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
     };
   }
 }

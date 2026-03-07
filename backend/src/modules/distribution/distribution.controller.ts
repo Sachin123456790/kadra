@@ -37,6 +37,21 @@ export class DistributionController {
     };
   }
 
+  @Get(':fundId/distributions/runs/:runId')
+  async getDistributionRun(
+    @Param('fundId') fundId: string,
+    @Param('runId') runId: string,
+  ) {
+    const data = await this.distributionService.getDistributionRun(
+      fundId,
+      runId,
+    );
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
   @Post(':fundId/distributions/runs')
   async executeRun(
     @Param('fundId') fundId: string,

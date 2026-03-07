@@ -114,6 +114,102 @@ export class SettlementsService {
     };
   }
 
+  async uploadPaymentEvidence(
+    subscriptionId: string,
+    input: {
+      documentId: string;
+      documentHashId?: string;
+      notes?: string;
+    },
+  ) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+    });
+    if (!subscription) throw new NotFoundError('Subscription', subscriptionId);
+
+    // Find the latest settlement record for this subscription
+    const settlementRecord = await this.prisma.settlementRecord.findFirst({
+      where: { subscriptionId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!settlementRecord) {
+      throw new NotFoundError('SettlementRecord for Subscription', subscriptionId);
+    }
+
+    // Verify document exists
+    const document = await this.prisma.document.findUnique({
+      where: { id: input.documentId },
+    });
+    if (!document) throw new NotFoundError('Document', input.documentId);
+
+    const evidence = await this.prisma.settlementEvidence.create({
+      data: {
+        settlementRecordId: settlementRecord.id,
+        evidenceType: 'PAYMENT_DOCUMENT',
+        documentId: input.documentId,
+        documentHashId: input.documentHashId ?? null,
+        notes: input.notes ?? null,
+        metadata: {},
+      },
+    });
+
+    return {
+      evidenceId: evidence.id,
+      subscriptionId,
+      documentId: evidence.documentId,
+    };
+  }
+
+  async overrideSettlement(
+    settlementRecordId: string,
+    input: { reason: string },
+  ) {
+    const record = await this.prisma.settlementRecord.findUnique({
+      where: { id: settlementRecordId },
+    });
+    if (!record) throw new NotFoundError('SettlementRecord', settlementRecordId);
+    if (record.status !== 'FAILED') {
+      throw new ConflictError(
+        'SETTLEMENT_NOT_FAILED',
+        'Only FAILED settlements can be overridden',
+      );
+    }
+
+    const now = new Date();
+
+    const updated = await this.prisma.settlementRecord.update({
+      where: { id: settlementRecordId },
+      data: {
+        status: 'OVERRIDDEN',
+        failureReasonText: input.reason,
+        updatedAt: now,
+      },
+    });
+
+    // Log to system_event_log
+    await this.prisma.systemEventLog.create({
+      data: {
+        eventType: 'SETTLEMENT_OVERRIDDEN',
+        aggregateType: 'SETTLEMENT_RECORD',
+        aggregateId: settlementRecordId,
+        sourceContext: 'settlements.service',
+        payloadJson: {
+          settlementRecordId,
+          subscriptionId: record.subscriptionId,
+          reason: input.reason,
+          previousStatus: 'FAILED',
+          newStatus: 'OVERRIDDEN',
+        },
+        occurredAt: now,
+      },
+    });
+
+    return {
+      settlementRecordId: updated.id,
+      status: 'OVERRIDDEN',
+    };
+  }
+
   async confirmSettlement(
     subscriptionId: string,
     settlementRecordId: string,

@@ -1,29 +1,22 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
+import { EmptyState } from "@/components/kadra/EmptyState";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const paymentQueue = [
-  { id: "pmt-1", investor: "BlackRock Capital Partners", amount: "$21,375,000", ref: "WR-2025-001", status: "Passed" as const },
-  { id: "pmt-2", investor: "Meridian Wealth Holdings", amount: "$13,650,000", ref: "WR-2025-002", status: "Verifying" as const },
-  { id: "pmt-3", investor: "Pacific Rim Advisors LLC", amount: "$16,575,000", ref: "WR-2025-003", status: "Failed" as const },
-];
+import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
+import { getSubscriptions, requestPaymentValidation, confirmSettlement } from "@/services";
+import type { ValidationResult } from "@/services/settlements.service";
 
 const checkItems = [
-  { label: "Amount Match", key: "amount" },
-  { label: "Investor Match", key: "investor" },
-  { label: "Reference Match", key: "reference" },
-  { label: "Hash Match", key: "hash" },
+  { label: "Amount Match", key: "checkAmountMatch" },
+  { label: "Investor Match", key: "checkInvestorMatch" },
+  { label: "Reference Match", key: "checkReferenceMatch" },
+  { label: "No Double Settlement", key: "checkNoDoubleSettlement" },
 ];
-
-const checkResults: Record<string, Record<string, "pass" | "fail" | "pending">> = {
-  "pmt-1": { amount: "pass", investor: "pass", reference: "pass", hash: "pass" },
-  "pmt-2": { amount: "pending", investor: "pending", reference: "pending", hash: "pending" },
-  "pmt-3": { amount: "pass", investor: "pass", reference: "fail", hash: "fail" },
-};
 
 const StatusIcon = ({ s }: { s: string }) => {
   if (s === "pass") return <CheckCircle2 className="h-4 w-4 text-success" />;
@@ -31,8 +24,66 @@ const StatusIcon = ({ s }: { s: string }) => {
   return <Loader2 className="h-4 w-4 text-warning animate-spin" />;
 };
 
+interface QueueItem {
+  id: string;
+  subscriptionId: string;
+  investor: string;
+  amount: string;
+  ref: string;
+  status: string;
+}
+
 export default function SettlementPage() {
-  const [selected, setSelected] = useState(paymentQueue[0]);
+  const fundId = DEFAULT_FUND_CODE;
+  const queryClient = useQueryClient();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [validationResults, setValidationResults] = useState<Record<string, ValidationResult>>({});
+
+  // Fetch pending subscriptions as the payment queue
+  const { data: queue, isLoading, error } = useQuery({
+    queryKey: [...QUERY_KEYS.subscriptions(fundId), 'PENDING'],
+    queryFn: () => getSubscriptions(fundId, 'PENDING').then(r => r.data),
+    select: (data): QueueItem[] =>
+      data.map((sub) => ({
+        id: sub.subscriptionId,
+        subscriptionId: sub.subscriptionId,
+        investor: sub.investorId,
+        amount: `$${Number(sub.committedAmount).toLocaleString()}`,
+        ref: sub.subscriptionRef,
+        status: sub.latestSettlementStatus ?? "Pending",
+      })),
+  });
+
+  const selected = queue?.find(q => q.id === selectedId) ?? queue?.[0] ?? null;
+
+  // Mutation: validate payment
+  const validateMutation = useMutation({
+    mutationFn: (item: QueueItem) =>
+      requestPaymentValidation(item.subscriptionId, {
+        paymentDocumentId: '', // placeholder — real flow would have a document upload first
+        declaredAmount: item.amount.replace(/[$,]/g, ''),
+        declaredCurrency: 'USD',
+        declaredReference: item.ref,
+      }).then(r => r.data),
+    onSuccess: (result, item) => {
+      setValidationResults(prev => ({ ...prev, [item.id]: result }));
+    },
+  });
+
+  // Mutation: confirm settlement
+  const confirmMutation = useMutation({
+    mutationFn: ({ subscriptionId, settlementRecordId }: { subscriptionId: string; settlementRecordId: string }) =>
+      confirmSettlement(subscriptionId, settlementRecordId).then(r => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions(fundId) });
+    },
+  });
+
+  if (isLoading) return <div className="p-6">Loading...</div>;
+  if (error) return <ErrorAlert title="Failed to load settlement queue" message={(error as Error).message} />;
+  if (!queue || queue.length === 0) return <EmptyState title="No pending settlements" message="All subscriptions have been settled." />;
+
+  const currentValidation = selected ? validationResults[selected.id] : null;
 
   return (
     <div>
@@ -40,13 +91,13 @@ export default function SettlementPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SectionCard title="Payment Evidence Queue">
           <div className="space-y-2">
-            {paymentQueue.map((p) => (
+            {queue.map((p) => (
               <button
                 key={p.id}
-                onClick={() => setSelected(p)}
+                onClick={() => setSelectedId(p.id)}
                 className={cn(
                   "w-full flex items-center justify-between rounded-md border border-border p-3 text-left transition-colors",
-                  selected.id === p.id ? "bg-sidebar-accent border-primary/30" : "hover:bg-muted"
+                  selected?.id === p.id ? "bg-sidebar-accent border-primary/30" : "hover:bg-muted"
                 )}
               >
                 <div>
@@ -60,22 +111,74 @@ export default function SettlementPage() {
         </SectionCard>
 
         <SectionCard title="Validation Checklist">
-          <div className="space-y-3 mb-4">
-            {checkItems.map((ci) => {
-              const result = checkResults[selected.id]?.[ci.key] || "pending";
-              return (
-                <div key={ci.key} className="flex items-center justify-between rounded-md border border-border p-3">
-                  <span className="text-sm text-card-foreground">{ci.label}</span>
-                  <div className="flex items-center gap-2">
-                    <StatusIcon s={result} />
-                    <span className="text-xs font-medium capitalize text-muted-foreground">{result}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {selected.status === "Failed" && (
-            <ErrorAlert title="Validation Failed" message="Reference and hash do not match the expected values. Manual review required." />
+          {selected && (
+            <>
+              <div className="space-y-3 mb-4">
+                {checkItems.map((ci) => {
+                  let result: "pass" | "fail" | "pending" = "pending";
+                  if (currentValidation) {
+                    const checkValue = currentValidation.checks[ci.key as keyof typeof currentValidation.checks];
+                    result = checkValue === true ? "pass" : checkValue === false ? "fail" : "pending";
+                  }
+                  return (
+                    <div key={ci.key} className="flex items-center justify-between rounded-md border border-border p-3">
+                      <span className="text-sm text-card-foreground">{ci.label}</span>
+                      <div className="flex items-center gap-2">
+                        <StatusIcon s={result} />
+                        <span className="text-xs font-medium capitalize text-muted-foreground">{result}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {currentValidation?.status === "FAILED" && (
+                <ErrorAlert
+                  title="Validation Failed"
+                  message={currentValidation.failureReasonCode ?? "One or more checks did not pass. Manual review required."}
+                />
+              )}
+
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => selected && validateMutation.mutate(selected)}
+                  disabled={validateMutation.isPending}
+                  className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {validateMutation.isPending ? "Validating..." : "Validate"}
+                </button>
+                <button
+                  onClick={() => {
+                    if (selected && currentValidation?.settlementRecordId) {
+                      confirmMutation.mutate({
+                        subscriptionId: selected.subscriptionId,
+                        settlementRecordId: currentValidation.settlementRecordId,
+                      });
+                    }
+                  }}
+                  disabled={!currentValidation || currentValidation.status !== "PASSED" || confirmMutation.isPending}
+                  className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {confirmMutation.isPending ? "Confirming..." : "Confirm Settlement"}
+                </button>
+              </div>
+
+              {confirmMutation.isError && (
+                <ErrorAlert
+                  title="Settlement failed"
+                  message={(confirmMutation.error as Error).message}
+                  className="mt-3"
+                />
+              )}
+
+              {validateMutation.isError && (
+                <ErrorAlert
+                  title="Validation failed"
+                  message={(validateMutation.error as Error).message}
+                  className="mt-3"
+                />
+              )}
+            </>
           )}
         </SectionCard>
       </div>

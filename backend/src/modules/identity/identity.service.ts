@@ -6,6 +6,63 @@ import { NotFoundError, ConflictError } from '../../common/errors';
 export class IdentityService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async createInvestor(input: {
+    legalName: string;
+    taxId?: string;
+    email?: string;
+    verificationStatus?: string;
+  }) {
+    const verificationStatus = input.verificationStatus ?? 'VERIFIED';
+    const now = new Date();
+
+    const investor = await this.prisma.investor.create({
+      data: {
+        legalName: input.legalName,
+        email: input.email ?? null,
+        verificationStatus,
+        verifiedAt: verificationStatus === 'VERIFIED' ? now : null,
+        metadata: input.taxId ? { taxId: input.taxId } : {},
+      },
+    });
+
+    return {
+      investorId: investor.id,
+      legalName: investor.legalName,
+      verificationStatus: investor.verificationStatus,
+    };
+  }
+
+  async linkWallet(investorId: string, input: {
+    chainId: number;
+    address: string;
+    label?: string;
+    isPrimary?: boolean;
+  }) {
+    const investor = await this.prisma.investor.findUnique({ where: { id: investorId } });
+    if (!investor) throw new NotFoundError('Investor', investorId);
+
+    const addressNorm = input.address.toLowerCase();
+
+    const wallet = await this.prisma.wallet.create({
+      data: {
+        investorId,
+        chainId: input.chainId,
+        address: input.address,
+        addressNorm,
+        label: input.label ?? null,
+        isPrimary: input.isPrimary ?? false,
+        walletStatus: 'ACTIVE',
+      },
+    });
+
+    return {
+      walletId: wallet.id,
+      investorId: wallet.investorId,
+      chainId: wallet.chainId,
+      address: wallet.address,
+    };
+  }
+
   async listInvestors(fundId: string, filters?: { eligibilityStatus?: string; verificationStatus?: string; search?: string }) {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);

@@ -1,4 +1,4 @@
-import { get } from './api-client';
+import { get, post } from './api-client';
 
 // ── Response types ─────────────────────────────────────────
 
@@ -47,4 +47,16 @@ export function getFundOverview(fundId: string) {
 
 export function getWaterfallConfig(fundId: string) {
   return get<WaterfallConfig>(`/admin/funds/${fundId}/waterfall-configs/active`);
+}
+
+export function createFund(body: {
+  fundName: string;
+  legalForm: string;
+  jurisdiction: string;
+}) {
+  return post<{ fundId: string }>('/admin/funds', body);
+}
+
+export function getFund(fundId: string) {
+  return get<FundOverview>(`/admin/funds/${fundId}`);
 }

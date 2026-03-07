@@ -1,5 +1,6 @@
-import { Controller, Get, Put, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Param, Body, Query } from '@nestjs/common';
 import { IdentityService } from './identity.service';
+import { CreateInvestorDto, LinkWalletDto } from './identity.dto';
 import { randomUUID } from 'crypto';
 
 @Controller('admin/funds')
@@ -26,6 +27,32 @@ export class IdentityController {
     @Body() body: { investorId: string; walletId: string; status: string; reason?: string },
   ) {
     const data = await this.identityService.upsertEligibility(fundId, body);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+}
+
+@Controller('admin/investors')
+export class InvestorController {
+  constructor(private readonly identityService: IdentityService) {}
+
+  @Post()
+  async createInvestor(@Body() body: CreateInvestorDto) {
+    const data = await this.identityService.createInvestor(body);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Post(':investorId/wallets')
+  async linkWallet(
+    @Param('investorId') investorId: string,
+    @Body() body: LinkWalletDto,
+  ) {
+    const data = await this.identityService.linkWallet(investorId, body);
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
