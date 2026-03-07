@@ -1,11 +1,16 @@
 import { Controller, Get, Post, Param, Body } from '@nestjs/common';
 import { FundService } from './fund.service';
 import { CreateFundDto } from './fund.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
 
 @Controller('admin/funds')
 export class FundController {
-  constructor(private readonly fundService: FundService) {}
+  constructor(
+    private readonly fundService: FundService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post()
   async createFund(@Body() body: CreateFundDto) {
@@ -14,13 +19,15 @@ export class FundController {
   }
 
   @Get(':fundId')
-  async getFundDetails(@Param('fundId') fundId: string) {
+  async getFundDetails(@Param('fundId') fundIdOrCode: string) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.fundService.getFundDetails(fundId);
     return { data, meta: { requestId: randomUUID(), timestamp: new Date().toISOString() } };
   }
 
   @Get(':fundId/overview')
-  async getOverview(@Param('fundId') fundId: string) {
+  async getOverview(@Param('fundId') fundIdOrCode: string) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.fundService.getFundOverview(fundId);
     return { data, meta: { requestId: randomUUID(), timestamp: new Date().toISOString() } };
   }

@@ -1,13 +1,19 @@
 import { Controller, Get, Post, Param, Body } from '@nestjs/common';
 import { DistributionService } from './distribution.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
 
 @Controller('admin/funds')
 export class DistributionController {
-  constructor(private readonly distributionService: DistributionService) {}
+  constructor(
+    private readonly distributionService: DistributionService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get(':fundId/waterfall-configs/active')
-  async getActiveConfig(@Param('fundId') fundId: string) {
+  async getActiveConfig(@Param('fundId') fundIdOrCode: string) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data =
       await this.distributionService.getActiveWaterfallConfig(fundId);
     return {
@@ -18,7 +24,7 @@ export class DistributionController {
 
   @Post(':fundId/distributions/preview')
   async previewDistribution(
-    @Param('fundId') fundId: string,
+    @Param('fundId') fundIdOrCode: string,
     @Body()
     body: {
       waterfallConfigId: string;
@@ -27,6 +33,7 @@ export class DistributionController {
       currency?: string;
     },
   ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.distributionService.previewDistribution(
       fundId,
       body,
@@ -39,9 +46,10 @@ export class DistributionController {
 
   @Get(':fundId/distributions/runs/:runId')
   async getDistributionRun(
-    @Param('fundId') fundId: string,
+    @Param('fundId') fundIdOrCode: string,
     @Param('runId') runId: string,
   ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.distributionService.getDistributionRun(
       fundId,
       runId,
@@ -54,7 +62,7 @@ export class DistributionController {
 
   @Post(':fundId/distributions/runs')
   async executeRun(
-    @Param('fundId') fundId: string,
+    @Param('fundId') fundIdOrCode: string,
     @Body()
     body: {
       waterfallConfigId: string;
@@ -63,6 +71,7 @@ export class DistributionController {
       currency?: string;
     },
   ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.distributionService.executeDistributionRun(
       fundId,
       body,

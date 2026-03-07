@@ -1,14 +1,19 @@
 import { Controller, Post, Get, Param, Body } from '@nestjs/common';
 import { AuditService } from './audit.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
 
 @Controller('admin')
 export class AuditController {
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post('funds/:fundId/audit-exports')
   async requestExport(
-    @Param('fundId') fundId: string,
+    @Param('fundId') fundIdOrCode: string,
     @Body()
     body: {
       exportType?: string;
@@ -17,6 +22,7 @@ export class AuditController {
       includeDistributionRuns?: boolean;
     },
   ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.auditService.requestExport(fundId, body);
     return {
       data,

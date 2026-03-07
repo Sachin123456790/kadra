@@ -1,18 +1,24 @@
 import { Controller, Get, Post, Param, Query, Body } from '@nestjs/common';
 import { OwnershipService } from './ownership.service';
 import { RebuildProjectionDto } from './ownership.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
 
 @Controller('admin/funds')
 export class OwnershipController {
-  constructor(private readonly ownershipService: OwnershipService) {}
+  constructor(
+    private readonly ownershipService: OwnershipService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get(':fundId/cap-table')
   async getCapTable(
-    @Param('fundId') fundId: string,
+    @Param('fundId') fundIdOrCode: string,
     @Query('asOfTimestamp') asOfTimestamp?: string,
     @Query('includePending') includePending?: string,
   ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.ownershipService.getCapTable(fundId, {
       asOfTimestamp,
       includePending: includePending !== 'false',
@@ -22,12 +28,13 @@ export class OwnershipController {
 
   @Get(':fundId/ownership-history')
   async getOwnershipHistory(
-    @Param('fundId') fundId: string,
+    @Param('fundId') fundIdOrCode: string,
     @Query('walletAddress') walletAddress?: string,
     @Query('investorId') investorId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.ownershipService.getOwnershipHistory(fundId, {
       walletAddress,
       investorId,

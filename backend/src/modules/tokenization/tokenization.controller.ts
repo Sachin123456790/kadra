@@ -1,10 +1,15 @@
 import { Controller, Post, Get, Param, Body } from '@nestjs/common';
 import { TokenizationService } from './tokenization.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
 
 @Controller()
 export class TokenizationController {
-  constructor(private readonly tokenizationService: TokenizationService) {}
+  constructor(
+    private readonly tokenizationService: TokenizationService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post('admin/subscriptions/:subscriptionId/token-mint')
   async mintTokens(@Param('subscriptionId') subscriptionId: string) {
@@ -18,7 +23,7 @@ export class TokenizationController {
 
   @Post('investor/funds/:fundId/transfers')
   async initiateTransfer(
-    @Param('fundId') fundId: string,
+    @Param('fundId') fundIdOrCode: string,
     @Body()
     body: {
       fromWalletAddress: string;
@@ -27,6 +32,7 @@ export class TokenizationController {
       reason?: string;
     },
   ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.tokenizationService.initiateTransfer(fundId, body);
     return {
       data,
@@ -47,7 +53,8 @@ export class TokenizationController {
   }
 
   @Get('admin/funds/:fundId/transfers/failed')
-  async getFailedTransfers(@Param('fundId') fundId: string) {
+  async getFailedTransfers(@Param('fundId') fundIdOrCode: string) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.tokenizationService.getFailedTransfers(fundId);
     return {
       data,
@@ -60,7 +67,8 @@ export class TokenizationController {
   }
 
   @Get('admin/funds/:fundId/transfers/successful')
-  async getSuccessfulTransfers(@Param('fundId') fundId: string) {
+  async getSuccessfulTransfers(@Param('fundId') fundIdOrCode: string) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.tokenizationService.getSuccessfulTransfers(fundId);
     return {
       data,

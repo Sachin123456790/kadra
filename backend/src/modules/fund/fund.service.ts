@@ -6,6 +6,7 @@ import { NotFoundError } from '../../common/errors';
 export class FundService {
   constructor(private readonly prisma: PrismaService) {}
 
+
   async createFund(input: {
     code: string;
     name: string;
