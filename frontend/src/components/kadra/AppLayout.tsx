@@ -4,7 +4,9 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, FileText, Landmark, ArrowLeftRight,
   PieChart, Coins, Shield, Search, Bell, Settings, Menu, X,
+  Sun, Moon, Monitor,
 } from "lucide-react";
+import { useTheme } from "./ThemeProvider";
 
 const navItems = [
   { label: "Overview", path: "/", icon: LayoutDashboard },
@@ -20,6 +22,14 @@ const navItems = [
 export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
+
+  const cycleTheme = () => {
+    const next = theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
+    setTheme(next);
+  };
+
+  const ThemeIcon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -40,6 +50,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
           />
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={cycleTheme}
+            className="text-topbar-foreground/70 hover:text-topbar-foreground"
+            title={`Theme: ${theme}`}
+          >
+            <ThemeIcon className="h-4.5 w-4.5" />
+          </button>
           <button className="text-topbar-foreground/70 hover:text-topbar-foreground"><Bell className="h-4.5 w-4.5" /></button>
           <button className="text-topbar-foreground/70 hover:text-topbar-foreground"><Settings className="h-4.5 w-4.5" /></button>
           <div className="h-7 w-7 rounded-full bg-topbar-foreground/20 flex items-center justify-center text-xs font-medium text-topbar-foreground">K</div>
