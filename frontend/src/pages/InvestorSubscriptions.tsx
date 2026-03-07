@@ -45,7 +45,7 @@ export default function InvestorSubscriptionsPage() {
     <div>
       <PageHeader title="My Subscriptions" subtitle="Your subscription commitments and settlement status" />
       <SectionCard>
-        <DataTable columns={columns} data={data} getRowId={(r) => r.subscriptionId} />
+        <DataTable columns={columns} data={data} getRowId={(r) => r.id} />
       </SectionCard>
     </div>
   );

@@ -8,22 +8,22 @@ import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMyDashboard } from "@/services";
-import type { InvestorDashboard as InvestorDashboardData } from "@/services/investor-portal.service";
+import type { InvestorDashboard as DashboardData } from "@/services/investor-portal.service";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
-type SubscriptionRow = InvestorDashboardData["subscriptions"][number];
-type PositionRow = InvestorDashboardData["positions"][number];
+type SubRow = DashboardData["subscriptions"][number];
+type PosRow = DashboardData["tokenPositions"][number];
 
-const subscriptionCols: Column<SubscriptionRow>[] = [
+const subCols: Column<SubRow>[] = [
   { key: "subscriptionRef", header: "Reference" },
   { key: "allocationPct", header: "Allocation %", render: (r) => `${r.allocationPct}%` },
   { key: "committedAmount", header: "Committed", render: (r) => fmt(Number(r.committedAmount)) },
   { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
 ];
 
-const positionCols: Column<PositionRow>[] = [
+const posCols: Column<PosRow>[] = [
   { key: "walletAddress", header: "Wallet", className: "font-mono text-xs" },
   { key: "settledTokenBalance", header: "Settled Balance", render: (r) => fmt(Number(r.settledTokenBalance)) },
   { key: "ownershipPct", header: "Ownership %", render: (r) => `${r.ownershipPct.toFixed(1)}%` },
@@ -41,13 +41,12 @@ export default function InvestorDashboardPage() {
   if (error) return <ErrorAlert title="Failed to load portfolio" message={(error as Error).message} />;
   if (!data) return <EmptyState title="No portfolio data" message="Your portfolio overview is not available yet." />;
 
-  const { summary, subscriptions, positions, capitalAccount } = data;
+  const { summary, subscriptions, tokenPositions, capitalAccount } = data;
 
   return (
     <div>
       <PageHeader title="Portfolio Overview" subtitle="Your investment summary" />
 
-      {/* Snapshot Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard label="Total Committed" value={fmt(Number(summary.totalCommitted))} />
         <MetricCard label="Total Settled" value={fmt(Number(summary.totalSettled))} />
@@ -55,33 +54,22 @@ export default function InvestorDashboardPage() {
         <MetricCard label="Ownership" value={`${summary.ownershipPct.toFixed(1)}%`} />
       </div>
 
-      {/* Subscriptions */}
       <SectionCard title="Subscriptions" className="mb-6">
         {subscriptions.length === 0 ? (
           <EmptyState title="No subscriptions" message="You have no active subscriptions." />
         ) : (
-          <DataTable
-            columns={subscriptionCols}
-            data={subscriptions}
-            getRowId={(r) => r.subscriptionId}
-          />
+          <DataTable columns={subCols} data={subscriptions} getRowId={(r) => r.id} />
         )}
       </SectionCard>
 
-      {/* Token Positions */}
       <SectionCard title="Token Positions" className="mb-6">
-        {positions.length === 0 ? (
+        {tokenPositions.length === 0 ? (
           <EmptyState title="No positions" message="You have no settled positions yet." />
         ) : (
-          <DataTable
-            columns={positionCols}
-            data={positions}
-            getRowId={(r) => r.walletAddress}
-          />
+          <DataTable columns={posCols} data={tokenPositions} getRowId={(r) => r.id} />
         )}
       </SectionCard>
 
-      {/* Capital Account */}
       {capitalAccount && (
         <SectionCard title="Capital Account">
           <dl className="space-y-3">

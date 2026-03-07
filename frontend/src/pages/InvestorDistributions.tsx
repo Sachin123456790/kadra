@@ -7,15 +7,15 @@ import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMyDistributions } from "@/services";
-import type { InvestorDistribution } from "@/services/investor-portal.service";
+import type { InvestorDistributionLineItem } from "@/services/investor-portal.service";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
-const columns: Column<InvestorDistribution>[] = [
-  { key: "asOfTimestamp", header: "Run Date", render: (r) => new Date(r.asOfTimestamp).toLocaleDateString() },
-  { key: "runStatus", header: "Status", render: (r) => <StatusBadge status={r.runStatus} /> },
-  { key: "ownershipPctUsed", header: "Ownership %", render: (r) => `${r.ownershipPctUsed}%` },
+const columns: Column<InvestorDistributionLineItem>[] = [
+  { key: "run", header: "Run Date", render: (r) => new Date(r.run.asOfTimestamp).toLocaleDateString() },
+  { key: "run", header: "Status", render: (r) => <StatusBadge status={r.run.runStatus} /> },
+  { key: "ownershipPctUsed", header: "Ownership %", render: (r) => r.ownershipPctUsed != null ? `${r.ownershipPctUsed}%` : "--" },
   { key: "grossAmount", header: "Gross Amount", render: (r) => fmt(Number(r.grossAmount)) },
   { key: "netAmount", header: "Net Amount", render: (r) => fmt(Number(r.netAmount)) },
   { key: "currency", header: "Currency" },
@@ -44,7 +44,7 @@ export default function InvestorDistributionsPage() {
     <div>
       <PageHeader title="My Distributions" subtitle="Your distribution history" />
       <SectionCard>
-        <DataTable columns={columns} data={data} getRowId={(r) => r.distributionRunId} />
+        <DataTable columns={columns} data={data} getRowId={(r) => r.id} />
       </SectionCard>
     </div>
   );

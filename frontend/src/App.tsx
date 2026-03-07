@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/kadra/AuthProvider";
 import { ThemeProvider } from "@/components/kadra/ThemeProvider";
 import { AuthGuard } from "@/components/kadra/AuthGuard";
+import { RoleGuard } from "@/components/kadra/RoleGuard";
 import { AppLayout } from "@/components/kadra/AppLayout";
 import FundOverview from "./pages/FundOverview";
 import InvestorsPage from "./pages/InvestorsPage";
@@ -49,20 +50,21 @@ const App = () => (
                 <AuthGuard>
                   <AppLayout>
                     <Routes>
-                      <Route path="/" element={<FundOverview />} />
-                      <Route path="/investors" element={<InvestorsPage />} />
-                      <Route path="/subscriptions" element={<SubscriptionsPage />} />
-                      <Route path="/settlement" element={<SettlementPage />} />
-                      <Route path="/transfers" element={<TransfersPage />} />
-                      <Route path="/cap-table" element={<CapTablePage />} />
-                      <Route path="/distribution" element={<DistributionPage />} />
-                      <Route path="/audit" element={<AuditPage />} />
+                      {/* Admin routes */}
+                      <Route path="/" element={<RoleGuard allow="admin"><FundOverview /></RoleGuard>} />
+                      <Route path="/investors" element={<RoleGuard allow="admin"><InvestorsPage /></RoleGuard>} />
+                      <Route path="/subscriptions" element={<RoleGuard allow="admin"><SubscriptionsPage /></RoleGuard>} />
+                      <Route path="/settlement" element={<RoleGuard allow="admin"><SettlementPage /></RoleGuard>} />
+                      <Route path="/transfers" element={<RoleGuard allow="admin"><TransfersPage /></RoleGuard>} />
+                      <Route path="/cap-table" element={<RoleGuard allow="admin"><CapTablePage /></RoleGuard>} />
+                      <Route path="/distribution" element={<RoleGuard allow="admin"><DistributionPage /></RoleGuard>} />
+                      <Route path="/audit" element={<RoleGuard allow="admin"><AuditPage /></RoleGuard>} />
                       {/* Investor routes */}
-                      <Route path="/investor" element={<InvestorDashboard />} />
-                      <Route path="/investor/subscriptions" element={<InvestorSubscriptions />} />
-                      <Route path="/investor/cap-table" element={<InvestorCapTable />} />
-                      <Route path="/investor/distributions" element={<InvestorDistributions />} />
-                      <Route path="/investor/transfers" element={<InvestorTransfers />} />
+                      <Route path="/investor" element={<RoleGuard allow="investor"><InvestorDashboard /></RoleGuard>} />
+                      <Route path="/investor/subscriptions" element={<RoleGuard allow="investor"><InvestorSubscriptions /></RoleGuard>} />
+                      <Route path="/investor/cap-table" element={<RoleGuard allow="investor"><InvestorCapTable /></RoleGuard>} />
+                      <Route path="/investor/distributions" element={<RoleGuard allow="investor"><InvestorDistributions /></RoleGuard>} />
+                      <Route path="/investor/transfers" element={<RoleGuard allow="investor"><InvestorTransfers /></RoleGuard>} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </AppLayout>

@@ -7,27 +7,21 @@ import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMyTransfers } from "@/services";
-import type { InvestorTransfer } from "@/services/investor-portal.service";
+import type { InvestorTransferRequest } from "@/services/investor-portal.service";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
-const columns: Column<InvestorTransfer>[] = [
-  {
-    key: "direction",
-    header: "Direction",
-    render: (r) => (
-      <StatusBadge
-        status={r.direction === "sent" ? "Sent" : "Received"}
-        className={r.direction === "sent" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"}
-      />
-    ),
-  },
-  { key: "counterpartyAddress", header: "Counterparty", className: "font-mono text-xs" },
+const truncAddr = (addr: string) =>
+  addr.length > 12 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : addr;
+
+const columns: Column<InvestorTransferRequest>[] = [
+  { key: "fromWalletAddress", header: "From", className: "font-mono text-xs", render: (r) => truncAddr(r.fromWalletAddress) },
+  { key: "toWalletAddress", header: "To", className: "font-mono text-xs", render: (r) => truncAddr(r.toWalletAddress) },
   { key: "tokenAmount", header: "Amount", render: (r) => fmt(Number(r.tokenAmount)) },
   { key: "requestStatus", header: "Status", render: (r) => <StatusBadge status={r.requestStatus} /> },
-  { key: "txHash", header: "Tx Hash", className: "font-mono text-xs", render: (r) => r.txHash || "--" },
-  { key: "timestamp", header: "Date", render: (r) => new Date(r.timestamp).toLocaleDateString() },
+  { key: "submittedTxHash", header: "Tx Hash", className: "font-mono text-xs", render: (r) => r.submittedTxHash ? truncAddr(r.submittedTxHash) : "--" },
+  { key: "createdAt", header: "Date", render: (r) => new Date(r.createdAt).toLocaleDateString() },
 ];
 
 export default function InvestorTransfersPage() {
@@ -53,7 +47,7 @@ export default function InvestorTransfersPage() {
     <div>
       <PageHeader title="My Transfers" subtitle="Your transfer history" />
       <SectionCard>
-        <DataTable columns={columns} data={data} getRowId={(r) => r.transferRequestId} />
+        <DataTable columns={columns} data={data} getRowId={(r) => r.id} />
       </SectionCard>
     </div>
   );
