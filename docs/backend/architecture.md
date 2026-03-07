@@ -57,7 +57,10 @@ interface DocumentStorageAdapter {
 ```
 
 - Token: `STORAGE_ADAPTER`
-- Implementation: `LocalFsStorageAdapter` -- writes to `<cwd>/storage/documents/`
+- Implementations:
+  - `LocalFsStorageAdapter` -- writes to `<cwd>/storage/documents/` (used when `SUPABASE_URL` is not set)
+  - `SupabaseStorageAdapter` (`src/adapters/storage/supabase-storage.adapter.ts`) -- uploads to Supabase Storage via REST API (used when `SUPABASE_URL` is set)
+- Selection: Conditional on the `SUPABASE_URL` environment variable at module registration time. When present, the `SupabaseStorageAdapter` is bound; otherwise `LocalFsStorageAdapter` is used.
 - Bound in: `DocumentsModule`
 
 ### HashProvider
@@ -236,18 +239,32 @@ Note: `SettlementEvidence.evidenceType` uses string values (`PAYMENT_DOCUMENT`, 
 
 ## Async Job Infrastructure
 
-The `JobsModule` and its associated Prisma models (`Job`, `JobDeadLetter`) provide the **skeleton** for a Postgres-backed job queue using an outbox pattern:
+The `JobsModule` and its associated Prisma models (`Job`, `JobDeadLetter`) provide a **Postgres-backed job queue** using an outbox pattern:
 
 - Jobs are created as rows in the `jobs` table with `status: QUEUED`.
-- A worker process (not yet implemented) would poll for unlocked jobs, lock them (`lockedBy`, `lockedAt`), execute, and update status.
-- Failed jobs exceeding `maxAttempts` would be moved to the `jobs_dead_letter` table.
-- Job types (document parsing, audit export building, distribution run execution) are planned but not yet wired.
-
-Current state: `JobsService` and `JobsController` are empty shells.
+- The `JobsService` (`src/modules/jobs/jobs.service.ts`) implements:
+  - **Batch drain** (`runPendingJobs`) -- polls for unlocked `QUEUED` jobs, locks them (`lockedBy`, `lockedAt`), executes, and updates status. Jobs exceeding `maxAttempts` are moved to the `jobs_dead_letter` table.
+  - **Single run** (`runSingleJob`) -- executes a single job by ID (must be `QUEUED` or `FAILED`).
+  - **Dead-letter retry** (`retryDeadLetter`) -- re-enqueues a dead-lettered job as a fresh `QUEUED` job.
+  - **Chain event ingestion** (`ingestChainEvents`) -- stub that queries deployed `TokenContract` rows and logs; real implementation will use ethers to fetch on-chain events.
+  - **Transaction sync** (`syncPendingTransactions`) -- stub that queries `SUBMITTED` transfer requests and logs; real implementation will check tx receipts via ethers.
+- The `JobsController` (`src/modules/jobs/jobs.controller.ts`) exposes 5 POST endpoints under `/admin/jobs`, all guarded by `ServiceTokenGuard`.
+- Job types dispatched via `executeJob` switch: `document.parse`, `settlement.validate`, `token.mint`, `transfer.submit`, `export.bundle.generate` (all currently stubs that log).
+- Supabase Cron (via `pg_cron` + `pg_net`) calls these endpoints on a schedule to drive background processing without a separate worker process.
 
 ---
 
-## Auth Guards (Planned)
+## Auth Guards
+
+### ServiceTokenGuard (Implemented)
+
+`ServiceTokenGuard` (`src/common/guards/service-token.guard.ts`) protects the cron/admin job endpoints. It validates the `x-service-token` request header against the `CRON_SERVICE_TOKEN` environment variable.
+
+- If `CRON_SERVICE_TOKEN` is not set, the guard is bypassed (development mode).
+- If `CRON_SERVICE_TOKEN` is set and the header is missing or does not match, the guard throws `UnauthorizedException` (HTTP 401).
+- Applied at the controller level on `JobsController` via `@UseGuards(ServiceTokenGuard)`.
+
+### Planned Guards
 
 The following guards are planned but **not yet wired** into the request pipeline:
 
@@ -258,7 +275,7 @@ The following guards are planned but **not yet wired** into the request pipeline
 | `FundScopeGuard` | Ensure the authenticated user has access to the requested fund |
 | `WalletOwnershipGuard` | Ensure the authenticated investor owns the wallet used in transfer requests |
 
-Currently, all endpoints are unauthenticated. The `/admin/*` and `/investor/*` path prefixes indicate the intended access level.
+Currently, all non-job endpoints are unauthenticated. The `/admin/*` and `/investor/*` path prefixes indicate the intended access level.
 
 ---
 
@@ -266,12 +283,12 @@ Currently, all endpoints are unauthenticated. The `/admin/*` and `/investor/*` p
 
 | Area | Status |
 |---|---|
-| Jobs module | Skeleton only -- `JobsService` and `JobsController` are empty |
-| Worker application | Not created -- no background job processor exists |
-| Auth guards | Defined in plan, not implemented or wired |
+| Jobs module | Batch drain, single run, and dead-letter retry implemented; job type handlers are stubs (log only) |
+| Chain ingest / tx sync | Stub implementations -- query DB but do not interact with chain |
+| Auth guards | `ServiceTokenGuard` implemented for job endpoints; JWT/role/scope guards not yet wired |
 | Real blockchain adapter | `MockTokenContractAdapter` is used -- no Hardhat/ethers adapter exists |
 | PDF parsing | `MockParserAdapter` returns hardcoded fields -- no real PDF extraction |
-| S3 storage adapter | Only `LocalFsStorageAdapter` is implemented |
+| S3 storage adapter | `SupabaseStorageAdapter` is implemented; no S3 adapter yet |
 | On-chain hash anchoring | `DocumentHash.anchoredOnchain` field exists but no service writes to chain |
 | System event log writes | `SystemEventLog` table exists but no service emits events |
 | Capital account updates | `CapitalAccount` table exists but is not updated by settlement or distribution flows |

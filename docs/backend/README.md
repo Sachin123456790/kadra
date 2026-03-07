@@ -36,7 +36,7 @@ The application is composed of **10 domain modules**, a global **Prisma module**
 | `ownership` | Cap table computation, ownership history event log |
 | `distribution` | Waterfall configuration, distribution preview, distribution run execution |
 | `audit` | Audit export request and status tracking |
-| `jobs` | Async job infrastructure (skeleton -- not yet implemented) |
+| `jobs` | Async job infrastructure: batch drain, single run, dead-letter retry, chain event ingestion (stub), transaction sync (stub) |
 
 All modules are registered in `src/app.module.ts`. The `PrismaModule` is `@Global()`, making `PrismaService` available to every module without explicit imports.
 
@@ -48,7 +48,7 @@ The backend uses an **adapter pattern** to isolate infrastructure concerns behin
 
 | Adapter Interface | Token | Current Implementation | Purpose |
 |---|---|---|---|
-| `DocumentStorageAdapter` | `STORAGE_ADAPTER` | `LocalFsStorageAdapter` | Save/read/check document files on disk |
+| `DocumentStorageAdapter` | `STORAGE_ADAPTER` | `LocalFsStorageAdapter` (local) / `SupabaseStorageAdapter` (when `SUPABASE_URL` is set) | Save/read/check document files on disk or in Supabase Storage |
 | `HashProvider` | `HASH_PROVIDER` | `Sha256HashProvider` | Compute SHA-256 hash of document buffers |
 | `DocumentParserAdapter` | `PARSER_ADAPTER` | `MockParserAdapter` | Extract structured fields from uploaded documents |
 | `TokenContractAdapter` | `TOKEN_CONTRACT_ADAPTER` | `MockTokenContractAdapter` | Deploy, mint, transfer, and query ERC-3643 token balances |
@@ -134,5 +134,11 @@ List endpoints add a `count` field to `meta`.
 | `src/common/dto/response.dto.ts` | Response envelope DTOs |
 | `src/common/filters/app-exception.filter.ts` | Global exception filter |
 | `src/prisma/prisma.service.ts` | PrismaClient with `@prisma/adapter-pg` driver adapter |
+| `src/adapters/storage/supabase-storage.adapter.ts` | Supabase Storage adapter (production file storage) |
+| `src/common/guards/service-token.guard.ts` | ServiceTokenGuard for cron/admin job endpoints |
+| `src/modules/jobs/jobs.service.ts` | Job runner: batch drain, single run, dead-letter retry, chain ingest, tx sync |
+| `src/modules/jobs/jobs.controller.ts` | 5 POST endpoints for job management (guarded by `ServiceTokenGuard`) |
+| `test/demo-flow.e2e-spec.ts` | Full 9-step demo flow E2E test (40 tests, runs against real Postgres) |
+| `vercel.json` | Vercel deployment config (`dist/src/main.js` via `@vercel/node`) |
 | `prisma/schema.prisma` | 26 Prisma models |
 | `prisma/seed.ts` | Demo seed data |

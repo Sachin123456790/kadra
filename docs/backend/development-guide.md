@@ -94,6 +94,26 @@ Run a specific suite:
 npx jest --testPathPattern=identity
 ```
 
+### End-to-End Tests
+
+The E2E test suite (`test/demo-flow.e2e-spec.ts`) runs the full 9-step demo flow (40 tests) against a real PostgreSQL database (typically Supabase). It boots the full NestJS application, seeds data via API calls, and walks through the complete lifecycle: fund overview, document upload, subscription creation, settlement validation, token minting, transfers (legal + illegal), distribution preview, and audit export.
+
+**Prerequisites:**
+
+- A seeded PostgreSQL database (run `npx prisma migrate deploy && npx prisma db seed` first)
+- `DATABASE_URL` pointing at the database
+- `CRON_SERVICE_TOKEN` set (the E2E test sends this header for job endpoints)
+
+**Run:**
+
+```bash
+DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres" \
+  CRON_SERVICE_TOKEN="your-token" \
+  npm run test:e2e
+```
+
+The test file is at `test/demo-flow.e2e-spec.ts`.
+
 ---
 
 ## Project Structure
@@ -115,6 +135,8 @@ backend/
         response.dto.ts        # SuccessResponse<T>, ErrorResponse, ResponseMeta
       filters/
         app-exception.filter.ts  # Global exception filter (catches AppError + HttpException)
+      guards/
+        service-token.guard.ts # ServiceTokenGuard (validates x-service-token header for cron endpoints)
 
     domain/
       enums.ts                 # 22 domain enums
@@ -130,6 +152,7 @@ backend/
       storage/
         storage.adapter.ts     # DocumentStorageAdapter interface + STORAGE_ADAPTER token
         local-fs.adapter.ts    # Local filesystem implementation
+        supabase-storage.adapter.ts  # Supabase Storage implementation (production)
       hash/
         hash.provider.ts       # HashProvider interface + HASH_PROVIDER token
         sha256.provider.ts     # SHA-256 implementation
@@ -198,12 +221,13 @@ backend/
         __tests__/audit.service.spec.ts
 
       jobs/
-        jobs.module.ts         # Skeleton -- no handlers implemented
-        jobs.controller.ts     # Empty controller
-        jobs.service.ts        # Empty service
+        jobs.module.ts         # Job infrastructure module
+        jobs.controller.ts     # 5 POST endpoints (guarded by ServiceTokenGuard)
+        jobs.service.ts        # Batch drain, single run, dead-letter retry, chain ingest, tx sync
 
   test/
     app.e2e-spec.ts            # E2E test stub
+    demo-flow.e2e-spec.ts      # Full 9-step demo flow E2E (40 tests, requires real Postgres)
     jest-e2e.json              # E2E Jest config
 
   dist/                        # Compiled output (gitignored)
@@ -213,6 +237,7 @@ backend/
   tsconfig.build.json
   nest-cli.json
   eslint.config.mjs
+  vercel.json                  # Vercel deployment config (dist/src/main.js via @vercel/node)
 ```
 
 ---

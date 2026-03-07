@@ -20,7 +20,19 @@ This document covers deploying the Kadra backend (NestJS + Fastify) to Vercel, p
 - **Output directory**: `backend/dist`
 - **Node.js version**: 20.x
 
-NestJS + Fastify requires the `@vercel/node` builder targeting `dist/main.js`. The `backend/vercel.json` file handles this routing.
+NestJS + Fastify requires the `@vercel/node` builder targeting `dist/src/main.js`. The `backend/vercel.json` file handles this routing:
+
+```json
+{
+  "version": 2,
+  "builds": [
+    { "src": "dist/src/main.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "dist/src/main.js" }
+  ]
+}
+```
 
 ### Deploy
 

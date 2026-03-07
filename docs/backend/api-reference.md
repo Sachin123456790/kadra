@@ -373,3 +373,106 @@ Upload a single file. Max size: 50 MB (configured in `src/main.ts`).
 ### GET `/api/v1/admin/audit-exports/:auditExportId`
 
 **Response `data`:** `AuditExport` with current `status`, `artifactPath` (when `READY`), `checksumSha256`, and `manifestJson`.
+
+---
+
+## Jobs (Cron / Admin)
+
+All jobs endpoints require the `x-service-token` header matching the `CRON_SERVICE_TOKEN` environment variable. They are protected by `ServiceTokenGuard` (`src/common/guards/service-token.guard.ts`). If `CRON_SERVICE_TOKEN` is not set, the guard is bypassed (development mode).
+
+| Method | Path | Description | Source |
+|---|---|---|---|
+| POST | `/api/v1/admin/jobs/run` | Drain queued jobs in batch. | `src/modules/jobs/jobs.controller.ts` |
+| POST | `/api/v1/admin/jobs/:jobId/run` | Run a single job by ID. | `src/modules/jobs/jobs.controller.ts` |
+| POST | `/api/v1/admin/jobs/:jobId/retry` | Re-enqueue a dead-lettered job. | `src/modules/jobs/jobs.controller.ts` |
+| POST | `/api/v1/admin/jobs/chain-ingest` | Ingest on-chain events from deployed contracts (stub). | `src/modules/jobs/jobs.controller.ts` |
+| POST | `/api/v1/admin/jobs/tx-sync` | Sync pending transfer transaction receipts (stub). | `src/modules/jobs/jobs.controller.ts` |
+
+### POST `/api/v1/admin/jobs/run`
+
+Drains up to `batchSize` queued jobs ordered by priority (desc) then scheduled time (asc). Jobs exceeding `maxAttempts` are moved to the `jobs_dead_letter` table.
+
+**Headers:** `x-service-token: <CRON_SERVICE_TOKEN>`
+
+**Request body:**
+
+```typescript
+{
+  batchSize?: number;    // Default: 10
+  jobTypes?: string[];   // Optional filter by job type
+}
+```
+
+**Response `data`:**
+
+```typescript
+{
+  processed: number;
+  succeeded: number;
+  failed: number;
+  deadLettered: number;
+}
+```
+
+### POST `/api/v1/admin/jobs/:jobId/run`
+
+Runs a single job. The job must be in `QUEUED` or `FAILED` status.
+
+**Headers:** `x-service-token: <CRON_SERVICE_TOKEN>`
+
+**Response `data`:**
+
+```typescript
+{
+  jobId: string;
+  status: string;     // "COMPLETED" | "FAILED"
+  error?: string;
+}
+```
+
+### POST `/api/v1/admin/jobs/:jobId/retry`
+
+Re-enqueues a dead-lettered job by creating a new `Job` row with `status: QUEUED` and `attempts: 0`.
+
+**Headers:** `x-service-token: <CRON_SERVICE_TOKEN>`
+
+**Response `data`:** The newly created `Job` record.
+
+### POST `/api/v1/admin/jobs/chain-ingest`
+
+Ingests on-chain events for deployed token contracts. Currently a stub that logs and returns counts.
+
+**Headers:** `x-service-token: <CRON_SERVICE_TOKEN>`
+
+**Request body:**
+
+```typescript
+{
+  fundId?: string;     // Optional: scope to a single fund
+}
+```
+
+**Response `data`:**
+
+```typescript
+{
+  contractsProcessed: number;
+  eventsIngested: number;
+}
+```
+
+### POST `/api/v1/admin/jobs/tx-sync`
+
+Checks pending transfer transactions for confirmation or revert. Currently a stub.
+
+**Headers:** `x-service-token: <CRON_SERVICE_TOKEN>`
+
+**Response `data`:**
+
+```typescript
+{
+  checked: number;
+  confirmed: number;
+  reverted: number;
+}
+```
