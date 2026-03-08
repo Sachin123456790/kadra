@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ADMIN_ROLES } from "@/config/constants";
 
 const adminNavItems = [
-  { label: "Overview", path: "/", icon: LayoutDashboard },
+  { label: "Overview", path: "/dashboard", icon: LayoutDashboard },
   { label: "Investors", path: "/investors", icon: Users },
   { label: "Subscriptions", path: "/subscriptions", icon: FileText },
   { label: "Settlement", path: "/settlement", icon: Landmark },
@@ -52,7 +52,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role && (ADMIN_ROLES as readonly string[]).includes(user.role);
   const navItems = isAdmin ? adminNavItems : investorNavItems;
-  const homeRoute = isAdmin ? "/" : "/investor";
+  const homeRoute = isAdmin ? "/dashboard" : "/investor";
 
   const unreadCount = mockNotifications.filter((n) => n.unread).length;
   const initials = user?.email

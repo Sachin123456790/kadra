@@ -8,6 +8,7 @@ coverage.json
 CLAUDE.md
 .DS_Store
 docs/claude/
+docs/plans/
 
 # Backend
 backend/dist

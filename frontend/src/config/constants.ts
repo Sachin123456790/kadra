@@ -43,8 +43,9 @@ export const QUERY_KEYS = {
 export const ADMIN_ROLES = ['admin', 'platform_admin', 'fund_admin', 'operations_analyst'] as const;
 
 export const ROUTES = {
+  LANDING: '/',
   LOGIN: '/login',
-  OVERVIEW: '/',
+  OVERVIEW: '/dashboard',
   INVESTORS: '/investors',
   SUBSCRIPTIONS: '/subscriptions',
   SETTLEMENT: '/settlement',

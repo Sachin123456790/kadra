@@ -22,6 +22,7 @@ import InvestorCapTable from "./pages/InvestorCapTable";
 import InvestorDistributions from "./pages/InvestorDistributions";
 import InvestorTransfers from "./pages/InvestorTransfers";
 import InvestorProfile from "./pages/InvestorProfile";
+import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
@@ -45,6 +46,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<LandingPage />} />
             <Route
               path="*"
               element={
@@ -52,7 +54,7 @@ const App = () => (
                   <AppLayout>
                     <Routes>
                       {/* Admin routes */}
-                      <Route path="/" element={<RoleGuard allow="admin"><FundOverview /></RoleGuard>} />
+                      <Route path="/dashboard" element={<RoleGuard allow="admin"><FundOverview /></RoleGuard>} />
                       <Route path="/investors" element={<RoleGuard allow="admin"><InvestorsPage /></RoleGuard>} />
                       <Route path="/subscriptions" element={<RoleGuard allow="admin"><SubscriptionsPage /></RoleGuard>} />
                       <Route path="/settlement" element={<RoleGuard allow="admin"><SettlementPage /></RoleGuard>} />
