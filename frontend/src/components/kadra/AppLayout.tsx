@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, Users, FileText, Landmark, ArrowLeftRight,
+  LayoutDashboard, Users, FileText, FileUp, Landmark, ArrowLeftRight,
   PieChart, Coins, Shield, Search, Menu, X,
   Sun, Moon, Bell, LogOut, User, HelpCircle, ChevronDown, Wallet,
 } from "lucide-react";
@@ -21,6 +21,7 @@ import { ADMIN_ROLES } from "@/config/constants";
 
 const adminNavItems = [
   { label: "Overview", path: "/dashboard", icon: LayoutDashboard },
+  { label: "Documents", path: "/documents", icon: FileUp },
   { label: "Investors", path: "/investors", icon: Users },
   { label: "Subscriptions", path: "/subscriptions", icon: FileText },
   { label: "Settlement", path: "/settlement", icon: Landmark },
@@ -154,8 +155,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium">{user?.email || "admin@kadra.io"}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{user?.role || "Fund Admin"}</p>
+                  <p className="text-sm font-medium">{user?.email || "Loading..."}</p>
+                  <p className="text-xs text-gray-500 capitalize">{user?.role || "Loading..."}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

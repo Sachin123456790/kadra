@@ -33,6 +33,7 @@ export interface SubscriptionRow {
   status: string;
   lpaHash: string;
   timestamp: string;
+  createdAt: string;
 }
 
 /** Settlement queue item derived from a pending subscription */

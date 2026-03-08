@@ -12,10 +12,12 @@ export interface FundOverview {
   settledSubscriptions: number;
   totalCommittedAmount: string;
   totalSettledAmount: string;
+  createdAt?: string;
   tokenContract: {
     chainId: number;
     contractAddress: string;
     deploymentStatus: string;
+    deployedAt?: string;
   } | null;
 }
 

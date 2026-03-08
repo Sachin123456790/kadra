@@ -14,6 +14,8 @@ const variantMap: Record<string, BadgeVariant> = {
   Revoked: "destructive",
   Failed: "destructive",
   Passed: "success",
+  MINT: "success",
+  TRANSFER: "info",
 };
 
 const variantStyles: Record<BadgeVariant, string> = {

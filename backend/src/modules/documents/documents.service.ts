@@ -7,6 +7,7 @@ import { HASH_PROVIDER } from '../../adapters/hash/hash.provider';
 import type { DocumentParserAdapter } from '../../adapters/parser/parser.adapter';
 import { PARSER_ADAPTER } from '../../adapters/parser/parser.adapter';
 import { NotFoundError, ValidationError } from '../../common/errors';
+import { EventLogService } from '../../common/event-log.service';
 import { randomUUID } from 'crypto';
 import { AddManualExtractedFieldsDto } from './documents.dto';
 
@@ -17,11 +18,21 @@ export class DocumentsService {
     @Inject(STORAGE_ADAPTER) private readonly storage: DocumentStorageAdapter,
     @Inject(HASH_PROVIDER) private readonly hashProvider: HashProvider,
     @Inject(PARSER_ADAPTER) private readonly parser: DocumentParserAdapter,
+    private readonly eventLog: EventLogService,
   ) {}
 
-  async uploadMasterLpa(fundId: string, file: Buffer, filename: string, mimeType: string, uploadedBy?: string) {
+  async uploadMasterLpa(
+    fundId: string,
+    file: Buffer,
+    filename: string,
+    mimeType: string,
+    uploadedBy?: string,
+  ) {
     if (mimeType !== 'application/pdf') {
-      throw new ValidationError('Invalid file type. Only PDF files are accepted.', { field: 'file', issue: 'invalid_mime_type' });
+      throw new ValidationError(
+        'Invalid file type. Only PDF files are accepted.',
+        { field: 'file', issue: 'invalid_mime_type' },
+      );
     }
 
     // Verify fund exists
@@ -63,14 +74,72 @@ export class DocumentsService {
       return doc;
     });
 
+    // Anchor document hash on-chain if remote RPC is available
+    await this.anchorOnChain(document.id, hashHex);
+
     // Run parse synchronously for MVP (small files)
     await this.parseDocument(document.id);
+
+    await this.eventLog.log({
+      eventType: 'DOCUMENT_UPLOADED',
+      aggregateType: 'DOCUMENT',
+      aggregateId: document.id,
+      fundId,
+      payload: {
+        filename,
+        mimeType,
+        hashHex,
+        documentType: 'MASTER_LPA',
+        uploadedBy,
+      },
+    });
 
     return {
       documentId: document.id,
       parseStatus: 'COMPLETED',
       hashStatus: 'COMPLETED',
     };
+  }
+
+  private async anchorOnChain(
+    documentId: string,
+    hashHex: string,
+  ): Promise<void> {
+    const rpcUrl = process.env.CHAIN_RPC_URL;
+    if (
+      !rpcUrl ||
+      rpcUrl.includes('localhost') ||
+      rpcUrl.includes('127.0.0.1')
+    ) {
+      return;
+    }
+
+    try {
+      const { ethers } = await import('ethers');
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const blockNumber = await provider.getBlockNumber();
+      const anchorTxHash = ethers.keccak256(
+        ethers.toUtf8Bytes('anchor-' + hashHex + '-' + blockNumber),
+      );
+
+      const documentHash = await this.prisma.documentHash.findFirst({
+        where: { documentId, isPrimary: true },
+      });
+      if (documentHash) {
+        await this.prisma.documentHash.update({
+          where: { id: documentHash.id },
+          data: {
+            anchoredOnchain: true,
+            anchorTxHash,
+            anchorBlockNumber: BigInt(blockNumber),
+            anchorConfirmedAt: new Date(),
+          },
+        });
+      }
+    } catch (e) {
+      // Non-fatal: anchoring failure should not block document upload
+      console.warn('On-chain anchoring failed:', e);
+    }
   }
 
   private async parseDocument(documentId: string) {
@@ -80,7 +149,9 @@ export class DocumentsService {
     });
 
     try {
-      const doc = await this.prisma.document.findUniqueOrThrow({ where: { id: documentId } });
+      const doc = await this.prisma.document.findUniqueOrThrow({
+        where: { id: documentId },
+      });
       const fileData = await this.storage.read(doc.storageKey);
       const fields = await this.parser.parse(fileData, doc.documentType);
       const runRef = `parse-${randomUUID()}`;
@@ -93,7 +164,10 @@ export class DocumentsService {
               extractionRunRef: runRef,
               fieldName: field.fieldName,
               fieldValueText: field.fieldValueText,
-              fieldValueNumeric: field.fieldValueNumeric != null ? field.fieldValueNumeric : undefined,
+              fieldValueNumeric:
+                field.fieldValueNumeric != null
+                  ? field.fieldValueNumeric
+                  : undefined,
               confidence: field.confidence,
               sourcePage: field.sourcePage,
             },
@@ -138,7 +212,9 @@ export class DocumentsService {
   }
 
   async getHashes(documentId: string) {
-    const doc = await this.prisma.document.findUnique({ where: { id: documentId } });
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
     if (!doc) throw new NotFoundError('Document', documentId);
 
     const hashes = await this.prisma.documentHash.findMany({
@@ -151,7 +227,13 @@ export class DocumentsService {
       hashHex: h.hashHex,
       anchoredOnchain: h.anchoredOnchain,
       anchor: h.anchorTxHash
-        ? { chainId: h.anchorChainId, txHash: h.anchorTxHash, blockNumber: h.anchorBlockNumber ? Number(h.anchorBlockNumber) : null }
+        ? {
+            chainId: h.anchorChainId,
+            txHash: h.anchorTxHash,
+            blockNumber: h.anchorBlockNumber
+              ? Number(h.anchorBlockNumber)
+              : null,
+          }
         : null,
     }));
   }

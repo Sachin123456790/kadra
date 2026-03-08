@@ -1,7 +1,12 @@
 import { TokenizationService } from '../tokenization.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { MockTokenContractAdapter } from '../../../adapters/blockchain/mock-token-contract.adapter';
-import { NotFoundError, ConflictError, ExternalDependencyError } from '../../../common/errors';
+import { EventLogService } from '../../../common/event-log.service';
+import {
+  NotFoundError,
+  ConflictError,
+  ExternalDependencyError,
+} from '../../../common/errors';
 
 const mockPrisma = () => ({
   fund: { findUnique: jest.fn() },
@@ -58,9 +63,13 @@ describe('TokenizationService', () => {
   beforeEach(() => {
     prisma = mockPrisma();
     adapter = new MockTokenContractAdapter();
+    const mockEventLog = {
+      log: jest.fn().mockResolvedValue({}),
+    } as unknown as EventLogService;
     service = new TokenizationService(
       prisma as unknown as PrismaService,
       adapter,
+      mockEventLog,
     );
   });
 
@@ -138,12 +147,12 @@ describe('TokenizationService', () => {
         status: 'PENDING',
       });
 
-      await expect(
-        service.mintForSubscription(subscriptionId),
-      ).rejects.toThrow(ConflictError);
-      await expect(
-        service.mintForSubscription(subscriptionId),
-      ).rejects.toThrow('Subscription must be SETTLED');
+      await expect(service.mintForSubscription(subscriptionId)).rejects.toThrow(
+        ConflictError,
+      );
+      await expect(service.mintForSubscription(subscriptionId)).rejects.toThrow(
+        'Subscription must be SETTLED',
+      );
     });
 
     it('rejects already-minted subscription', async () => {
@@ -153,20 +162,20 @@ describe('TokenizationService', () => {
         eventType: 'MINT',
       });
 
-      await expect(
-        service.mintForSubscription(subscriptionId),
-      ).rejects.toThrow(ConflictError);
-      await expect(
-        service.mintForSubscription(subscriptionId),
-      ).rejects.toThrow('already minted');
+      await expect(service.mintForSubscription(subscriptionId)).rejects.toThrow(
+        ConflictError,
+      );
+      await expect(service.mintForSubscription(subscriptionId)).rejects.toThrow(
+        'already minted',
+      );
     });
 
     it('rejects when subscription not found', async () => {
       prisma.subscription.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.mintForSubscription('no-sub'),
-      ).rejects.toThrow(NotFoundError);
+      await expect(service.mintForSubscription('no-sub')).rejects.toThrow(
+        NotFoundError,
+      );
     });
 
     it('updates existing token position on repeat mint to same wallet', async () => {

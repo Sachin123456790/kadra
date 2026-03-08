@@ -7,6 +7,7 @@ import {
   ConflictError,
   ExternalDependencyError,
 } from '../../common/errors';
+import { EventLogService } from '../../common/event-log.service';
 
 @Injectable()
 export class TokenizationService {
@@ -14,6 +15,7 @@ export class TokenizationService {
     private readonly prisma: PrismaService,
     @Inject(TOKEN_CONTRACT_ADAPTER)
     private readonly tokenAdapter: TokenContractAdapter,
+    private readonly eventLog: EventLogService,
   ) {}
 
   async ensureContract(fundId: string) {
@@ -36,14 +38,13 @@ export class TokenizationService {
     const result = await this.tokenAdapter.deploy({
       name: fund.name + ' Token',
       symbol: 'KDRA',
-      identityRegistryAddress:
-        '0x0000000000000000000000000000000000000000', // Mock for MVP
+      identityRegistryAddress: '0x0000000000000000000000000000000000000000', // Mock for MVP
     });
 
     const contract = await this.prisma.tokenContract.create({
       data: {
         fundId,
-        chainId: 31337,
+        chainId: parseInt(process.env.CHAIN_ID || '11155111'),
         contractAddress: result.contractAddress,
         contractAddressNorm: result.contractAddress.toLowerCase(),
         tokenStandard: 'ERC-3643',
@@ -122,7 +123,7 @@ export class TokenizationService {
         data: {
           fundId: subscription.fundId,
           tokenContractId: contract.id,
-          chainId: 31337,
+          chainId: parseInt(process.env.CHAIN_ID || '11155111'),
           blockNumber: BigInt(result.blockNumber),
           blockTimestamp: new Date(),
           txHash: result.txHash,
@@ -174,6 +175,21 @@ export class TokenizationService {
           },
         });
       }
+
+      await this.eventLog.log({
+        eventType: 'TOKEN_MINTED',
+        aggregateType: 'TOKEN_POSITION_EVENT',
+        aggregateId: event.id,
+        fundId: subscription.fundId,
+        payload: {
+          subscriptionId,
+          walletAddress: subscription.wallet.address,
+          tokenAmount,
+          contractAddress: contract.contractAddress,
+        },
+        txHash: result.txHash,
+        blockNumber: result.blockNumber,
+      });
 
       return {
         mintRequestId: event.id,
@@ -304,6 +320,20 @@ export class TokenizationService {
         },
       });
 
+      await this.eventLog.log({
+        eventType: 'TRANSFER_FAILED',
+        aggregateType: 'TRANSFER_REQUEST',
+        aggregateId: transferRequest.id,
+        fundId,
+        payload: {
+          stage: 'PRECHECK',
+          failureCode,
+          fromWallet: input.fromWalletAddress,
+          toWallet: input.toWalletAddress,
+          tokenAmount: input.tokenAmount,
+        },
+      });
+
       return {
         transferRequestId: transferRequest.id,
         requestStatus: 'PRECHECK_FAILED',
@@ -359,7 +389,7 @@ export class TokenizationService {
         data: {
           fundId,
           tokenContractId: contract.id,
-          chainId: 31337,
+          chainId: parseInt(process.env.CHAIN_ID || '11155111'),
           blockNumber: BigInt(result.blockNumber),
           blockTimestamp: new Date(),
           txHash: result.txHash,
@@ -379,7 +409,7 @@ export class TokenizationService {
         },
       });
 
-      // Update positions atomically
+      // Update positions and capital accounts atomically
       await this.prisma.$transaction(async (tx) => {
         if (position) {
           await tx.tokenPosition.update({
@@ -411,6 +441,89 @@ export class TokenizationService {
             },
           });
         }
+
+        // Proportionally adjust capital accounts for transfer
+        const transferFraction = balance > 0 ? amount / balance : 0;
+        let transferredCapital = 0;
+
+        // Read sender account and compute transferred capital before any updates
+        const senderAccount = senderWallet
+          ? await tx.capitalAccount.findFirst({
+              where: {
+                fundId,
+                investorId: senderWallet.investorId,
+                isCurrent: true,
+                deletedAt: null,
+              },
+            })
+          : null;
+
+        if (senderAccount) {
+          const senderBalance = parseFloat(
+            senderAccount.endingCapitalBalance.toString(),
+          );
+          transferredCapital = senderBalance * transferFraction;
+          await tx.capitalAccount.update({
+            where: { id: senderAccount.id },
+            data: {
+              endingCapitalBalance: senderBalance - transferredCapital,
+              asOfDate: new Date(),
+            },
+          });
+        }
+
+        if (recipientWallet && transferredCapital > 0) {
+          const recipientAccount = await tx.capitalAccount.findFirst({
+            where: {
+              fundId,
+              investorId: recipientWallet.investorId,
+              isCurrent: true,
+              deletedAt: null,
+            },
+          });
+
+          if (recipientAccount) {
+            await tx.capitalAccount.update({
+              where: { id: recipientAccount.id },
+              data: {
+                endingCapitalBalance: {
+                  increment: transferredCapital,
+                },
+                asOfDate: new Date(),
+              },
+            });
+          } else {
+            await tx.capitalAccount.create({
+              data: {
+                fundId,
+                investorId: recipientWallet.investorId,
+                openingBalance: 0,
+                initialContribution: 0,
+                contributedAt: new Date(),
+                capitalReturned: 0,
+                accruedPref: 0,
+                residualAllocation: 0,
+                endingCapitalBalance: transferredCapital,
+                asOfDate: new Date(),
+                isCurrent: true,
+              },
+            });
+          }
+        }
+      });
+
+      await this.eventLog.log({
+        eventType: 'TRANSFER_COMPLETED',
+        aggregateType: 'TRANSFER_REQUEST',
+        aggregateId: transferRequest.id,
+        fundId,
+        payload: {
+          fromWallet: input.fromWalletAddress,
+          toWallet: input.toWalletAddress,
+          tokenAmount: input.tokenAmount,
+        },
+        txHash: result.txHash,
+        blockNumber: result.blockNumber,
       });
 
       return {
@@ -440,9 +553,22 @@ export class TokenizationService {
           tokenContractId: contract.id,
           eventKind: 'CHAIN_REVERTED',
           reasonCode: 'CONTRACT_REVERT',
-          reasonText:
-            error instanceof Error ? error.message : 'unknown',
+          reasonText: error instanceof Error ? error.message : 'unknown',
           payload: {},
+        },
+      });
+
+      await this.eventLog.log({
+        eventType: 'TRANSFER_FAILED',
+        aggregateType: 'TRANSFER_REQUEST',
+        aggregateId: transferRequest.id,
+        fundId,
+        payload: {
+          stage: 'CHAIN',
+          reason: error instanceof Error ? error.message : 'unknown',
+          fromWallet: input.fromWalletAddress,
+          toWallet: input.toWalletAddress,
+          tokenAmount: input.tokenAmount,
         },
       });
 
@@ -473,8 +599,7 @@ export class TokenizationService {
           ? {
               recipientEligible:
                 req.precheckReasonCode !== 'RECIPIENT_NOT_ELIGIBLE',
-              senderEligible:
-                req.precheckReasonCode !== 'SENDER_NOT_ELIGIBLE',
+              senderEligible: req.precheckReasonCode !== 'SENDER_NOT_ELIGIBLE',
               sufficientBalance:
                 req.precheckReasonCode !== 'INSUFFICIENT_BALANCE',
               failureCode: req.precheckReasonCode,

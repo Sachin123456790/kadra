@@ -1,5 +1,6 @@
 import { SettlementsService } from '../settlements.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EventLogService } from '../../../common/event-log.service';
 import { NotFoundError, ConflictError } from '../../../common/errors';
 
 const mockPrisma = () => ({
@@ -10,11 +11,17 @@ const mockPrisma = () => ({
   document: {
     findUnique: jest.fn(),
   },
+  documentHash: {
+    findUnique: jest.fn(),
+  },
   settlementRecord: {
     create: jest.fn(),
     update: jest.fn(),
     findFirst: jest.fn(),
     findUnique: jest.fn(),
+  },
+  capitalAccount: {
+    create: jest.fn(),
   },
 });
 
@@ -39,17 +46,31 @@ describe('SettlementsService', () => {
     subscriptionRef: 'SUB-001',
     fundId: 'fund-1',
     investorId: 'inv-1',
+    governingHashId: 'hash-1',
+    walletId: 'w-1',
   };
 
   beforeEach(() => {
     prisma = mockPrisma();
-    service = new SettlementsService(prisma as unknown as PrismaService);
+    const mockEventLog = {
+      log: jest.fn().mockResolvedValue({}),
+    } as unknown as EventLogService;
+    service = new SettlementsService(
+      prisma as unknown as PrismaService,
+      mockEventLog,
+    );
   });
 
   describe('requestValidation', () => {
     it('succeeds and passes when amounts and reference match', async () => {
       prisma.subscription.findUnique.mockResolvedValue(pendingSubscription);
-      prisma.document.findUnique.mockResolvedValue({ id: paymentDocumentId });
+      prisma.document.findUnique.mockResolvedValue({
+        id: paymentDocumentId,
+        linkedEntityType: 'INVESTOR',
+        linkedEntityId: 'inv-1',
+        fundId: 'fund-1',
+      });
+      prisma.documentHash.findUnique.mockResolvedValue({ id: 'hash-1' });
       prisma.settlementRecord.create.mockResolvedValue({
         id: 'sr-1',
         status: 'REQUESTED',
@@ -59,7 +80,10 @@ describe('SettlementsService', () => {
         .mockResolvedValueOnce({ id: 'sr-1', status: 'PASSED' }); // second update: PASSED
       prisma.settlementRecord.findFirst.mockResolvedValue(null); // no double settlement
 
-      const result = await service.requestValidation(subscriptionId, validInput);
+      const result = await service.requestValidation(
+        subscriptionId,
+        validInput,
+      );
 
       expect(result.status).toBe('PASSED');
       expect(result.checks.checkAmountMatch).toBe(true);
@@ -71,7 +95,13 @@ describe('SettlementsService', () => {
 
     it('fails on amount mismatch', async () => {
       prisma.subscription.findUnique.mockResolvedValue(pendingSubscription);
-      prisma.document.findUnique.mockResolvedValue({ id: paymentDocumentId });
+      prisma.document.findUnique.mockResolvedValue({
+        id: paymentDocumentId,
+        linkedEntityType: 'INVESTOR',
+        linkedEntityId: 'inv-1',
+        fundId: 'fund-1',
+      });
+      prisma.documentHash.findUnique.mockResolvedValue({ id: 'hash-1' });
       prisma.settlementRecord.create.mockResolvedValue({
         id: 'sr-2',
         status: 'REQUESTED',
@@ -93,7 +123,13 @@ describe('SettlementsService', () => {
 
     it('fails on reference mismatch', async () => {
       prisma.subscription.findUnique.mockResolvedValue(pendingSubscription);
-      prisma.document.findUnique.mockResolvedValue({ id: paymentDocumentId });
+      prisma.document.findUnique.mockResolvedValue({
+        id: paymentDocumentId,
+        linkedEntityType: 'INVESTOR',
+        linkedEntityId: 'inv-1',
+        fundId: 'fund-1',
+      });
+      prisma.documentHash.findUnique.mockResolvedValue({ id: 'hash-1' });
       prisma.settlementRecord.create.mockResolvedValue({
         id: 'sr-3',
         status: 'REQUESTED',
@@ -146,7 +182,13 @@ describe('SettlementsService', () => {
 
     it('detects double settlement', async () => {
       prisma.subscription.findUnique.mockResolvedValue(pendingSubscription);
-      prisma.document.findUnique.mockResolvedValue({ id: paymentDocumentId });
+      prisma.document.findUnique.mockResolvedValue({
+        id: paymentDocumentId,
+        linkedEntityType: 'INVESTOR',
+        linkedEntityId: 'inv-1',
+        fundId: 'fund-1',
+      });
+      prisma.documentHash.findUnique.mockResolvedValue({ id: 'hash-1' });
       prisma.settlementRecord.create.mockResolvedValue({
         id: 'sr-4',
         status: 'REQUESTED',
@@ -160,7 +202,10 @@ describe('SettlementsService', () => {
         status: 'PASSED',
       });
 
-      const result = await service.requestValidation(subscriptionId, validInput);
+      const result = await service.requestValidation(
+        subscriptionId,
+        validInput,
+      );
 
       expect(result.status).toBe('FAILED');
       expect(result.checks.checkNoDoubleSettlement).toBe(false);
@@ -184,6 +229,7 @@ describe('SettlementsService', () => {
         status: 'SETTLED',
         settledAt,
       });
+      prisma.capitalAccount.create.mockResolvedValue({ id: 'ca-1' });
 
       const result = await service.confirmSettlement(
         subscriptionId,
@@ -193,6 +239,7 @@ describe('SettlementsService', () => {
       expect(result.status).toBe('SETTLED');
       expect(result.subscriptionId).toBe(subscriptionId);
       expect(result.settledAt).toBe(settledAt.toISOString());
+      expect(prisma.capitalAccount.create).toHaveBeenCalledTimes(1);
     });
 
     it('rejects when settlement is FAILED', async () => {

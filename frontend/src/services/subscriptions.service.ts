@@ -4,11 +4,14 @@ export interface Subscription {
   subscriptionId: string;
   subscriptionRef: string;
   investorId: string;
+  investorName: string | null;
   walletId: string;
   allocationPct: number;
   committedAmount: string;
   status: string;
   settledAt: string | null;
+  createdAt: string | null;
+  governingHashHex: string | null;
   latestSettlementStatus: string | null;
 }
 

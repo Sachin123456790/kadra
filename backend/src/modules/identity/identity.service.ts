@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError, ConflictError } from '../../common/errors';
+import { EventLogService } from '../../common/event-log.service';
 
 @Injectable()
 export class IdentityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventLog: EventLogService,
+  ) {}
 
   async createInvestor(input: {
     legalName: string;
@@ -25,6 +29,17 @@ export class IdentityService {
       },
     });
 
+    await this.eventLog.log({
+      eventType: 'INVESTOR_CREATED',
+      aggregateType: 'INVESTOR',
+      aggregateId: investor.id,
+      payload: {
+        legalName: investor.legalName,
+        verificationStatus,
+        email: input.email,
+      },
+    });
+
     return {
       investorId: investor.id,
       legalName: investor.legalName,
@@ -32,13 +47,18 @@ export class IdentityService {
     };
   }
 
-  async linkWallet(investorId: string, input: {
-    chainId: number;
-    address: string;
-    label?: string;
-    isPrimary?: boolean;
-  }) {
-    const investor = await this.prisma.investor.findUnique({ where: { id: investorId } });
+  async linkWallet(
+    investorId: string,
+    input: {
+      chainId: number;
+      address: string;
+      label?: string;
+      isPrimary?: boolean;
+    },
+  ) {
+    const investor = await this.prisma.investor.findUnique({
+      where: { id: investorId },
+    });
     if (!investor) throw new NotFoundError('Investor', investorId);
 
     const addressNorm = input.address.toLowerCase();
@@ -55,6 +75,13 @@ export class IdentityService {
       },
     });
 
+    await this.eventLog.log({
+      eventType: 'WALLET_LINKED',
+      aggregateType: 'WALLET',
+      aggregateId: wallet.id,
+      payload: { investorId, chainId: input.chainId, address: input.address },
+    });
+
     return {
       walletId: wallet.id,
       investorId: wallet.investorId,
@@ -63,15 +90,31 @@ export class IdentityService {
     };
   }
 
-  async listInvestors(fundId: string, filters?: { eligibilityStatus?: string; verificationStatus?: string; search?: string }) {
+  async listInvestors(
+    fundId: string,
+    filters?: {
+      eligibilityStatus?: string;
+      verificationStatus?: string;
+      search?: string;
+    },
+  ) {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);
 
     const investors = await this.prisma.investor.findMany({
       where: {
         deletedAt: null,
-        ...(filters?.verificationStatus ? { verificationStatus: filters.verificationStatus } : {}),
-        ...(filters?.search ? { legalName: { contains: filters.search, mode: 'insensitive' as const } } : {}),
+        ...(filters?.verificationStatus
+          ? { verificationStatus: filters.verificationStatus }
+          : {}),
+        ...(filters?.search
+          ? {
+              legalName: {
+                contains: filters.search,
+                mode: 'insensitive' as const,
+              },
+            }
+          : {}),
       },
       include: {
         wallets: { where: { deletedAt: null } },
@@ -97,7 +140,8 @@ export class IdentityService {
         ? {
             eligibilityId: inv.eligibilities[0].id,
             status: inv.eligibilities[0].eligibilityStatus,
-            effectiveAt: inv.eligibilities[0].effectiveAt?.toISOString() ?? null,
+            effectiveAt:
+              inv.eligibilities[0].effectiveAt?.toISOString() ?? null,
           }
         : null,
     }));
@@ -113,20 +157,38 @@ export class IdentityService {
     return results;
   }
 
-  async upsertEligibility(fundId: string, input: { investorId: string; walletId: string; status: string; reason?: string }) {
+  async upsertEligibility(
+    fundId: string,
+    input: {
+      investorId: string;
+      walletId: string;
+      status: string;
+      reason?: string;
+    },
+  ) {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);
 
-    const investor = await this.prisma.investor.findUnique({ where: { id: input.investorId } });
+    const investor = await this.prisma.investor.findUnique({
+      where: { id: input.investorId },
+    });
     if (!investor) throw new NotFoundError('Investor', input.investorId);
     if (investor.verificationStatus !== 'VERIFIED') {
-      throw new ConflictError('INVESTOR_NOT_VERIFIED', 'Investor must be VERIFIED before granting eligibility');
+      throw new ConflictError(
+        'INVESTOR_NOT_VERIFIED',
+        'Investor must be VERIFIED before granting eligibility',
+      );
     }
 
-    const wallet = await this.prisma.wallet.findUnique({ where: { id: input.walletId } });
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { id: input.walletId },
+    });
     if (!wallet) throw new NotFoundError('Wallet', input.walletId);
     if (wallet.investorId !== input.investorId) {
-      throw new ConflictError('WALLET_NOT_LINKED', 'Wallet does not belong to this investor');
+      throw new ConflictError(
+        'WALLET_NOT_LINKED',
+        'Wallet does not belong to this investor',
+      );
     }
 
     const existing = await this.prisma.investorFundEligibility.findFirst({
@@ -162,6 +224,19 @@ export class IdentityService {
         },
       });
     }
+
+    await this.eventLog.log({
+      eventType: 'ELIGIBILITY_UPDATED',
+      aggregateType: 'INVESTOR_FUND_ELIGIBILITY',
+      aggregateId: eligibility.id,
+      fundId,
+      payload: {
+        investorId: input.investorId,
+        walletId: input.walletId,
+        status: input.status,
+        reason: input.reason,
+      },
+    });
 
     return {
       eligibilityId: eligibility.id,

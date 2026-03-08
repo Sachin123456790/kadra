@@ -1,5 +1,6 @@
 import { IdentityService } from '../identity.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EventLogService } from '../../../common/event-log.service';
 import { NotFoundError, ConflictError } from '../../../common/errors';
 
 const mockPrisma = () => ({
@@ -19,7 +20,13 @@ describe('IdentityService', () => {
 
   beforeEach(() => {
     prisma = mockPrisma();
-    service = new IdentityService(prisma as unknown as PrismaService);
+    const mockEventLog = {
+      log: jest.fn().mockResolvedValue({}),
+    } as unknown as EventLogService;
+    service = new IdentityService(
+      prisma as unknown as PrismaService,
+      mockEventLog,
+    );
   });
 
   describe('listInvestors', () => {
@@ -33,10 +40,20 @@ describe('IdentityService', () => {
           email: 'alice@example.com',
           verificationStatus: 'VERIFIED',
           wallets: [
-            { id: 'w-1', address: '0xabc', chainId: 1, isPrimary: true, walletStatus: 'ACTIVE' },
+            {
+              id: 'w-1',
+              address: '0xabc',
+              chainId: 1,
+              isPrimary: true,
+              walletStatus: 'ACTIVE',
+            },
           ],
           eligibilities: [
-            { id: 'elig-1', eligibilityStatus: 'ELIGIBLE', effectiveAt: new Date('2024-01-01T00:00:00Z') },
+            {
+              id: 'elig-1',
+              eligibilityStatus: 'ELIGIBLE',
+              effectiveAt: new Date('2024-01-01T00:00:00Z'),
+            },
           ],
         },
       ]);
@@ -54,7 +71,9 @@ describe('IdentityService', () => {
 
     it('throws NotFoundError when fund does not exist', async () => {
       prisma.fund.findUnique.mockResolvedValue(null);
-      await expect(service.listInvestors('nonexistent')).rejects.toThrow(NotFoundError);
+      await expect(service.listInvestors('nonexistent')).rejects.toThrow(
+        NotFoundError,
+      );
     });
 
     it('filters by eligibilityStatus NOT_SET', async () => {
@@ -74,11 +93,19 @@ describe('IdentityService', () => {
           email: null,
           verificationStatus: 'VERIFIED',
           wallets: [],
-          eligibilities: [{ id: 'e-1', eligibilityStatus: 'ELIGIBLE', effectiveAt: new Date() }],
+          eligibilities: [
+            {
+              id: 'e-1',
+              eligibilityStatus: 'ELIGIBLE',
+              effectiveAt: new Date(),
+            },
+          ],
         },
       ]);
 
-      const result = await service.listInvestors('fund-1', { eligibilityStatus: 'NOT_SET' });
+      const result = await service.listInvestors('fund-1', {
+        eligibilityStatus: 'NOT_SET',
+      });
       expect(result).toHaveLength(1);
       expect(result[0].investorId).toBe('inv-1');
     });
@@ -90,8 +117,14 @@ describe('IdentityService', () => {
 
     it('grants eligibility for verified investor (create path)', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
-      prisma.investor.findUnique.mockResolvedValue({ id: 'inv-1', verificationStatus: 'VERIFIED' });
-      prisma.wallet.findUnique.mockResolvedValue({ id: 'w-1', investorId: 'inv-1' });
+      prisma.investor.findUnique.mockResolvedValue({
+        id: 'inv-1',
+        verificationStatus: 'VERIFIED',
+      });
+      prisma.wallet.findUnique.mockResolvedValue({
+        id: 'w-1',
+        investorId: 'inv-1',
+      });
       prisma.investorFundEligibility.findFirst.mockResolvedValue(null);
       prisma.investorFundEligibility.create.mockResolvedValue({
         id: 'elig-new',
@@ -108,8 +141,14 @@ describe('IdentityService', () => {
 
     it('updates existing eligibility (update path)', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
-      prisma.investor.findUnique.mockResolvedValue({ id: 'inv-1', verificationStatus: 'VERIFIED' });
-      prisma.wallet.findUnique.mockResolvedValue({ id: 'w-1', investorId: 'inv-1' });
+      prisma.investor.findUnique.mockResolvedValue({
+        id: 'inv-1',
+        verificationStatus: 'VERIFIED',
+      });
+      prisma.wallet.findUnique.mockResolvedValue({
+        id: 'w-1',
+        investorId: 'inv-1',
+      });
       prisma.investorFundEligibility.findFirst.mockResolvedValue({
         id: 'elig-existing',
         effectiveAt: new Date('2024-01-01'),
@@ -120,7 +159,11 @@ describe('IdentityService', () => {
         effectiveAt: new Date('2024-01-01'),
       });
 
-      const result = await service.upsertEligibility(fundId, { ...input, status: 'REVOKED', reason: 'Non-compliant' });
+      const result = await service.upsertEligibility(fundId, {
+        ...input,
+        status: 'REVOKED',
+        reason: 'Non-compliant',
+      });
 
       expect(result.eligibilityId).toBe('elig-existing');
       expect(result.status).toBe('REVOKED');
@@ -129,37 +172,63 @@ describe('IdentityService', () => {
 
     it('rejects unverified investor', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
-      prisma.investor.findUnique.mockResolvedValue({ id: 'inv-1', verificationStatus: 'UNKNOWN' });
+      prisma.investor.findUnique.mockResolvedValue({
+        id: 'inv-1',
+        verificationStatus: 'UNKNOWN',
+      });
 
-      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(ConflictError);
-      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow('Investor must be VERIFIED');
+      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(
+        ConflictError,
+      );
+      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(
+        'Investor must be VERIFIED',
+      );
     });
 
     it('rejects wallet not owned by investor', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
-      prisma.investor.findUnique.mockResolvedValue({ id: 'inv-1', verificationStatus: 'VERIFIED' });
-      prisma.wallet.findUnique.mockResolvedValue({ id: 'w-1', investorId: 'inv-other' });
+      prisma.investor.findUnique.mockResolvedValue({
+        id: 'inv-1',
+        verificationStatus: 'VERIFIED',
+      });
+      prisma.wallet.findUnique.mockResolvedValue({
+        id: 'w-1',
+        investorId: 'inv-other',
+      });
 
-      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(ConflictError);
-      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow('Wallet does not belong to this investor');
+      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(
+        ConflictError,
+      );
+      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(
+        'Wallet does not belong to this investor',
+      );
     });
 
     it('throws NotFoundError when fund does not exist', async () => {
       prisma.fund.findUnique.mockResolvedValue(null);
-      await expect(service.upsertEligibility('no-fund', input)).rejects.toThrow(NotFoundError);
+      await expect(service.upsertEligibility('no-fund', input)).rejects.toThrow(
+        NotFoundError,
+      );
     });
 
     it('throws NotFoundError when investor does not exist', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
       prisma.investor.findUnique.mockResolvedValue(null);
-      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(NotFoundError);
+      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(
+        NotFoundError,
+      );
     });
 
     it('throws NotFoundError when wallet does not exist', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
-      prisma.investor.findUnique.mockResolvedValue({ id: 'inv-1', verificationStatus: 'VERIFIED' });
+      prisma.investor.findUnique.mockResolvedValue({
+        id: 'inv-1',
+        verificationStatus: 'VERIFIED',
+      });
       prisma.wallet.findUnique.mockResolvedValue(null);
-      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(NotFoundError);
+      await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 });

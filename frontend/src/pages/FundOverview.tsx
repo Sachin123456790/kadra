@@ -75,6 +75,30 @@ export default function FundOverviewPage() {
             ))}
           </div>
 
+          {/* Key Dates */}
+          {(data.createdAt || data.tokenContract?.deployedAt) && (
+            <SectionCard title="Key Dates">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {data.createdAt && (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">Fund Created</dt>
+                    <dd className="mt-1 text-sm font-medium text-gray-900">
+                      {new Date(data.createdAt).toLocaleDateString()} {new Date(data.createdAt).toLocaleTimeString()}
+                    </dd>
+                  </div>
+                )}
+                {data.tokenContract?.deployedAt && (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">Token Deployed</dt>
+                    <dd className="mt-1 text-sm font-medium text-gray-900">
+                      {new Date(data.tokenContract.deployedAt).toLocaleDateString()} {new Date(data.tokenContract.deployedAt).toLocaleTimeString()}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </SectionCard>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <SectionCard title="Fund Metrics">
               <dl className="space-y-3">

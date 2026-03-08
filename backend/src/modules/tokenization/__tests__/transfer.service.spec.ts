@@ -1,34 +1,55 @@
 import { TokenizationService } from '../tokenization.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { MockTokenContractAdapter } from '../../../adapters/blockchain/mock-token-contract.adapter';
+import { EventLogService } from '../../../common/event-log.service';
 import { NotFoundError } from '../../../common/errors';
 
-const mockPrisma = () => ({
-  fund: { findUnique: jest.fn() },
-  subscription: { findUnique: jest.fn() },
-  tokenContract: {
-    findFirst: jest.fn(),
-    create: jest.fn(),
-  },
-  tokenPositionEvent: {
-    findFirst: jest.fn(),
-    create: jest.fn(),
-  },
-  tokenPosition: {
-    findFirst: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-  },
-  wallet: { findFirst: jest.fn() },
-  investorFundEligibility: { findFirst: jest.fn() },
-  transferRequest: {
-    create: jest.fn(),
-    update: jest.fn(),
-    findUnique: jest.fn(),
-    findMany: jest.fn(),
-  },
-  transferEvent: { create: jest.fn() },
-});
+const mockPrisma = () => {
+  const txProxy = {
+    tokenPosition: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    capitalAccount: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      update: jest.fn(),
+      create: jest.fn(),
+    },
+  };
+  return {
+    fund: { findUnique: jest.fn() },
+    subscription: { findUnique: jest.fn() },
+    tokenContract: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
+    tokenPositionEvent: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
+    tokenPosition: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    wallet: { findFirst: jest.fn() },
+    investorFundEligibility: { findFirst: jest.fn() },
+    transferRequest: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+    },
+    transferEvent: { create: jest.fn() },
+    $transaction: jest
+      .fn()
+      .mockImplementation(async (fn: (tx: typeof txProxy) => Promise<void>) => {
+        await fn(txProxy);
+      }),
+    _tx: txProxy,
+  };
+};
 
 describe('TokenizationService – Transfer Enforcement', () => {
   let service: TokenizationService;
@@ -93,9 +114,13 @@ describe('TokenizationService – Transfer Enforcement', () => {
   beforeEach(() => {
     prisma = mockPrisma();
     adapter = new MockTokenContractAdapter();
+    const mockEventLog = {
+      log: jest.fn().mockResolvedValue({}),
+    } as unknown as EventLogService;
     service = new TokenizationService(
       prisma as unknown as PrismaService,
       adapter,
+      mockEventLog,
     );
   });
 
@@ -103,14 +128,12 @@ describe('TokenizationService – Transfer Enforcement', () => {
     prisma.fund.findUnique.mockResolvedValue(mockFund);
     prisma.tokenContract.findFirst.mockResolvedValue(deployedContract);
     prisma.wallet.findFirst
-      .mockResolvedValueOnce(senderWallet)
-      .mockResolvedValueOnce(recipientWallet);
+      .mockResolvedValueOnce({ ...senderWallet, investorId: 'inv-1' })
+      .mockResolvedValueOnce({ ...recipientWallet, investorId: 'inv-2' });
     prisma.investorFundEligibility.findFirst
       .mockResolvedValueOnce(senderEligibility)
       .mockResolvedValueOnce(recipientEligibility);
-    prisma.tokenPosition.findFirst
-      .mockResolvedValueOnce(senderPosition) // balance check
-      .mockResolvedValueOnce({ id: 'pos-2', settledTokenBalance: 1000 }); // recipient position
+    prisma.tokenPosition.findFirst.mockResolvedValueOnce(senderPosition); // balance check
     prisma.transferRequest.create.mockResolvedValue({
       id: 'tr-1',
       requestStatus: 'REQUESTED',
@@ -119,6 +142,13 @@ describe('TokenizationService – Transfer Enforcement', () => {
     prisma.transferEvent.create.mockResolvedValue({ id: 'te-1' });
     prisma.tokenPositionEvent.create.mockResolvedValue({ id: 'tpe-1' });
     prisma.tokenPosition.update.mockResolvedValue({});
+    // Set up transaction proxy mocks
+    prisma._tx.tokenPosition.findFirst.mockResolvedValue({
+      id: 'pos-2',
+      settledTokenBalance: 1000,
+    });
+    prisma._tx.tokenPosition.update.mockResolvedValue({});
+    prisma._tx.capitalAccount.findFirst.mockResolvedValue(null);
     // Mock the adapter transfer to return a successful result
     jest.spyOn(adapter, 'transfer').mockResolvedValue({
       txHash: '0x' + 'a'.repeat(64),
@@ -140,8 +170,8 @@ describe('TokenizationService – Transfer Enforcement', () => {
       expect(prisma.transferRequest.create).toHaveBeenCalledTimes(1);
       expect(prisma.transferEvent.create).toHaveBeenCalledTimes(1);
       expect(prisma.tokenPositionEvent.create).toHaveBeenCalledTimes(1);
-      // Both sender and recipient positions updated
-      expect(prisma.tokenPosition.update).toHaveBeenCalledTimes(2);
+      // Both sender and recipient positions updated inside transaction
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
 
     it('fails pre-check when recipient is not eligible', async () => {
@@ -285,18 +315,16 @@ describe('TokenizationService – Transfer Enforcement', () => {
       expect(result.precheckResult!.recipientEligible).toBe(false);
       expect(result.precheckResult!.senderEligible).toBe(true);
       expect(result.precheckResult!.sufficientBalance).toBe(true);
-      expect(result.precheckResult!.failureCode).toBe(
-        'RECIPIENT_NOT_ELIGIBLE',
-      );
+      expect(result.precheckResult!.failureCode).toBe('RECIPIENT_NOT_ELIGIBLE');
       expect(result.txHash).toBeNull();
     });
 
     it('throws NotFoundError for unknown transfer request', async () => {
       prisma.transferRequest.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getTransferValidation('no-such-id'),
-      ).rejects.toThrow(NotFoundError);
+      await expect(service.getTransferValidation('no-such-id')).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 

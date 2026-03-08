@@ -25,3 +25,16 @@ export function createAuditExport(fundId: string) {
 export function getAuditExport(auditExportId: string) {
   return get<AuditExportDetail>(`/admin/audit-exports/${auditExportId}`);
 }
+
+export interface AuditExportDownload {
+  exportId: string;
+  fundId: string;
+  fundName: string | null;
+  generatedAt: string | null;
+  checksumSha256: string | null;
+  files: Record<string, string>;
+}
+
+export function downloadAuditExport(auditExportId: string) {
+  return get<AuditExportDownload>(`/admin/audit-exports/${auditExportId}/download`);
+}

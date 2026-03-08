@@ -19,7 +19,8 @@ const columns: Column<SubscriptionRow>[] = [
   { key: "committedAmount", header: "Committed", render: (r) => fmt(r.committedAmount) },
   { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
   { key: "lpaHash", header: "LPA Hash", className: "font-mono text-xs" },
-  { key: "timestamp", header: "Date", render: (r) => r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "—" },
+  { key: "createdAt", header: "Created", render: (r) => r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—" },
+  { key: "timestamp", header: "Settled", render: (r) => r.timestamp ? new Date(r.timestamp).toLocaleDateString() : "—" },
 ];
 
 export default function SubscriptionsPage() {
@@ -35,12 +36,13 @@ export default function SubscriptionsPage() {
         id: sub.subscriptionId,
         ref: sub.subscriptionRef,
         investorId: sub.investorId,
-        investorName: sub.investorId, // backend returns investorId; display as-is unless enriched
+        investorName: sub.investorName || sub.investorId,
         allocation: sub.allocationPct,
         committedAmount: Number(sub.committedAmount) || 0,
         status: sub.status,
-        lpaHash: "—", // governing hash not returned in list endpoint
+        lpaHash: sub.governingHashHex || "—",
         timestamp: sub.settledAt ?? "",
+        createdAt: sub.createdAt ?? "",
       })),
   });
 
@@ -68,16 +70,17 @@ export default function SubscriptionsPage() {
                   ["Committed", fmt(selected.committedAmount)],
                   ["Status", selected.status],
                   ["LPA Hash", selected.lpaHash],
-                  ["Date", selected.timestamp ? new Date(selected.timestamp).toLocaleString() : "—"],
+                  ["Created", selected.createdAt ? new Date(selected.createdAt).toLocaleString() : "—"],
+                  ["Settled", selected.timestamp ? new Date(selected.timestamp).toLocaleString() : "—"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between border-b border-border pb-2 last:border-0">
-                    <dt className="text-sm text-muted-foreground">{k}</dt>
-                    <dd className="text-sm font-medium text-card-foreground">{v}</dd>
+                    <dt className="text-sm text-gray-500">{k}</dt>
+                    <dd className="text-sm font-medium text-gray-900">{v}</dd>
                   </div>
                 ))}
               </dl>
             ) : (
-              <p className="text-sm text-muted-foreground py-4 text-center">Select a subscription to view details</p>
+              <p className="text-sm text-gray-500 py-4 text-center">Select a subscription to view details</p>
             )}
           </SectionCard>
         </div>

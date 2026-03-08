@@ -37,10 +37,17 @@ export class AuditController {
   }
 
   @Get('audit-exports/:auditExportId')
-  async getExportStatus(
-    @Param('auditExportId') auditExportId: string,
-  ) {
+  async getExportStatus(@Param('auditExportId') auditExportId: string) {
     const data = await this.auditService.getExportStatus(auditExportId);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Get('audit-exports/:auditExportId/download')
+  async downloadExport(@Param('auditExportId') auditExportId: string) {
+    const data = await this.auditService.getExportDownload(auditExportId);
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },

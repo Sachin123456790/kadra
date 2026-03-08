@@ -1,10 +1,147 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError, ConflictError } from '../../common/errors';
+import { EventLogService } from '../../common/event-log.service';
+
+interface TierBreakdown {
+  readonly returnOfCapital: string;
+  readonly preferredReturn: string;
+  readonly gpCatchUp: string;
+  readonly carriedInterest: string;
+}
+
+export interface WaterfallLineItem {
+  readonly investorId: string | null;
+  readonly investorName: string | null;
+  readonly walletAddress: string;
+  readonly ownershipPctUsed: number;
+  readonly grossAmount: string;
+  readonly netAmount: string;
+  readonly returnOfCapitalAmount: number;
+  readonly prefAmount: number;
+  readonly promoteAmount: number;
+  readonly tierBreakdown: TierBreakdown;
+}
+
+interface WaterfallConfig {
+  readonly prefReturnPct: number | null;
+  readonly gpPromotePct: number | null;
+  readonly catchUpEnabled: boolean;
+}
+
+interface PositionWithInvestor {
+  readonly walletAddress: string;
+  readonly walletId: string | null;
+  readonly settledTokenBalance: unknown;
+  readonly wallet?: {
+    readonly investor?: {
+      readonly id: string;
+      readonly legalName: string;
+    } | null;
+  } | null;
+}
 
 @Injectable()
 export class DistributionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventLog: EventLogService,
+  ) {}
+
+  /**
+   * Apply tiered waterfall logic to a single LP position.
+   *
+   * Tiers (standard PE waterfall):
+   *  1. Return of Capital — return LP's initial contribution first
+   *  2. Preferred Return — prefReturnPct on the contribution
+   *  3. GP Catch-up — if enabled, GP receives until their promote share is met
+   *  4. Carried Interest — remaining split LP / GP per gpPromotePct
+   */
+  private computeWaterfallForPosition(
+    position: PositionWithInvestor,
+    totalSupply: number,
+    grossAmount: number,
+    config: WaterfallConfig,
+    initialContribution: number,
+  ): WaterfallLineItem {
+    const ownershipPct =
+      (Number(position.settledTokenBalance) / totalSupply) * 100;
+    const lpGrossAllocation = (ownershipPct / 100) * grossAmount;
+
+    const prefRate = config.prefReturnPct
+      ? Number(config.prefReturnPct) / 100
+      : 0;
+    const gpPromoteRate = config.gpPromotePct
+      ? Number(config.gpPromotePct) / 100
+      : 0;
+
+    // Use initial contribution if available, otherwise fall back to gross allocation
+    const contribution =
+      initialContribution > 0 ? initialContribution : lpGrossAllocation;
+
+    // Tier 1: Return of Capital — up to the LP's contribution
+    const returnOfCapital = Math.min(lpGrossAllocation, contribution);
+    let remaining = Math.max(0, lpGrossAllocation - returnOfCapital);
+
+    // Tier 2: Preferred Return — prefReturnPct applied to the contribution
+    const preferredReturn = Math.min(remaining, contribution * prefRate);
+    remaining = Math.max(0, remaining - preferredReturn);
+
+    // Tier 3: GP Catch-up — if enabled, GP receives 100% until GP's total
+    // equals gpPromoteRate of cumulative distributions (RoC + pref + catch-up)
+    let gpCatchUp = 0;
+    if (config.catchUpEnabled && gpPromoteRate > 0 && remaining > 0) {
+      // GP needs to "catch up" so their total equals gpPromoteRate of total distributed so far.
+      // After tiers 1+2, LP has received (returnOfCapital + preferredReturn).
+      // GP catch-up amount = (lpReceived / (1 - gpPromoteRate)) * gpPromoteRate - 0 (GP has 0 so far)
+      const lpReceivedSoFar = returnOfCapital + preferredReturn;
+      const targetGpTotal =
+        (lpReceivedSoFar / (1 - gpPromoteRate)) * gpPromoteRate;
+      gpCatchUp = Math.min(remaining, targetGpTotal);
+      remaining = Math.max(0, remaining - gpCatchUp);
+    }
+
+    // Tier 4: Carried Interest — split remaining between LP and GP
+    const carriedInterestGp = remaining * gpPromoteRate;
+
+    // Total GP take = catch-up + carried interest GP portion
+    const totalPromote = gpCatchUp + carriedInterestGp;
+
+    // Net to LP = gross allocation - total GP promote
+    const netToLP = lpGrossAllocation - totalPromote;
+
+    return {
+      investorId: position.wallet?.investor?.id ?? null,
+      investorName: position.wallet?.investor?.legalName ?? null,
+      walletAddress: position.walletAddress,
+      ownershipPctUsed: ownershipPct,
+      grossAmount: lpGrossAllocation.toFixed(2),
+      netAmount: netToLP.toFixed(2),
+      returnOfCapitalAmount: returnOfCapital,
+      prefAmount: preferredReturn,
+      promoteAmount: totalPromote,
+      tierBreakdown: {
+        returnOfCapital: returnOfCapital.toFixed(2),
+        preferredReturn: preferredReturn.toFixed(2),
+        gpCatchUp: gpCatchUp.toFixed(2),
+        carriedInterest: carriedInterestGp.toFixed(2),
+      },
+    };
+  }
+
+  /**
+   * Fetch initial contribution for an investor's capital account.
+   */
+  private async getInitialContribution(
+    fundId: string,
+    investorId: string | null | undefined,
+  ): Promise<number> {
+    if (!investorId) return 0;
+    const account = await this.prisma.capitalAccount.findFirst({
+      where: { fundId, investorId, isCurrent: true, deletedAt: null },
+    });
+    return account ? Number(account.initialContribution) : 0;
+  }
 
   async getActiveWaterfallConfig(fundId: string) {
     const config = await this.prisma.waterfallConfig.findFirst({
@@ -68,8 +205,12 @@ export class DistributionService {
         asOfTimestamp: run.asOfTimestamp.toISOString(),
         startedAt: run.startedAt?.toISOString() ?? null,
         completedAt: run.completedAt?.toISOString() ?? null,
-        totalGrossAmount: run.totalGrossAmount ? Number(run.totalGrossAmount).toFixed(2) : null,
-        totalNetAmount: run.totalNetAmount ? Number(run.totalNetAmount).toFixed(2) : null,
+        totalGrossAmount: run.totalGrossAmount
+          ? Number(run.totalGrossAmount).toFixed(2)
+          : null,
+        totalNetAmount: run.totalNetAmount
+          ? Number(run.totalNetAmount).toFixed(2)
+          : null,
         currency: run.currency,
         failureReason: run.failureReason,
       },
@@ -82,7 +223,9 @@ export class DistributionService {
         grossAmount: Number(li.grossAmount).toFixed(2),
         netAmount: Number(li.netAmount).toFixed(2),
         currency: li.currency,
-        ownershipPctUsed: li.ownershipPctUsed ? Number(li.ownershipPctUsed) : null,
+        ownershipPctUsed: li.ownershipPctUsed
+          ? Number(li.ownershipPctUsed)
+          : null,
         prefAmount: Number(li.prefAmount).toFixed(2),
         returnOfCapitalAmount: Number(li.returnOfCapitalAmount).toFixed(2),
         promoteAmount: Number(li.promoteAmount).toFixed(2),
@@ -107,7 +250,8 @@ export class DistributionService {
       where: { id: input.waterfallConfigId },
       include: { tiers: { orderBy: { tierOrder: 'asc' } } },
     });
-    if (!config) throw new NotFoundError('WaterfallConfig', input.waterfallConfigId);
+    if (!config)
+      throw new NotFoundError('WaterfallConfig', input.waterfallConfigId);
 
     // Get current positions for ownership %
     const contract = await this.prisma.tokenContract.findFirst({
@@ -134,26 +278,38 @@ export class DistributionService {
 
     const grossAmount = parseFloat(input.grossDistributableAmount);
 
-    // Simple pro-rata distribution (simplified waterfall for MVP)
-    const lineItems = positions.map((p) => {
-      const ownershipPct = (Number(p.settledTokenBalance) / totalSupply) * 100;
-      const grossAllocation = (ownershipPct / 100) * grossAmount;
+    const waterfallConfig: WaterfallConfig = {
+      prefReturnPct: config.prefReturnPct ? Number(config.prefReturnPct) : null,
+      gpPromotePct: config.gpPromotePct ? Number(config.gpPromotePct) : null,
+      catchUpEnabled: config.catchUpEnabled,
+    };
 
-      return {
-        investorId: p.wallet?.investor?.id ?? null,
-        investorName: p.wallet?.investor?.legalName ?? null,
-        walletAddress: p.walletAddress,
-        ownershipPctUsed: ownershipPct,
-        grossAmount: grossAllocation.toFixed(2),
-        netAmount: grossAllocation.toFixed(2), // No fees in MVP
-        tierBreakdown: {},
-      };
-    });
+    // Apply tiered waterfall calculation per LP position
+    const lineItems: WaterfallLineItem[] = [];
+    let totalNet = 0;
+
+    for (const p of positions) {
+      const contribution = await this.getInitialContribution(
+        fundId,
+        p.wallet?.investor?.id,
+      );
+      const item = this.computeWaterfallForPosition(
+        p,
+        totalSupply,
+        grossAmount,
+        waterfallConfig,
+        contribution,
+      );
+      lineItems.push(item);
+      totalNet += parseFloat(item.netAmount);
+    }
 
     return {
       asOfTimestamp: input.asOfTimestamp,
       summary: {
         gross: input.grossDistributableAmount,
+        net: totalNet.toFixed(2),
+        totalPromote: (grossAmount - totalNet).toFixed(2),
         currency: input.currency || 'USD',
       },
       lineItems,
@@ -171,6 +327,20 @@ export class DistributionService {
   ) {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);
+
+    // Fetch waterfall config for tiered calculation
+    const config = await this.prisma.waterfallConfig.findUnique({
+      where: { id: input.waterfallConfigId },
+      include: { tiers: { orderBy: { tierOrder: 'asc' } } },
+    });
+    if (!config)
+      throw new NotFoundError('WaterfallConfig', input.waterfallConfigId);
+
+    const waterfallConfig: WaterfallConfig = {
+      prefReturnPct: config.prefReturnPct ? Number(config.prefReturnPct) : null,
+      gpPromotePct: config.gpPromotePct ? Number(config.gpPromotePct) : null,
+      catchUpEnabled: config.catchUpEnabled,
+    };
 
     // Create ownership snapshot first
     const contract = await this.prisma.tokenContract.findFirst({
@@ -240,13 +410,10 @@ export class DistributionService {
 
     try {
       let totalGross = 0;
-      for (const p of positions) {
-        const ownershipPct =
-          (Number(p.settledTokenBalance) / totalSupply) * 100;
-        const allocation = (ownershipPct / 100) * grossAmount;
-        totalGross += allocation;
+      let totalNet = 0;
 
-        // Find capital account
+      for (const p of positions) {
+        // Find capital account for contribution data
         const capitalAccount = await this.prisma.capitalAccount.findFirst({
           where: {
             fundId,
@@ -256,20 +423,35 @@ export class DistributionService {
           },
         });
 
+        const contribution = capitalAccount
+          ? Number(capitalAccount.initialContribution)
+          : 0;
+
+        const item = this.computeWaterfallForPosition(
+          p,
+          totalSupply,
+          grossAmount,
+          waterfallConfig,
+          contribution,
+        );
+
+        totalGross += parseFloat(item.grossAmount);
+        totalNet += parseFloat(item.netAmount);
+
         await this.prisma.distributionLineItem.create({
           data: {
             distributionRunId: run.id,
             investorId: p.wallet?.investor?.id ?? '',
             walletId: p.walletId,
             capitalAccountId: capitalAccount?.id,
-            grossAmount: allocation,
-            netAmount: allocation,
+            grossAmount: parseFloat(item.grossAmount),
+            netAmount: parseFloat(item.netAmount),
             currency: input.currency || 'USD',
-            ownershipPctUsed: ownershipPct,
-            prefAmount: 0,
-            returnOfCapitalAmount: 0,
-            promoteAmount: 0,
-            tierBreakdown: {},
+            ownershipPctUsed: item.ownershipPctUsed,
+            prefAmount: item.prefAmount,
+            returnOfCapitalAmount: item.returnOfCapitalAmount,
+            promoteAmount: item.promoteAmount,
+            tierBreakdown: item.tierBreakdown as object,
           },
         });
       }
@@ -280,7 +462,21 @@ export class DistributionService {
           runStatus: 'COMPLETED',
           completedAt: new Date(),
           totalGrossAmount: totalGross,
-          totalNetAmount: totalGross,
+          totalNetAmount: totalNet,
+        },
+      });
+
+      await this.eventLog.log({
+        eventType: 'DISTRIBUTION_COMPLETED',
+        aggregateType: 'DISTRIBUTION_RUN',
+        aggregateId: run.id,
+        fundId,
+        payload: {
+          totalGross,
+          totalNet,
+          lineItemCount: positions.length,
+          currency: input.currency || 'USD',
+          waterfallConfigId: input.waterfallConfigId,
         },
       });
 
@@ -294,8 +490,7 @@ export class DistributionService {
         where: { id: run.id },
         data: {
           runStatus: 'FAILED',
-          failureReason:
-            error instanceof Error ? error.message : 'unknown',
+          failureReason: error instanceof Error ? error.message : 'unknown',
         },
       });
       throw error;

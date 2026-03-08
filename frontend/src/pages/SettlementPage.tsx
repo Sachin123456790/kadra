@@ -28,6 +28,7 @@ interface QueueItem {
   id: string;
   subscriptionId: string;
   investor: string;
+  investorId: string;
   amount: string;
   ref: string;
   status: string;
@@ -38,6 +39,7 @@ export default function SettlementPage() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [validationResults, setValidationResults] = useState<Record<string, ValidationResult>>({});
+  const [paymentDocIds, setPaymentDocIds] = useState<Record<string, string>>({});
 
   // Fetch pending subscriptions as the payment queue
   const { data: queue, isLoading, error } = useQuery({
@@ -47,7 +49,8 @@ export default function SettlementPage() {
       data.map((sub) => ({
         id: sub.subscriptionId,
         subscriptionId: sub.subscriptionId,
-        investor: sub.investorId,
+        investor: sub.investorName || sub.investorId,
+        investorId: sub.investorId,
         amount: `$${Number(sub.committedAmount).toLocaleString()}`,
         ref: sub.subscriptionRef,
         status: sub.latestSettlementStatus ?? "Pending",
@@ -60,7 +63,7 @@ export default function SettlementPage() {
   const validateMutation = useMutation({
     mutationFn: (item: QueueItem) =>
       requestPaymentValidation(item.subscriptionId, {
-        paymentDocumentId: '', // placeholder — real flow would have a document upload first
+        paymentDocumentId: paymentDocIds[item.id] || '',
         declaredAmount: item.amount.replace(/[$,]/g, ''),
         declaredCurrency: 'USD',
         declaredReference: item.ref,
@@ -101,8 +104,8 @@ export default function SettlementPage() {
                 )}
               >
                 <div>
-                  <p className="text-sm font-medium text-card-foreground">{p.investor}</p>
-                  <p className="text-xs text-muted-foreground">{p.amount} · {p.ref}</p>
+                  <p className="text-sm font-medium text-gray-900">{p.investor}</p>
+                  <p className="text-xs text-gray-500">{p.amount} · {p.ref}</p>
                 </div>
                 <StatusBadge status={p.status} />
               </button>
@@ -113,6 +116,28 @@ export default function SettlementPage() {
         <SectionCard title="Validation Checklist">
           {selected && (
             <>
+              {/* Payment Document Reference */}
+              <div className="mb-4">
+                <label htmlFor="paymentDocId" className="block text-sm font-medium text-gray-600 mb-1">
+                  Payment Document ID
+                </label>
+                <input
+                  id="paymentDocId"
+                  type="text"
+                  placeholder="Paste document reference or leave blank"
+                  value={paymentDocIds[selected.id] || ''}
+                  onChange={(e) =>
+                    setPaymentDocIds(prev => ({ ...prev, [selected.id]: e.target.value }))
+                  }
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                {!paymentDocIds[selected.id] && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    No document reference provided. Validation will proceed without it.
+                  </p>
+                )}
+              </div>
+
               <div className="space-y-3 mb-4">
                 {checkItems.map((ci) => {
                   let result: "pass" | "fail" | "pending" = "pending";

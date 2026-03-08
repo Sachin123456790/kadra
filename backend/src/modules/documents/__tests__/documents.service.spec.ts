@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { STORAGE_ADAPTER } from '../../../adapters/storage/storage.adapter';
 import { HASH_PROVIDER } from '../../../adapters/hash/hash.provider';
 import { PARSER_ADAPTER } from '../../../adapters/parser/parser.adapter';
+import { EventLogService } from '../../../common/event-log.service';
 import { NotFoundError, ValidationError } from '../../../common/errors';
 
 describe('DocumentsService', () => {
@@ -45,9 +46,24 @@ describe('DocumentsService', () => {
 
   const mockParser = {
     parse: jest.fn().mockResolvedValue([
-      { fieldName: 'fund_name', fieldValueText: 'Kadra Demo Fund I', confidence: 0.98, sourcePage: 1 },
-      { fieldName: 'total_commitment', fieldValueNumeric: 5000000, confidence: 0.92, sourcePage: 2 },
-      { fieldName: 'preferred_return', fieldValueNumeric: 8, confidence: 0.85, sourcePage: 4 },
+      {
+        fieldName: 'fund_name',
+        fieldValueText: 'Kadra Demo Fund I',
+        confidence: 0.98,
+        sourcePage: 1,
+      },
+      {
+        fieldName: 'total_commitment',
+        fieldValueNumeric: 5000000,
+        confidence: 0.92,
+        sourcePage: 2,
+      },
+      {
+        fieldName: 'preferred_return',
+        fieldValueNumeric: 8,
+        confidence: 0.85,
+        sourcePage: 4,
+      },
     ]),
   };
 
@@ -61,6 +77,10 @@ describe('DocumentsService', () => {
         { provide: STORAGE_ADAPTER, useValue: mockStorage },
         { provide: HASH_PROVIDER, useValue: mockHashProvider },
         { provide: PARSER_ADAPTER, useValue: mockParser },
+        {
+          provide: EventLogService,
+          useValue: { log: jest.fn().mockResolvedValue({}) },
+        },
       ],
     }).compile();
 
@@ -87,7 +107,9 @@ describe('DocumentsService', () => {
           return fn({
             document: {
               create: jest.fn().mockResolvedValue(createdDoc),
-              update: jest.fn().mockResolvedValue({ ...createdDoc, parseStatus: 'COMPLETED' }),
+              update: jest
+                .fn()
+                .mockResolvedValue({ ...createdDoc, parseStatus: 'COMPLETED' }),
             },
             documentHash: {
               create: jest.fn().mockResolvedValue({ id: 'hash-1' }),
@@ -101,22 +123,39 @@ describe('DocumentsService', () => {
       });
 
       // For the parseDocument call
-      mockPrisma.document.update.mockResolvedValue({ ...createdDoc, parseStatus: 'PROCESSING' });
+      mockPrisma.document.update.mockResolvedValue({
+        ...createdDoc,
+        parseStatus: 'PROCESSING',
+      });
       mockPrisma.document.findUniqueOrThrow.mockResolvedValue(createdDoc);
 
-      const result = await service.uploadMasterLpa('fund-1', pdfBuffer, 'test.pdf', 'application/pdf', 'admin');
+      const result = await service.uploadMasterLpa(
+        'fund-1',
+        pdfBuffer,
+        'test.pdf',
+        'application/pdf',
+        'admin',
+      );
 
       expect(result.documentId).toBe(mockDocId);
       expect(result.parseStatus).toBe('COMPLETED');
       expect(result.hashStatus).toBe('COMPLETED');
       expect(mockStorage.save).toHaveBeenCalledTimes(1);
       expect(mockHashProvider.hash).toHaveBeenCalledWith(pdfBuffer);
-      expect(mockPrisma.fund.findUnique).toHaveBeenCalledWith({ where: { id: 'fund-1' } });
+      expect(mockPrisma.fund.findUnique).toHaveBeenCalledWith({
+        where: { id: 'fund-1' },
+      });
     });
 
     it('should reject non-PDF mime types', async () => {
       await expect(
-        service.uploadMasterLpa('fund-1', pdfBuffer, 'doc.docx', 'application/msword', 'admin'),
+        service.uploadMasterLpa(
+          'fund-1',
+          pdfBuffer,
+          'doc.docx',
+          'application/msword',
+          'admin',
+        ),
       ).rejects.toThrow(ValidationError);
 
       expect(mockPrisma.fund.findUnique).not.toHaveBeenCalled();
@@ -127,7 +166,13 @@ describe('DocumentsService', () => {
       mockPrisma.fund.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.uploadMasterLpa('nonexistent', pdfBuffer, 'test.pdf', 'application/pdf', 'admin'),
+        service.uploadMasterLpa(
+          'nonexistent',
+          pdfBuffer,
+          'test.pdf',
+          'application/pdf',
+          'admin',
+        ),
       ).rejects.toThrow(NotFoundError);
 
       expect(mockStorage.save).not.toHaveBeenCalled();
@@ -159,7 +204,9 @@ describe('DocumentsService', () => {
     it('should throw NotFoundError for non-existent document', async () => {
       mockPrisma.document.findUnique.mockResolvedValue(null);
 
-      await expect(service.getParseStatus('nonexistent')).rejects.toThrow(NotFoundError);
+      await expect(service.getParseStatus('nonexistent')).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 
@@ -219,7 +266,9 @@ describe('DocumentsService', () => {
     it('should throw NotFoundError for non-existent document', async () => {
       mockPrisma.document.findUnique.mockResolvedValue(null);
 
-      await expect(service.getHashes('nonexistent')).rejects.toThrow(NotFoundError);
+      await expect(service.getHashes('nonexistent')).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 });

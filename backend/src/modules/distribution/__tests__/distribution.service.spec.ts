@@ -1,5 +1,6 @@
 import { DistributionService } from '../distribution.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EventLogService } from '../../../common/event-log.service';
 import { NotFoundError, ConflictError } from '../../../common/errors';
 
 const mockPrisma = () => ({
@@ -35,6 +36,10 @@ const mockPrisma = () => ({
   distributionLineItem: {
     create: jest.fn(),
   },
+});
+
+const mockEventLog = () => ({
+  log: jest.fn().mockResolvedValue(undefined),
 });
 
 describe('DistributionService', () => {
@@ -111,9 +116,15 @@ describe('DistributionService', () => {
     },
   ];
 
+  let eventLog: ReturnType<typeof mockEventLog>;
+
   beforeEach(() => {
     prisma = mockPrisma();
-    service = new DistributionService(prisma as unknown as PrismaService);
+    eventLog = mockEventLog();
+    service = new DistributionService(
+      prisma as unknown as PrismaService,
+      eventLog as unknown as EventLogService,
+    );
   });
 
   describe('getActiveWaterfallConfig', () => {
@@ -141,9 +152,9 @@ describe('DistributionService', () => {
     it('throws NotFoundError when no active config', async () => {
       prisma.waterfallConfig.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getActiveWaterfallConfig(fundId),
-      ).rejects.toThrow(NotFoundError);
+      await expect(service.getActiveWaterfallConfig(fundId)).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 
@@ -155,11 +166,13 @@ describe('DistributionService', () => {
       currency: 'USD',
     };
 
-    it('returns pro-rata line items', async () => {
+    it('returns tiered waterfall line items with tier breakdown', async () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
       prisma.waterfallConfig.findUnique.mockResolvedValue(mockConfig);
       prisma.tokenContract.findFirst.mockResolvedValue(mockContract);
       prisma.tokenPosition.findMany.mockResolvedValue(mockPositions);
+      // No capital accounts — fallback uses gross allocation as contribution
+      prisma.capitalAccount.findFirst.mockResolvedValue(null);
 
       const result = await service.previewDistribution(fundId, previewInput);
 
@@ -169,16 +182,104 @@ describe('DistributionService', () => {
       expect(result.lineItems).toHaveLength(2);
 
       // Investor A: 2000/5000 = 40% -> 200000
+      // No capital account: contribution = grossAllocation, RoC absorbs all, net = gross
       expect(result.lineItems[0].investorId).toBe('inv-1');
       expect(result.lineItems[0].investorName).toBe('Investor A');
       expect(result.lineItems[0].ownershipPctUsed).toBe(40);
       expect(result.lineItems[0].grossAmount).toBe('200000.00');
       expect(result.lineItems[0].netAmount).toBe('200000.00');
+      expect(result.lineItems[0].tierBreakdown).toBeDefined();
+      expect(result.lineItems[0].tierBreakdown.returnOfCapital).toBe(
+        '200000.00',
+      );
 
       // Investor B: 3000/5000 = 60% -> 300000
       expect(result.lineItems[1].investorId).toBe('inv-2');
       expect(result.lineItems[1].ownershipPctUsed).toBe(60);
       expect(result.lineItems[1].grossAmount).toBe('300000.00');
+    });
+
+    it('applies waterfall tiers when capital accounts are available', async () => {
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.waterfallConfig.findUnique.mockResolvedValue(mockConfig);
+      prisma.tokenContract.findFirst.mockResolvedValue(mockContract);
+      prisma.tokenPosition.findMany.mockResolvedValue(mockPositions);
+      // Capital accounts with contribution < gross allocation to trigger tiers
+      prisma.capitalAccount.findFirst.mockResolvedValue({
+        id: 'ca-1',
+        initialContribution: 100000, // Less than 200k/300k gross allocation
+      });
+
+      const result = await service.previewDistribution(fundId, previewInput);
+
+      expect(result.lineItems).toHaveLength(2);
+
+      // Investor A: gross = 200000, contribution = 100000
+      // Tier 1 RoC: min(200000, 100000) = 100000, remaining = 100000
+      // Tier 2 Pref: min(100000, 100000 * 0.08) = 8000, remaining = 92000
+      // Tier 3 GP catch-up: disabled
+      // Tier 4 Carried: GP gets 92000 * 0.20 = 18400
+      // Net = 200000 - 18400 = 181600
+      const itemA = result.lineItems[0];
+      expect(itemA.grossAmount).toBe('200000.00');
+      expect(itemA.tierBreakdown.returnOfCapital).toBe('100000.00');
+      expect(itemA.tierBreakdown.preferredReturn).toBe('8000.00');
+      expect(itemA.tierBreakdown.gpCatchUp).toBe('0.00');
+      expect(itemA.tierBreakdown.carriedInterest).toBe('18400.00');
+      expect(itemA.netAmount).toBe('181600.00');
+
+      // Investor B: gross = 300000, contribution = 100000
+      // Tier 1 RoC: min(300000, 100000) = 100000, remaining = 200000
+      // Tier 2 Pref: min(200000, 100000 * 0.08) = 8000, remaining = 192000
+      // Tier 3 GP catch-up: disabled
+      // Tier 4 Carried: GP gets 192000 * 0.20 = 38400
+      // Net = 300000 - 38400 = 261600
+      const itemB = result.lineItems[1];
+      expect(itemB.grossAmount).toBe('300000.00');
+      expect(itemB.tierBreakdown.returnOfCapital).toBe('100000.00');
+      expect(itemB.tierBreakdown.preferredReturn).toBe('8000.00');
+      expect(itemB.tierBreakdown.gpCatchUp).toBe('0.00');
+      expect(itemB.tierBreakdown.carriedInterest).toBe('38400.00');
+      expect(itemB.netAmount).toBe('261600.00');
+
+      // Summary: total promote = 18400 + 38400 = 56800
+      expect(result.summary.totalPromote).toBe('56800.00');
+    });
+
+    it('applies GP catch-up when enabled', async () => {
+      const configWithCatchUp = {
+        ...mockConfig,
+        catchUpEnabled: true,
+      };
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.waterfallConfig.findUnique.mockResolvedValue(configWithCatchUp);
+      prisma.tokenContract.findFirst.mockResolvedValue(mockContract);
+      // Single investor for simplicity
+      prisma.tokenPosition.findMany.mockResolvedValue([mockPositions[0]]);
+      prisma.capitalAccount.findFirst.mockResolvedValue({
+        id: 'ca-1',
+        initialContribution: 100000,
+      });
+
+      const singleInput = {
+        ...previewInput,
+        grossDistributableAmount: '200000.00',
+      };
+      const result = await service.previewDistribution(fundId, singleInput);
+
+      // Investor A owns 100% (only position), gross = 200000, contribution = 100000
+      // Tier 1 RoC: 100000, remaining = 100000
+      // Tier 2 Pref: 8000, remaining = 92000
+      // Tier 3 GP catch-up: LP has 108000, GP target = (108000 / 0.80) * 0.20 = 27000
+      //   catch-up = min(92000, 27000) = 27000, remaining = 65000
+      // Tier 4 Carried: GP gets 65000 * 0.20 = 13000
+      // Total promote = 27000 + 13000 = 40000, Net = 160000
+      const item = result.lineItems[0];
+      expect(item.tierBreakdown.returnOfCapital).toBe('100000.00');
+      expect(item.tierBreakdown.preferredReturn).toBe('8000.00');
+      expect(item.tierBreakdown.gpCatchUp).toBe('27000.00');
+      expect(item.tierBreakdown.carriedInterest).toBe('13000.00');
+      expect(item.netAmount).toBe('160000.00');
     });
 
     it('throws NotFoundError for missing fund', async () => {
@@ -238,11 +339,15 @@ describe('DistributionService', () => {
       prisma.distributionRun.create.mockResolvedValue({ id: 'run-1' });
       prisma.distributionRun.update.mockResolvedValue({ id: 'run-1' });
       prisma.distributionLineItem.create.mockResolvedValue({ id: 'li-1' });
-      prisma.capitalAccount.findFirst.mockResolvedValue({ id: 'ca-1' });
+      prisma.capitalAccount.findFirst.mockResolvedValue({
+        id: 'ca-1',
+        initialContribution: 0,
+      });
     });
 
     it('creates snapshot and line items', async () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.waterfallConfig.findUnique.mockResolvedValue(mockConfig);
       prisma.tokenContract.findFirst.mockResolvedValue(mockContract);
       prisma.tokenPosition.findMany.mockResolvedValue(mockPositions);
 
@@ -298,6 +403,7 @@ describe('DistributionService', () => {
 
     it('marks run as COMPLETED on success', async () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.waterfallConfig.findUnique.mockResolvedValue(mockConfig);
       prisma.tokenContract.findFirst.mockResolvedValue(mockContract);
       prisma.tokenPosition.findMany.mockResolvedValue(mockPositions);
 
@@ -316,6 +422,7 @@ describe('DistributionService', () => {
 
     it('throws ConflictError when no settled ownership', async () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.waterfallConfig.findUnique.mockResolvedValue(mockConfig);
       prisma.tokenContract.findFirst.mockResolvedValue(null);
 
       await expect(
@@ -325,6 +432,7 @@ describe('DistributionService', () => {
 
     it('marks run as FAILED when line item creation errors', async () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.waterfallConfig.findUnique.mockResolvedValue(mockConfig);
       prisma.tokenContract.findFirst.mockResolvedValue(mockContract);
       prisma.tokenPosition.findMany.mockResolvedValue(mockPositions);
       prisma.distributionLineItem.create.mockRejectedValue(

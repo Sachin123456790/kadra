@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError, ConflictError } from '../../common/errors';
+import { EventLogService } from '../../common/event-log.service';
 
 @Injectable()
 export class SettlementsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventLog: EventLogService,
+  ) {}
 
   async requestValidation(
     subscriptionId: string,
@@ -53,6 +57,7 @@ export class SettlementsService {
     settlementRecordId: string,
     subscription: any,
     input: {
+      paymentDocumentId: string;
       declaredAmount: string;
       declaredReference: string;
     },
@@ -67,7 +72,34 @@ export class SettlementsService {
       parseFloat(subscription.committedAmount.toString());
     const checkReferenceMatch =
       input.declaredReference === subscription.subscriptionRef;
-    const checkInvestorMatch = true; // Simplified for MVP — payment doc is accepted as evidence
+
+    // Investor match: verify payment document is linked to the subscription's investor
+    const paymentDoc = await this.prisma.document.findUnique({
+      where: { id: input.paymentDocumentId },
+    });
+    let checkInvestorMatch = false;
+    if (paymentDoc) {
+      if (
+        paymentDoc.linkedEntityType === 'INVESTOR' &&
+        paymentDoc.linkedEntityId != null
+      ) {
+        // Direct link: payment doc references a specific investor
+        checkInvestorMatch =
+          paymentDoc.linkedEntityId === subscription.investorId;
+      } else {
+        // Fallback: verify payment doc belongs to the same fund as the subscription
+        checkInvestorMatch = paymentDoc.fundId === subscription.fundId;
+      }
+    }
+
+    // Hash match: verify subscription's governing document hash record exists
+    let checkHashMatch = false;
+    if (subscription.governingHashId) {
+      const governingHash = await this.prisma.documentHash.findUnique({
+        where: { id: subscription.governingHashId },
+      });
+      checkHashMatch = governingHash != null;
+    }
 
     // Check for double settlement
     const existingPassed = await this.prisma.settlementRecord.findFirst({
@@ -79,12 +111,14 @@ export class SettlementsService {
       checkAmountMatch &&
       checkReferenceMatch &&
       checkInvestorMatch &&
+      checkHashMatch &&
       checkNoDoubleSettlement;
 
     let failureReasonCode: string | null = null;
     if (!checkAmountMatch) failureReasonCode = 'AMOUNT_MISMATCH';
     else if (!checkReferenceMatch) failureReasonCode = 'REFERENCE_MISMATCH';
     else if (!checkInvestorMatch) failureReasonCode = 'INVESTOR_MISMATCH';
+    else if (!checkHashMatch) failureReasonCode = 'HASH_MISMATCH';
     else if (!checkNoDoubleSettlement) failureReasonCode = 'DOUBLE_SETTLEMENT';
 
     const now = new Date();
@@ -95,6 +129,7 @@ export class SettlementsService {
         checkAmountMatch,
         checkInvestorMatch,
         checkReferenceMatch,
+        checkHashMatch,
         checkNoDoubleSettlement,
         failureReasonCode,
         validatedAt: now,
@@ -108,6 +143,7 @@ export class SettlementsService {
         checkAmountMatch,
         checkInvestorMatch,
         checkReferenceMatch,
+        checkHashMatch,
         checkNoDoubleSettlement,
       },
       failureReasonCode,
@@ -133,7 +169,10 @@ export class SettlementsService {
       orderBy: { createdAt: 'desc' },
     });
     if (!settlementRecord) {
-      throw new NotFoundError('SettlementRecord for Subscription', subscriptionId);
+      throw new NotFoundError(
+        'SettlementRecord for Subscription',
+        subscriptionId,
+      );
     }
 
     // Verify document exists
@@ -167,7 +206,8 @@ export class SettlementsService {
     const record = await this.prisma.settlementRecord.findUnique({
       where: { id: settlementRecordId },
     });
-    if (!record) throw new NotFoundError('SettlementRecord', settlementRecordId);
+    if (!record)
+      throw new NotFoundError('SettlementRecord', settlementRecordId);
     if (record.status !== 'FAILED') {
       throw new ConflictError(
         'SETTLEMENT_NOT_FAILED',
@@ -210,12 +250,10 @@ export class SettlementsService {
     };
   }
 
-  async confirmSettlement(
-    subscriptionId: string,
-    settlementRecordId: string,
-  ) {
+  async confirmSettlement(subscriptionId: string, settlementRecordId: string) {
     const subscription = await this.prisma.subscription.findUnique({
       where: { id: subscriptionId },
+      include: { fund: true, wallet: true },
     });
     if (!subscription) throw new NotFoundError('Subscription', subscriptionId);
     if (subscription.status !== 'PENDING') {
@@ -228,7 +266,8 @@ export class SettlementsService {
     const record = await this.prisma.settlementRecord.findUnique({
       where: { id: settlementRecordId },
     });
-    if (!record) throw new NotFoundError('SettlementRecord', settlementRecordId);
+    if (!record)
+      throw new NotFoundError('SettlementRecord', settlementRecordId);
     if (record.subscriptionId !== subscriptionId) {
       throw new ConflictError(
         'SETTLEMENT_MISMATCH',
@@ -248,10 +287,61 @@ export class SettlementsService {
       data: { status: 'SETTLED', settledAt: now, updatedAt: now },
     });
 
+    // Create capital account for the settled subscription
+    const contributionAmount = parseFloat(
+      subscription.committedAmount.toString(),
+    );
+    await this.prisma.capitalAccount.create({
+      data: {
+        fundId: subscription.fundId,
+        investorId: subscription.investorId,
+        openingBalance: 0,
+        initialContribution: contributionAmount,
+        contributedAt: now,
+        capitalReturned: 0,
+        accruedPref: 0,
+        residualAllocation: 0,
+        endingCapitalBalance: contributionAmount,
+        asOfDate: now,
+        isCurrent: true,
+      },
+    });
+
+    // Generate ECDSA mint authorization
+    let mintAuthSignature: string | null = null;
+    const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
+    if (privateKey) {
+      try {
+        const { ethers } = await import('ethers');
+        const wallet = new ethers.Wallet(privateKey);
+        const message = ethers.solidityPackedKeccak256(
+          ['string', 'string', 'uint256'],
+          [subscriptionId, subscription.walletId ?? '', BigInt(Date.now())],
+        );
+        mintAuthSignature = await wallet.signMessage(ethers.getBytes(message));
+      } catch (e) {
+        console.warn('ECDSA signature generation failed:', e);
+      }
+    }
+
+    await this.eventLog.log({
+      eventType: 'SETTLEMENT_CONFIRMED',
+      aggregateType: 'SUBSCRIPTION',
+      aggregateId: subscriptionId,
+      fundId: subscription.fundId,
+      payload: {
+        settlementRecordId,
+        settledAt: now.toISOString(),
+        committedAmount: subscription.committedAmount.toString(),
+        mintAuthSignature,
+      },
+    });
+
     return {
       subscriptionId: updated.id,
       status: updated.status,
       settledAt: updated.settledAt?.toISOString(),
+      mintAuthSignature,
     };
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError, ConflictError } from '../../common/errors';
+import { EventLogService } from '../../common/event-log.service';
 
 interface SubscriptionItem {
   investorId: string;
@@ -13,9 +14,16 @@ interface SubscriptionItem {
 
 @Injectable()
 export class SubscriptionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventLog: EventLogService,
+  ) {}
 
-  async createSubscriptions(fundId: string, governingDocumentId: string, items: SubscriptionItem[]) {
+  async createSubscriptions(
+    fundId: string,
+    governingDocumentId: string,
+    items: SubscriptionItem[],
+  ) {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);
 
@@ -25,24 +33,40 @@ export class SubscriptionsService {
       include: { hashes: { where: { isPrimary: true } } },
     });
     if (!doc) throw new NotFoundError('GoverningDocument', governingDocumentId);
-    if (doc.hashes.length === 0) throw new ConflictError('DOCUMENT_NOT_HASHED', 'Governing document has no hash');
+    if (doc.hashes.length === 0)
+      throw new ConflictError(
+        'DOCUMENT_NOT_HASHED',
+        'Governing document has no hash',
+      );
 
     const governingHashId = doc.hashes[0].id;
 
     // Validate all investors are eligible
     for (const item of items) {
       const eligibility = await this.prisma.investorFundEligibility.findFirst({
-        where: { fundId, investorId: item.investorId, walletId: item.walletId, eligibilityStatus: 'ELIGIBLE', deletedAt: null },
+        where: {
+          fundId,
+          investorId: item.investorId,
+          walletId: item.walletId,
+          eligibilityStatus: 'ELIGIBLE',
+          deletedAt: null,
+        },
       });
       if (!eligibility) {
-        throw new ConflictError('INVESTOR_NOT_ELIGIBLE', `Investor ${item.investorId} is not eligible for this fund`);
+        throw new ConflictError(
+          'INVESTOR_NOT_ELIGIBLE',
+          `Investor ${item.investorId} is not eligible for this fund`,
+        );
       }
     }
 
     // Validate allocation total
     const totalAllocation = items.reduce((sum, i) => sum + i.allocationPct, 0);
     if (totalAllocation > 100) {
-      throw new ConflictError('INVALID_ALLOCATION_TOTAL', `Total allocation ${totalAllocation}% exceeds 100%`);
+      throw new ConflictError(
+        'INVALID_ALLOCATION_TOTAL',
+        `Total allocation ${totalAllocation}% exceeds 100%`,
+      );
     }
 
     // Create subscriptions in transaction
@@ -69,6 +93,21 @@ export class SubscriptionsService {
       return results;
     });
 
+    for (const sub of subscriptions) {
+      await this.eventLog.log({
+        eventType: 'SUBSCRIPTION_CREATED',
+        aggregateType: 'SUBSCRIPTION',
+        aggregateId: sub.id,
+        fundId,
+        payload: {
+          subscriptionRef: sub.subscriptionRef,
+          investorId: sub.investorId,
+          walletId: sub.walletId,
+          allocationPct: Number(sub.allocationPct),
+        },
+      });
+    }
+
     return {
       createdCount: subscriptions.length,
       subscriptions: subscriptions.map((s) => ({
@@ -79,7 +118,14 @@ export class SubscriptionsService {
     };
   }
 
-  async listSubscriptions(fundId: string, filters?: { status?: string; investorId?: string; subscriptionRef?: string }) {
+  async listSubscriptions(
+    fundId: string,
+    filters?: {
+      status?: string;
+      investorId?: string;
+      subscriptionRef?: string;
+    },
+  ) {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);
 
@@ -89,10 +135,14 @@ export class SubscriptionsService {
         deletedAt: null,
         ...(filters?.status ? { status: filters.status } : {}),
         ...(filters?.investorId ? { investorId: filters.investorId } : {}),
-        ...(filters?.subscriptionRef ? { subscriptionRef: filters.subscriptionRef } : {}),
+        ...(filters?.subscriptionRef
+          ? { subscriptionRef: filters.subscriptionRef }
+          : {}),
       },
       include: {
         settlementRecords: { orderBy: { createdAt: 'desc' }, take: 1 },
+        investor: { select: { legalName: true } },
+        governingHash: { select: { hashHex: true } },
       },
     });
 
@@ -106,6 +156,8 @@ export class SubscriptionsService {
       status: s.status,
       settledAt: s.settledAt?.toISOString() ?? null,
       latestSettlementStatus: s.settlementRecords[0]?.status ?? null,
+      investorName: s.investor?.legalName ?? null,
+      governingHashHex: s.governingHash?.hashHex ?? null,
     }));
   }
 
@@ -115,7 +167,9 @@ export class SubscriptionsService {
       include: {
         investor: true,
         wallet: true,
-        governingDocument: { include: { hashes: { where: { isPrimary: true } } } },
+        governingDocument: {
+          include: { hashes: { where: { isPrimary: true } } },
+        },
         settlementRecords: { orderBy: { createdAt: 'desc' } },
       },
     });

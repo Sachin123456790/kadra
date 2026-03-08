@@ -1,5 +1,6 @@
 import { AuditService } from '../audit.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EventLogService } from '../../../common/event-log.service';
 import { NotFoundError } from '../../../common/errors';
 
 // Mock fs module
@@ -51,7 +52,13 @@ describe('AuditService', () => {
 
   beforeEach(() => {
     prisma = mockPrisma();
-    service = new AuditService(prisma as unknown as PrismaService);
+    const mockEventLog = {
+      log: jest.fn().mockResolvedValue({}),
+    } as unknown as EventLogService;
+    service = new AuditService(
+      prisma as unknown as PrismaService,
+      mockEventLog,
+    );
   });
 
   describe('requestExport', () => {
@@ -172,9 +179,9 @@ describe('AuditService', () => {
     it('throws NotFoundError for missing export', async () => {
       prisma.auditExport.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getExportStatus('nonexistent'),
-      ).rejects.toThrow(NotFoundError);
+      await expect(service.getExportStatus('nonexistent')).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 });

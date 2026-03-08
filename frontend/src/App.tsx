@@ -16,6 +16,7 @@ import TransfersPage from "./pages/TransfersPage";
 import CapTablePage from "./pages/CapTablePage";
 import DistributionPage from "./pages/DistributionPage";
 import AuditPage from "./pages/AuditPage";
+import DocumentsPage from "./pages/DocumentsPage";
 import InvestorDashboard from "./pages/InvestorDashboard";
 import InvestorSubscriptions from "./pages/InvestorSubscriptions";
 import InvestorCapTable from "./pages/InvestorCapTable";
@@ -64,6 +65,7 @@ const App = () => (
                       <Route path="/transfers" element={<RoleGuard allow="admin"><TransfersPage /></RoleGuard>} />
                       <Route path="/cap-table" element={<RoleGuard allow="admin"><CapTablePage /></RoleGuard>} />
                       <Route path="/distribution" element={<RoleGuard allow="admin"><DistributionPage /></RoleGuard>} />
+                      <Route path="/documents" element={<RoleGuard allow="admin"><DocumentsPage /></RoleGuard>} />
                       <Route path="/audit" element={<RoleGuard allow="admin"><AuditPage /></RoleGuard>} />
                       {/* Shared routes (admin + investor) */}
                       <Route path="/notifications" element={<NotificationsPage />} />

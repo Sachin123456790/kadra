@@ -7,8 +7,9 @@ import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
-import { getInvestors } from "@/services";
+import { getInvestors, getSubscriptions } from "@/services";
 import { getCapTable } from "@/services/ownership.service";
+import { Calendar, FileText as FileTextIcon } from "lucide-react";
 import type { Investor } from "@/services/investors.service";
 import type { InvestorRow } from "@/types/api";
 import { X, User, Wallet, Shield, Mail } from "lucide-react";
@@ -25,6 +26,12 @@ export default function InvestorsPage() {
   const { data: capTable } = useQuery({
     queryKey: QUERY_KEYS.capTable(fundId),
     queryFn: () => getCapTable(fundId).then(r => r.data),
+  });
+
+  const { data: subscriptions } = useQuery({
+    queryKey: QUERY_KEYS.subscriptions(fundId),
+    queryFn: () => getSubscriptions(fundId).then(r => r.data),
+    enabled: !!selectedInvestor,
   });
 
   const investors: InvestorRow[] | undefined = rawInvestors?.map((inv) => {
@@ -173,6 +180,49 @@ export default function InvestorsPage() {
                   <p className="text-sm text-muted-foreground">No eligibility record</p>
                 )}
               </div>
+
+              {/* Subscription Details */}
+              {subscriptions && (() => {
+                const investorSubs = subscriptions.filter(s => s.investorId === selectedInvestor.investorId);
+                if (investorSubs.length === 0) return null;
+                return (
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Subscriptions</h3>
+                    <div className="space-y-3">
+                      {investorSubs.map((sub) => (
+                        <div key={sub.subscriptionId} className="p-3 rounded-lg border border-border bg-muted/30 space-y-2">
+                          <div className="flex items-center gap-3">
+                            <FileTextIcon className="h-4 w-4 text-gray-400 shrink-0" />
+                            <div className="flex-1">
+                              <dt className="text-xs text-gray-500">Subscription Ref</dt>
+                              <dd className="text-sm font-medium text-gray-900">{sub.subscriptionRef}</dd>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
+                            <div className="flex-1">
+                              <dt className="text-xs text-gray-500">Settlement Date</dt>
+                              <dd className="text-sm text-gray-900">
+                                {sub.settledAt ? new Date(sub.settledAt).toLocaleString() : "Not settled"}
+                              </dd>
+                            </div>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Status</span>
+                            <StatusBadge status={sub.status} />
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Committed</span>
+                            <span className="font-medium text-gray-900">
+                              ${Number(sub.committedAmount).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Ownership from cap table */}
               {capTable && (() => {

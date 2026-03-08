@@ -14,11 +14,13 @@ import { JobsModule } from './modules/jobs/jobs.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { InvestorPortalModule } from './modules/investor-portal/investor-portal.module';
 import { HealthController } from './health.controller';
+import { EventLogModule } from './common/event-log.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    EventLogModule,
     FundModule,
     IdentityModule,
     DocumentsModule,

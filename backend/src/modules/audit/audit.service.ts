@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError } from '../../common/errors';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { EventLogService } from '../../common/event-log.service';
 import { createHash } from 'crypto';
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventLog: EventLogService,
+  ) {}
 
   async requestExport(
     fundId: string,
@@ -39,6 +41,14 @@ export class AuditService {
 
     // Build export inline for MVP
     await this.buildExport(auditExport.id);
+
+    await this.eventLog.log({
+      eventType: 'AUDIT_EXPORT_COMPLETED',
+      aggregateType: 'AUDIT_EXPORT',
+      aggregateId: auditExport.id,
+      fundId,
+      payload: { exportType: input.exportType || 'AUDIT_PACKET' },
+    });
 
     return {
       auditExportId: auditExport.id,
@@ -159,31 +169,16 @@ export class AuditService {
         ),
       ].join('\n');
 
-      // Write artifacts
-      const exportDir = path.join(
-        process.cwd(),
-        'storage',
-        'exports',
-        exportId,
-      );
-      await fs.mkdir(exportDir, { recursive: true });
-
-      await Promise.all([
-        fs.writeFile(
-          path.join(exportDir, 'manifest.json'),
-          JSON.stringify(manifest, null, 2),
-        ),
-        fs.writeFile(path.join(exportDir, 'cap-table.csv'), capTableCsv),
-        fs.writeFile(
-          path.join(exportDir, 'document-hashes.csv'),
-          hashCsv,
-        ),
-        fs.writeFile(
-          path.join(exportDir, 'subscriptions.csv'),
-          subsCsv,
-        ),
-        fs.writeFile(path.join(exportDir, 'transfers.csv'), transfersCsv),
-      ]);
+      // Store CSV data in manifestJson (no filesystem writes — works on Vercel serverless)
+      const exportData = {
+        ...manifest,
+        files: {
+          'cap-table.csv': capTableCsv,
+          'document-hashes.csv': hashCsv,
+          'subscriptions.csv': subsCsv,
+          'transfers.csv': transfersCsv,
+        },
+      };
 
       // Compute checksum of manifest
       const manifestBuffer = Buffer.from(JSON.stringify(manifest));
@@ -191,13 +186,15 @@ export class AuditService {
         .update(manifestBuffer)
         .digest('hex');
 
+      const artifactName = `audit-packet-${new Date().toISOString().slice(0, 10)}`;
+
       await this.prisma.auditExport.update({
         where: { id: exportId },
         data: {
           status: 'READY',
           completedAt: new Date(),
-          artifactPath: exportDir,
-          manifestJson: manifest,
+          artifactPath: artifactName,
+          manifestJson: exportData,
           checksumSha256: checksum,
           expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
         },
@@ -207,8 +204,7 @@ export class AuditService {
         where: { id: exportId },
         data: {
           status: 'FAILED',
-          errorMessage:
-            error instanceof Error ? error.message : 'unknown',
+          errorMessage: error instanceof Error ? error.message : 'unknown',
         },
       });
       throw error;
@@ -235,6 +231,34 @@ export class AuditService {
           : null,
       requestedAt: exp.requestedAt.toISOString(),
       completedAt: exp.completedAt?.toISOString() ?? null,
+    };
+  }
+
+  async getExportDownload(auditExportId: string) {
+    const exp = await this.prisma.auditExport.findUnique({
+      where: { id: auditExportId },
+    });
+    if (!exp) throw new NotFoundError('AuditExport', auditExportId);
+
+    if (exp.status !== 'READY') {
+      throw new Error(`Export is not ready (status: ${exp.status})`);
+    }
+
+    const manifestData = exp.manifestJson as Record<string, unknown> | null;
+    if (!manifestData || !manifestData.files) {
+      throw new Error('Export data not found in manifest');
+    }
+
+    const files = manifestData.files as Record<string, string>;
+
+    return {
+      exportId: exp.id,
+      fundId: exp.fundId,
+      fundName: (manifestData.fundName as string) ?? null,
+      generatedAt:
+        (manifestData.generatedAt as string) ?? exp.completedAt?.toISOString(),
+      checksumSha256: exp.checksumSha256,
+      files,
     };
   }
 }

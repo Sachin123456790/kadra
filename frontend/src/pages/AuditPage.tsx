@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQueries, useMutation } from '@tanstack/react-query';
 import { DEFAULT_FUND_CODE, QUERY_KEYS } from '@/config/constants';
-import { createAuditExport, getAuditExport } from '@/services';
+import { createAuditExport, getAuditExport, downloadAuditExport } from '@/services';
 import type { AuditExportDetail } from '@/services/audit.service';
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
@@ -10,6 +10,49 @@ import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 
+function triggerCsvDownload(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function DownloadButton({ exportId, status }: { exportId: string; status: string }) {
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = useCallback(async () => {
+    setDownloading(true);
+    try {
+      const response = await downloadAuditExport(exportId);
+      const { files } = response.data;
+      for (const [filename, content] of Object.entries(files)) {
+        triggerCsvDownload(filename, content);
+      }
+    } catch (err) {
+      console.error('Download failed:', err);
+    } finally {
+      setDownloading(false);
+    }
+  }, [exportId]);
+
+  if (status !== 'READY') return <span className="text-xs text-gray-500">--</span>;
+
+  return (
+    <button
+      onClick={handleDownload}
+      disabled={downloading}
+      className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+    >
+      {downloading ? 'Downloading...' : 'Download'}
+    </button>
+  );
+}
+
 const columns: Column<AuditExportDetail>[] = [
   { key: "auditExportId", header: "Export ID", className: "font-mono text-xs" },
   { key: "exportType", header: "Type" },
@@ -17,15 +60,8 @@ const columns: Column<AuditExportDetail>[] = [
   { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status === 'READY' ? 'Completed' : r.status === 'BUILDING' || r.status === 'QUEUED' ? 'Processing' : r.status} /> },
   {
     key: "artifact" as keyof AuditExportDetail,
-    header: "Artifact",
-    render: (r) =>
-      r.artifact?.path ? (
-        <span className="text-xs text-primary font-medium hover:underline cursor-pointer">
-          {r.artifact.path.split('/').pop()}
-        </span>
-      ) : (
-        "—"
-      ),
+    header: "Download",
+    render: (r) => <DownloadButton exportId={r.auditExportId} status={r.status} />,
   },
 ];
 

@@ -1,5 +1,6 @@
 import { SubscriptionsService } from '../subscriptions.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EventLogService } from '../../../common/event-log.service';
 import { NotFoundError, ConflictError } from '../../../common/errors';
 
 const mockTx = {
@@ -17,7 +18,9 @@ const mockPrisma = () => ({
     findUnique: jest.fn(),
     create: jest.fn(),
   },
-  $transaction: jest.fn((fn: (tx: typeof mockTx) => Promise<any>) => fn(mockTx)),
+  $transaction: jest.fn((fn: (tx: typeof mockTx) => Promise<any>) =>
+    fn(mockTx),
+  ),
 });
 
 describe('SubscriptionsService', () => {
@@ -27,14 +30,32 @@ describe('SubscriptionsService', () => {
   beforeEach(() => {
     prisma = mockPrisma();
     mockTx.subscription.create.mockReset();
-    service = new SubscriptionsService(prisma as unknown as PrismaService);
+    const mockEventLog = {
+      log: jest.fn().mockResolvedValue({}),
+    } as unknown as EventLogService;
+    service = new SubscriptionsService(
+      prisma as unknown as PrismaService,
+      mockEventLog,
+    );
   });
 
   const fundId = 'fund-1';
   const governingDocumentId = 'doc-1';
   const items = [
-    { investorId: 'inv-1', walletId: 'w-1', allocationPct: 50, committedAmount: '500000', subscriptionRef: 'SUB-001' },
-    { investorId: 'inv-2', walletId: 'w-2', allocationPct: 50, committedAmount: '500000', subscriptionRef: 'SUB-002' },
+    {
+      investorId: 'inv-1',
+      walletId: 'w-1',
+      allocationPct: 50,
+      committedAmount: '500000',
+      subscriptionRef: 'SUB-001',
+    },
+    {
+      investorId: 'inv-2',
+      walletId: 'w-2',
+      allocationPct: 50,
+      committedAmount: '500000',
+      subscriptionRef: 'SUB-002',
+    },
   ];
 
   describe('createSubscriptions', () => {
@@ -44,12 +65,27 @@ describe('SubscriptionsService', () => {
         id: governingDocumentId,
         hashes: [{ id: 'hash-1', isPrimary: true }],
       });
-      prisma.investorFundEligibility.findFirst.mockResolvedValue({ id: 'elig-1', eligibilityStatus: 'ELIGIBLE' });
+      prisma.investorFundEligibility.findFirst.mockResolvedValue({
+        id: 'elig-1',
+        eligibilityStatus: 'ELIGIBLE',
+      });
       mockTx.subscription.create
-        .mockResolvedValueOnce({ id: 'sub-1', status: 'PENDING', subscriptionRef: 'SUB-001' })
-        .mockResolvedValueOnce({ id: 'sub-2', status: 'PENDING', subscriptionRef: 'SUB-002' });
+        .mockResolvedValueOnce({
+          id: 'sub-1',
+          status: 'PENDING',
+          subscriptionRef: 'SUB-001',
+        })
+        .mockResolvedValueOnce({
+          id: 'sub-2',
+          status: 'PENDING',
+          subscriptionRef: 'SUB-002',
+        });
 
-      const result = await service.createSubscriptions(fundId, governingDocumentId, items);
+      const result = await service.createSubscriptions(
+        fundId,
+        governingDocumentId,
+        items,
+      );
 
       expect(result.createdCount).toBe(2);
       expect(result.subscriptions).toHaveLength(2);
@@ -60,20 +96,31 @@ describe('SubscriptionsService', () => {
 
     it('rejects when fund does not exist', async () => {
       prisma.fund.findUnique.mockResolvedValue(null);
-      await expect(service.createSubscriptions(fundId, governingDocumentId, items)).rejects.toThrow(NotFoundError);
+      await expect(
+        service.createSubscriptions(fundId, governingDocumentId, items),
+      ).rejects.toThrow(NotFoundError);
     });
 
     it('rejects when governing document does not exist', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
       prisma.document.findUnique.mockResolvedValue(null);
-      await expect(service.createSubscriptions(fundId, governingDocumentId, items)).rejects.toThrow(NotFoundError);
+      await expect(
+        service.createSubscriptions(fundId, governingDocumentId, items),
+      ).rejects.toThrow(NotFoundError);
     });
 
     it('rejects when governing document has no hash', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
-      prisma.document.findUnique.mockResolvedValue({ id: governingDocumentId, hashes: [] });
-      await expect(service.createSubscriptions(fundId, governingDocumentId, items)).rejects.toThrow(ConflictError);
-      await expect(service.createSubscriptions(fundId, governingDocumentId, items)).rejects.toThrow('Governing document has no hash');
+      prisma.document.findUnique.mockResolvedValue({
+        id: governingDocumentId,
+        hashes: [],
+      });
+      await expect(
+        service.createSubscriptions(fundId, governingDocumentId, items),
+      ).rejects.toThrow(ConflictError);
+      await expect(
+        service.createSubscriptions(fundId, governingDocumentId, items),
+      ).rejects.toThrow('Governing document has no hash');
     });
 
     it('rejects ineligible investor', async () => {
@@ -84,8 +131,12 @@ describe('SubscriptionsService', () => {
       });
       prisma.investorFundEligibility.findFirst.mockResolvedValue(null);
 
-      await expect(service.createSubscriptions(fundId, governingDocumentId, items)).rejects.toThrow(ConflictError);
-      await expect(service.createSubscriptions(fundId, governingDocumentId, items)).rejects.toThrow('not eligible');
+      await expect(
+        service.createSubscriptions(fundId, governingDocumentId, items),
+      ).rejects.toThrow(ConflictError);
+      await expect(
+        service.createSubscriptions(fundId, governingDocumentId, items),
+      ).rejects.toThrow('not eligible');
     });
 
     it('rejects total allocation > 100%', async () => {
@@ -94,15 +145,34 @@ describe('SubscriptionsService', () => {
         id: governingDocumentId,
         hashes: [{ id: 'hash-1', isPrimary: true }],
       });
-      prisma.investorFundEligibility.findFirst.mockResolvedValue({ id: 'elig-1', eligibilityStatus: 'ELIGIBLE' });
+      prisma.investorFundEligibility.findFirst.mockResolvedValue({
+        id: 'elig-1',
+        eligibilityStatus: 'ELIGIBLE',
+      });
 
       const overAllocated = [
-        { investorId: 'inv-1', walletId: 'w-1', allocationPct: 60, committedAmount: '600000', subscriptionRef: 'SUB-001' },
-        { investorId: 'inv-2', walletId: 'w-2', allocationPct: 50, committedAmount: '500000', subscriptionRef: 'SUB-002' },
+        {
+          investorId: 'inv-1',
+          walletId: 'w-1',
+          allocationPct: 60,
+          committedAmount: '600000',
+          subscriptionRef: 'SUB-001',
+        },
+        {
+          investorId: 'inv-2',
+          walletId: 'w-2',
+          allocationPct: 50,
+          committedAmount: '500000',
+          subscriptionRef: 'SUB-002',
+        },
       ];
 
-      await expect(service.createSubscriptions(fundId, governingDocumentId, overAllocated)).rejects.toThrow(ConflictError);
-      await expect(service.createSubscriptions(fundId, governingDocumentId, overAllocated)).rejects.toThrow('exceeds 100%');
+      await expect(
+        service.createSubscriptions(fundId, governingDocumentId, overAllocated),
+      ).rejects.toThrow(ConflictError);
+      await expect(
+        service.createSubscriptions(fundId, governingDocumentId, overAllocated),
+      ).rejects.toThrow('exceeds 100%');
     });
   });
 
@@ -146,7 +216,9 @@ describe('SubscriptionsService', () => {
 
     it('throws NotFoundError when fund does not exist', async () => {
       prisma.fund.findUnique.mockResolvedValue(null);
-      await expect(service.listSubscriptions('no-fund')).rejects.toThrow(NotFoundError);
+      await expect(service.listSubscriptions('no-fund')).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 
@@ -168,7 +240,9 @@ describe('SubscriptionsService', () => {
 
     it('throws NotFoundError when subscription does not exist', async () => {
       prisma.subscription.findUnique.mockResolvedValue(null);
-      await expect(service.getSubscription('nonexistent')).rejects.toThrow(NotFoundError);
+      await expect(service.getSubscription('nonexistent')).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 });
