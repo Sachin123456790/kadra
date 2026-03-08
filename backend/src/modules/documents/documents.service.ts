@@ -8,6 +8,7 @@ import type { DocumentParserAdapter } from '../../adapters/parser/parser.adapter
 import { PARSER_ADAPTER } from '../../adapters/parser/parser.adapter';
 import { NotFoundError, ValidationError } from '../../common/errors';
 import { randomUUID } from 'crypto';
+import { AddManualExtractedFieldsDto } from './documents.dto';
 
 @Injectable()
 export class DocumentsService {
@@ -153,5 +154,60 @@ export class DocumentsService {
         ? { chainId: h.anchorChainId, txHash: h.anchorTxHash, blockNumber: h.anchorBlockNumber ? Number(h.anchorBlockNumber) : null }
         : null,
     }));
+  }
+
+  async addManualExtractedFields(
+    documentId: string,
+    input: AddManualExtractedFieldsDto,
+    addedBy?: string,
+  ) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc) throw new NotFoundError('Document', documentId);
+
+    if (!input.fields || input.fields.length === 0) {
+      throw new ValidationError('At least one field is required');
+    }
+
+    const runRef = `manual-${randomUUID()}`;
+    const created = await this.prisma.$transaction(async (tx) => {
+      const rows: string[] = [];
+      for (const field of input.fields) {
+        if (!field.fieldName?.trim()) continue;
+        const row = await tx.extractedDocumentField.create({
+          data: {
+            documentId,
+            extractionRunRef: runRef,
+            fieldName: field.fieldName.trim(),
+            fieldValueText: field.fieldValueText?.trim(),
+            fieldValueNumeric: field.fieldValueNumeric,
+            confidence:
+              field.confidence != null
+                ? Math.max(0, Math.min(1, field.confidence))
+                : 1,
+            sourcePage:
+              field.sourcePage != null ? Math.floor(field.sourcePage) : null,
+            fieldValueJson: addedBy
+              ? { source: 'MANUAL_OVERRIDE', addedBy }
+              : { source: 'MANUAL_OVERRIDE' },
+          },
+        });
+        rows.push(row.id);
+      }
+
+      await tx.document.update({
+        where: { id: documentId },
+        data: { parseStatus: 'COMPLETED' },
+      });
+
+      return rows;
+    });
+
+    return {
+      documentId,
+      extractionRunRef: runRef,
+      fieldsAdded: created.length,
+    };
   }
 }

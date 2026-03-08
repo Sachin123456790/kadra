@@ -8,6 +8,7 @@ import { HASH_PROVIDER } from '../../adapters/hash/hash.provider';
 import { Sha256HashProvider } from '../../adapters/hash/sha256.provider';
 import { PARSER_ADAPTER } from '../../adapters/parser/parser.adapter';
 import { MockParserAdapter } from '../../adapters/parser/mock-parser.adapter';
+import { GeminiParserAdapter } from '../../adapters/parser/gemini-parser.adapter';
 
 @Module({
   controllers: [DocumentsController],
@@ -20,7 +21,14 @@ import { MockParserAdapter } from '../../adapters/parser/mock-parser.adapter';
         : LocalFsStorageAdapter,
     },
     { provide: HASH_PROVIDER, useClass: Sha256HashProvider },
-    { provide: PARSER_ADAPTER, useClass: MockParserAdapter },
+    {
+      provide: PARSER_ADAPTER,
+      useClass:
+        (process.env.DOCUMENT_PARSER_PROVIDER ?? 'mock').toLowerCase() ===
+          'gemini' && !!process.env.GEMINI_API_KEY
+          ? GeminiParserAdapter
+          : MockParserAdapter,
+    },
   ],
   exports: [DocumentsService],
 })
