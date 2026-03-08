@@ -9,7 +9,6 @@ CLAUDE.md
 .DS_Store
 docs/claude/
 docs/plans/
-docs/SSOT/
 docs/audit/
 # Backend
 backend/dist
