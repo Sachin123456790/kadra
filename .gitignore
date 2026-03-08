@@ -21,3 +21,4 @@ backend/supabase
 frontend/node_modules
 frontend/dist
 frontend/.next
+.vercel

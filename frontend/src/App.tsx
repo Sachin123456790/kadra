@@ -24,6 +24,9 @@ import InvestorTransfers from "./pages/InvestorTransfers";
 import InvestorProfile from "./pages/InvestorProfile";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import ProfilePage from "./pages/ProfilePage";
+import HelpSupportPage from "./pages/HelpSupportPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -62,6 +65,10 @@ const App = () => (
                       <Route path="/cap-table" element={<RoleGuard allow="admin"><CapTablePage /></RoleGuard>} />
                       <Route path="/distribution" element={<RoleGuard allow="admin"><DistributionPage /></RoleGuard>} />
                       <Route path="/audit" element={<RoleGuard allow="admin"><AuditPage /></RoleGuard>} />
+                      {/* Shared routes (admin + investor) */}
+                      <Route path="/notifications" element={<NotificationsPage />} />
+                      <Route path="/profile" element={<ProfilePage />} />
+                      <Route path="/help" element={<HelpSupportPage />} />
                       {/* Investor routes */}
                       <Route path="/investor" element={<RoleGuard allow="investor"><InvestorDashboard /></RoleGuard>} />
                       <Route path="/investor/subscriptions" element={<RoleGuard allow="investor"><InvestorSubscriptions /></RoleGuard>} />

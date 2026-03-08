@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, FileText, Landmark, ArrowLeftRight,
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "@/hooks/useAuth";
+import { useNotifications, formatRelativeTime } from "@/hooks/useNotifications";
 import { ADMIN_ROLES } from "@/config/constants";
 
 const adminNavItems = [
@@ -38,23 +39,20 @@ const investorNavItems = [
   { label: "Profile & Wallets", path: "/investor/profile", icon: Wallet },
 ];
 
-const mockNotifications = [
-  { id: 1, text: "Settlement confirmed for LP-003", time: "2m ago", unread: true },
-  { id: 2, text: "New subscription created", time: "15m ago", unread: true },
-  { id: 3, text: "Audit export ready for download", time: "1h ago", unread: false },
-  { id: 4, text: "Transfer LP-001 to LP-004 completed", time: "3h ago", unread: false },
-];
-
 export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, toggle } = useTheme();
   const { user, logout } = useAuth();
+  const { notifications, unreadCount, markAsRead } = useNotifications();
   const isAdmin = user?.role && (ADMIN_ROLES as readonly string[]).includes(user.role);
   const navItems = isAdmin ? adminNavItems : investorNavItems;
   const homeRoute = isAdmin ? "/dashboard" : "/investor";
+  const profileRoute = isAdmin ? "/profile" : "/investor/profile";
 
-  const unreadCount = mockNotifications.filter((n) => n.unread).length;
+  // Show the 5 most recent notifications in dropdown
+  const recentNotifications = notifications.slice(0, 5);
   const initials = user?.email
     ? user.email.substring(0, 2).toUpperCase()
     : "KA";
@@ -107,19 +105,34 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 )}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {mockNotifications.map((n) => (
-                <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-1 py-2.5 cursor-pointer">
-                  <div className="flex items-start gap-2 w-full">
-                    {n.unread && <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />}
-                    <span className={cn("text-sm leading-snug", n.unread ? "font-medium" : "text-muted-foreground")}>
-                      {n.text}
+              {recentNotifications.length === 0 ? (
+                <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  No notifications yet
+                </div>
+              ) : (
+                recentNotifications.map((n) => (
+                  <DropdownMenuItem
+                    key={n.id}
+                    className="flex flex-col items-start gap-1 py-2.5 cursor-pointer"
+                    onClick={() => markAsRead(n.id)}
+                  >
+                    <div className="flex items-start gap-2 w-full">
+                      {!n.read && <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />}
+                      <span className={cn("text-sm leading-snug", !n.read ? "font-medium" : "text-muted-foreground")}>
+                        {n.message}
+                      </span>
+                    </div>
+                    <span className={cn("text-xs text-muted-foreground", !n.read && "ml-3.5")}>
+                      {formatRelativeTime(n.timestamp)}
                     </span>
-                  </div>
-                  <span className={cn("text-xs text-muted-foreground", n.unread && "ml-3.5")}>{n.time}</span>
-                </DropdownMenuItem>
-              ))}
+                  </DropdownMenuItem>
+                ))
+              )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="justify-center text-xs text-muted-foreground cursor-pointer">
+              <DropdownMenuItem
+                className="justify-center text-xs text-muted-foreground cursor-pointer"
+                onClick={() => navigate("/notifications")}
+              >
                 View all notifications
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -147,14 +160,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer gap-2" asChild>
-                <Link to={isAdmin ? "#" : "/investor/profile"}>
+                <Link to={profileRoute}>
                   <User className="h-4 w-4" />
                   Profile
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer gap-2">
-                <HelpCircle className="h-4 w-4" />
-                Help & Support
+              <DropdownMenuItem className="cursor-pointer gap-2" asChild>
+                <Link to="/help">
+                  <HelpCircle className="h-4 w-4" />
+                  Help & Support
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
