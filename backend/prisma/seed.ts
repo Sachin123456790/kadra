@@ -75,19 +75,43 @@ async function main() {
       },
     });
 
-    // Create wallet for each investor (using Hardhat signer addresses pattern)
-    const walletAddress = `0x${(i + 1).toString(16).padStart(40, '0')}`;
+    // Realistic wallet addresses (derived from keccak-like hashes for demo)
+    const realisticAddresses = [
+      '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
+      '0x2B5AD5c4795c026514f8317c7a215E218DcCD6cF',
+      '0x9E63B020ae098E73cF201EE1357EDc72DFEaA518',
+      '0xA7d9ddBE1f17865597fBD27EC712455208B6B76d',
+      '0xFCAd0B19bB29D4674531d6f115237E16AfCE377c',
+      '0x03C6FcED478cBbC9a4FAB34eF9f40767739D1Ff7',
+    ];
+    const walletAddress = realisticAddresses[i];
+    const chainId = 11155111; // Sepolia
+
+    // Delete old wallets for this investor that don't match the realistic address
+    const existingWallets = await prisma.wallet.findMany({
+      where: { investorId: investor.id },
+    });
+    for (const ew of existingWallets) {
+      if (ew.addressNorm !== walletAddress.toLowerCase()) {
+        // Remove eligibilities referencing the old wallet first
+        await prisma.investorFundEligibility.deleteMany({
+          where: { walletId: ew.id },
+        });
+        await prisma.wallet.delete({ where: { id: ew.id } });
+      }
+    }
+
     const wallet = await prisma.wallet.upsert({
       where: {
         chainId_addressNorm: {
-          chainId: parseInt(process.env.CHAIN_ID || '11155111'),
+          chainId,
           addressNorm: walletAddress.toLowerCase(),
         },
       },
-      update: {},
+      update: { address: walletAddress, isPrimary: true },
       create: {
         investorId: investor.id,
-        chainId: 31337,
+        chainId,
         address: walletAddress,
         addressNorm: walletAddress.toLowerCase(),
         isPrimary: true,

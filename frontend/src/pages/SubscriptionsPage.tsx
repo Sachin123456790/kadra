@@ -52,8 +52,6 @@ export default function SubscriptionsPage() {
       })),
   });
 
-  if (isLoading) return <div className="p-6">Loading...</div>;
-  if (error) return <ErrorAlert title="Failed to load subscriptions" message={(error as Error).message} />;
   const statusChartData = useMemo(() => {
     if (!subscriptions) return [];
     const counts: Record<string, number> = {};
@@ -64,6 +62,8 @@ export default function SubscriptionsPage() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [subscriptions]);
 
+  if (isLoading) return <div className="p-6">Loading...</div>;
+  if (error) return <ErrorAlert title="Failed to load subscriptions" message={(error as Error).message} />;
   if (!subscriptions || subscriptions.length === 0) return <EmptyState title="No subscriptions" message="No subscription records exist yet." />;
 
   return (

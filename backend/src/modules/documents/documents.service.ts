@@ -51,7 +51,7 @@ export class DocumentsService {
         data: {
           fundId,
           documentType: 'MASTER_LPA',
-          storageProvider: 'LOCAL_FS',
+          storageProvider: process.env.SUPABASE_URL ? 'SUPABASE' : 'LOCAL_FS',
           storageKey,
           originalFilename: filename,
           mimeType,

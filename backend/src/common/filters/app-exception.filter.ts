@@ -1,5 +1,9 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException } from '@nestjs/common';
-import { FastifyReply } from 'fastify';
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { AppError } from '../errors';
 
@@ -7,12 +11,19 @@ import { AppError } from '../errors';
 export class AppExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
-    const reply = ctx.getResponse<FastifyReply>();
+    const response = ctx.getResponse();
     const requestId = randomUUID();
 
     let statusCode = 500;
     let code = 'INTERNAL_ERROR';
     let message = 'An unexpected error occurred';
+
+    if (
+      !(exception instanceof AppError) &&
+      !(exception instanceof HttpException)
+    ) {
+      console.error('Unhandled exception:', exception);
+    }
 
     if (exception instanceof AppError) {
       statusCode = exception.statusCode;
@@ -21,18 +32,26 @@ export class AppExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       code = 'HTTP_ERROR';
-      const response = exception.getResponse();
-      if (typeof response === 'object' && response !== null && 'message' in response) {
-        const msgs = (response as Record<string, unknown>).message;
+      const resp = exception.getResponse();
+      if (typeof resp === 'object' && resp !== null && 'message' in resp) {
+        const msgs = (resp as Record<string, unknown>).message;
         message = Array.isArray(msgs) ? msgs.join('; ') : String(msgs);
       } else {
         message = exception.message;
       }
     }
 
-    reply.status(statusCode).send({
+    const body = {
       error: { code, message },
       meta: { requestId, timestamp: new Date().toISOString() },
-    });
+    };
+
+    // Fastify response: has .status().send() with code() method
+    if (typeof response.code === 'function') {
+      response.code(statusCode).send(body);
+    } else {
+      // Express response: has .status().json()
+      response.status(statusCode).json(body);
+    }
   }
 }

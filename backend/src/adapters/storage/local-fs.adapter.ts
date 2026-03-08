@@ -5,7 +5,9 @@ import * as path from 'path';
 
 @Injectable()
 export class LocalFsStorageAdapter implements DocumentStorageAdapter {
-  private readonly basePath = path.join(process.cwd(), 'storage', 'documents');
+  private readonly basePath = process.env.VERCEL
+    ? path.join('/tmp', 'storage', 'documents')
+    : path.join(process.cwd(), 'storage', 'documents');
 
   async save(key: string, data: Buffer, mimeType: string): Promise<void> {
     const filePath = path.join(this.basePath, key);
