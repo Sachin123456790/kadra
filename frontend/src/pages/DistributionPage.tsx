@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid,
+} from 'recharts';
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from '@/config/constants';
 import { getWaterfallConfig } from '@/services/fund.service';
 import { previewDistribution } from '@/services/distribution.service';
@@ -18,6 +21,41 @@ const columns: Column<DistributionLineItem>[] = [
   { key: "grossAmount", header: "Gross Allocation", render: (r) => fmt(parseFloat(r.grossAmount)) },
   { key: "netAmount", header: "Net Amount", render: (r) => fmt(parseFloat(r.netAmount)) },
 ];
+
+function DistributionBarChart({ lineItems }: { lineItems: DistributionLineItem[] }) {
+  const chartData = useMemo(
+    () =>
+      lineItems.map((item) => ({
+        name: item.investorName ?? 'Unknown',
+        gross: parseFloat(item.grossAmount),
+        net: parseFloat(item.netAmount),
+      })),
+    [lineItems],
+  );
+
+  return (
+    <div>
+      <h4 className="text-sm font-medium text-gray-700 mb-3">Allocation per Investor</h4>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={chartData} margin={{ top: 8, right: 24, left: 16, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} />
+          <YAxis
+            tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+            tick={{ fontSize: 12, fill: '#6b7280' }}
+          />
+          <Tooltip
+            formatter={(value: number) => fmt(value)}
+            contentStyle={{ borderRadius: 6, borderColor: '#e5e7eb', fontSize: 13 }}
+          />
+          <Legend wrapperStyle={{ fontSize: 13 }} />
+          <Bar dataKey="gross" name="Gross Allocation" fill="#a5b4fc" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="net" name="Net Amount" fill="#4338ca" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 export default function DistributionPage() {
   const fundId = DEFAULT_FUND_CODE;
@@ -107,11 +145,14 @@ export default function DistributionPage() {
         ) : !previewData || previewData.lineItems.length === 0 ? (
           <EmptyState title="No distribution data" message="No settled ownership positions to distribute against." />
         ) : (
-          <DataTable
-            columns={columns}
-            data={previewData.lineItems}
-            getRowId={(r) => r.investorId ?? r.walletAddress}
-          />
+          <div className="space-y-6">
+            <DistributionBarChart lineItems={previewData.lineItems} />
+            <DataTable
+              columns={columns}
+              data={previewData.lineItems}
+              getRowId={(r) => r.investorId ?? r.walletAddress}
+            />
+          </div>
         )}
       </SectionCard>
     </div>

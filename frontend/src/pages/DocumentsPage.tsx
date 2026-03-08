@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { Upload, FileText, CheckCircle2, Clock, Hash } from "lucide-react";
+import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 
 interface UploadedDocument {
   documentId: string;
@@ -282,7 +283,7 @@ export default function DocumentsPage() {
                       {h.anchor && (
                         <div className="mt-2 text-xs text-gray-500 space-y-0.5">
                           <p>Chain ID: {h.anchor.chainId}</p>
-                          <p className="break-all">Tx: {h.anchor.txHash}</p>
+                          <p className="break-all flex items-center gap-1">Tx: <ExplorerLink value={h.anchor.txHash} type="tx" /></p>
                           {h.anchor.blockNumber && <p>Block: {h.anchor.blockNumber}</p>}
                         </div>
                       )}

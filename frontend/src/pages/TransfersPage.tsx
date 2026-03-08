@@ -1,5 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
+  AreaChart, Area,
+} from 'recharts';
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from '@/config/constants';
 import { getFailedTransfers, getSuccessfulTransfers, getOwnershipHistory } from '@/services';
 import type { FailedTransfer, SuccessfulTransfer } from '@/services/tokenization.service';
@@ -10,21 +14,22 @@ import { DataTable, Column } from "@/components/kadra/DataTable";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 
 const fmt = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
 const successCols: Column<SuccessfulTransfer>[] = [
-  { key: "fromWalletAddress", header: "From", className: "font-mono text-xs" },
-  { key: "toWalletAddress", header: "To", className: "font-mono text-xs" },
+  { key: "fromWalletAddress", header: "From", render: (r) => <ExplorerLink value={r.fromWalletAddress} type="address" /> },
+  { key: "toWalletAddress", header: "To", render: (r) => <ExplorerLink value={r.toWalletAddress} type="address" /> },
   { key: "tokenAmount", header: "Amount", render: (r) => fmt(parseFloat(r.tokenAmount)) },
   { key: "transferRequestId", header: "Status", render: () => <StatusBadge status="Success" /> },
-  { key: "txHash", header: "Tx Hash", className: "font-mono text-xs", render: (r) => r.txHash || "—" },
+  { key: "txHash", header: "Tx Hash", render: (r) => <ExplorerLink value={r.txHash || "—"} type="tx" /> },
   { key: "timestamp", header: "Date", render: (r) => new Date(r.timestamp).toLocaleDateString() },
 ];
 
 const failedCols: Column<FailedTransfer>[] = [
-  { key: "fromWalletAddress", header: "From", className: "font-mono text-xs" },
-  { key: "toWalletAddress", header: "To", className: "font-mono text-xs" },
+  { key: "fromWalletAddress", header: "From", render: (r) => <ExplorerLink value={r.fromWalletAddress} type="address" /> },
+  { key: "toWalletAddress", header: "To", render: (r) => <ExplorerLink value={r.toWalletAddress} type="address" /> },
   { key: "tokenAmount", header: "Amount", render: (r) => fmt(parseFloat(r.tokenAmount)) },
   { key: "transferRequestId", header: "Status", render: () => <StatusBadge status="Failed" /> },
   { key: "failureCode", header: "Failure Reason", render: (r) => r.failureCode ? r.failureCode.replace(/_/g, ' ') : "—" },
@@ -35,12 +40,91 @@ const ownershipCols: Column<OwnershipEvent>[] = [
   { key: "eventType", header: "Event Type", render: (r) => (
     <StatusBadge status={r.eventType} />
   )},
-  { key: "toWalletAddress", header: "Wallet Address", className: "font-mono text-xs", render: (r) => r.toWalletAddress },
+  { key: "toWalletAddress", header: "Wallet Address", render: (r) => <ExplorerLink value={r.toWalletAddress} type="address" /> },
   { key: "tokenDelta", header: "Amount", render: (r) => fmt(parseFloat(r.tokenDelta)) },
-  { key: "txHash", header: "Tx Hash", className: "font-mono text-xs", render: (r) => r.txHash ? `${r.txHash.slice(0, 10)}...` : "---" },
+  { key: "txHash", header: "Tx Hash", render: (r) => <ExplorerLink value={r.txHash || "—"} type="tx" /> },
   { key: "blockNumber", header: "Block Number", render: (r) => r.blockNumber ?? "---" },
   { key: "eventTimestamp", header: "Timestamp", render: (r) => new Date(r.eventTimestamp).toLocaleString() },
 ];
+
+function TransferSummaryChart({
+  successCount,
+  failedCount,
+}: {
+  successCount: number;
+  failedCount: number;
+}) {
+  const data = [
+    { name: 'Successful', count: successCount },
+    { name: 'Failed', count: failedCount },
+  ];
+  const colors = ['#16a34a', '#ef4444'];
+
+  return (
+    <SectionCard title="Transfer Summary" className="mb-6">
+      <ResponsiveContainer width="100%" height={250}>
+        <BarChart data={data} margin={{ top: 8, right: 24, left: 16, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
+          <Tooltip contentStyle={{ borderRadius: 6, borderColor: '#e5e7eb', fontSize: 13 }} />
+          <Bar dataKey="count" name="Transfers" radius={[4, 4, 0, 0]}>
+            {data.map((_entry, index) => (
+              <Cell key={`cell-${index}`} fill={colors[index]} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </SectionCard>
+  );
+}
+
+function OwnershipTimelineChart({ events }: { events: OwnershipEvent[] }) {
+  const chartData = useMemo(() => {
+    const sorted = [...events].sort(
+      (a, b) => new Date(a.eventTimestamp).getTime() - new Date(b.eventTimestamp).getTime(),
+    );
+    let cumulative = 0;
+    return sorted.map((e) => {
+      cumulative += parseFloat(e.tokenDelta);
+      return {
+        date: new Date(e.eventTimestamp).toLocaleDateString(),
+        cumulativeTokens: cumulative,
+        eventType: e.eventType,
+      };
+    });
+  }, [events]);
+
+  if (chartData.length === 0) return null;
+
+  return (
+    <div className="mb-6">
+      <h4 className="text-sm font-medium text-gray-700 mb-3">Token Movement Timeline</h4>
+      <ResponsiveContainer width="100%" height={250}>
+        <AreaChart data={chartData} margin={{ top: 8, right: 24, left: 16, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} />
+          <YAxis
+            tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+            tick={{ fontSize: 12, fill: '#6b7280' }}
+          />
+          <Tooltip
+            formatter={(value: number) => fmt(value)}
+            contentStyle={{ borderRadius: 6, borderColor: '#e5e7eb', fontSize: 13 }}
+          />
+          <Area
+            type="monotone"
+            dataKey="cumulativeTokens"
+            name="Cumulative Tokens"
+            stroke="#4f46e5"
+            fill="#c7d2fe"
+            strokeWidth={2}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 type Tab = 'transfers' | 'ownership';
 
@@ -91,6 +175,7 @@ export default function TransfersPage() {
 
     return (
       <div className="space-y-6">
+        <TransferSummaryChart successCount={successful.length} failedCount={failed.length} />
         <SectionCard title={`Failed Transfers (${failed.length})`}>
           {failed.length === 0 ? (
             <EmptyState title="No failed transfers" message="All transfer attempts have succeeded." />
@@ -116,13 +201,16 @@ export default function TransfersPage() {
     const events = ownershipData ?? [];
 
     return (
-      <SectionCard title={`Ownership Events (${events.length})`}>
-        {events.length === 0 ? (
-          <EmptyState title="No ownership events" message="No token minting or transfer events recorded yet." />
-        ) : (
-          <DataTable columns={ownershipCols} data={events} getRowId={(r) => r.eventId} />
-        )}
-      </SectionCard>
+      <div className="space-y-6">
+        {events.length > 0 && <OwnershipTimelineChart events={events} />}
+        <SectionCard title={`Ownership Events (${events.length})`}>
+          {events.length === 0 ? (
+            <EmptyState title="No ownership events" message="No token minting or transfer events recorded yet." />
+          ) : (
+            <DataTable columns={ownershipCols} data={events} getRowId={(r) => r.eventId} />
+          )}
+        </SectionCard>
+      </div>
     );
   };
 

@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
+  Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { MetricCard } from "@/components/kadra/MetricCard";
 import { SectionCard } from "@/components/kadra/SectionCard";
@@ -11,9 +15,102 @@ import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getFundOverview } from "@/services";
 import { getInvestors } from "@/services/investors.service";
 import { getCapTable } from "@/services/ownership.service";
+import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+
+const CAPITAL_COLORS = ["#4338ca", "#a5b4fc", "#d1d5db"] as const;
+const BAR_COLOR = "#4f46e5";
 
 const fmt = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+const fmtCompact = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(n);
 const pct = (n: number) => `${n.toFixed(1)}%`;
+
+/* ── Capital Breakdown Donut ── */
+
+interface CapitalDonutProps {
+  readonly settledCapital: number;
+  readonly pendingCapital: number;
+  readonly committedCapital: number;
+}
+
+function CapitalDonutChart({ settledCapital, pendingCapital, committedCapital }: CapitalDonutProps) {
+  const chartData = useMemo(() => [
+    { name: "Settled", value: settledCapital },
+    { name: "Pending", value: pendingCapital },
+    ...(committedCapital - settledCapital - pendingCapital > 0
+      ? [{ name: "Remaining", value: committedCapital - settledCapital - pendingCapital }]
+      : []),
+  ], [settledCapital, pendingCapital, committedCapital]);
+
+  return (
+    <div className="relative">
+      <ResponsiveContainer width="100%" height={250}>
+        <PieChart>
+          <Pie
+            data={chartData}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={80}
+            paddingAngle={2}
+          >
+            {chartData.map((entry, idx) => (
+              <Cell key={entry.name} fill={CAPITAL_COLORS[idx] ?? CAPITAL_COLORS[2]} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={(value: number) => fmt(value)}
+            contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13 }}
+          />
+          <Legend
+            verticalAlign="bottom"
+            iconType="circle"
+            iconSize={8}
+            formatter={(value: string) => <span className="text-sm text-gray-600">{value}</span>}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+      {/* Center label */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginBottom: 28 }}>
+        <div className="text-center">
+          <p className="text-xs text-gray-500">Total</p>
+          <p className="text-sm font-semibold text-gray-900">{fmtCompact(committedCapital)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Ownership Bar Chart ── */
+
+interface OwnershipBarProps {
+  readonly rows: ReadonlyArray<{ investorName: string | null; ownershipPct: number; investorId: string | null }>;
+}
+
+function OwnershipBarChart({ rows }: OwnershipBarProps) {
+  const sortedData = useMemo(
+    () =>
+      [...rows]
+        .sort((a, b) => b.ownershipPct - a.ownershipPct)
+        .map((r) => ({ name: r.investorName ?? "Unknown", ownership: Number(r.ownershipPct.toFixed(1)) })),
+    [rows],
+  );
+
+  return (
+    <ResponsiveContainer width="100%" height={250}>
+      <BarChart data={sortedData} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
+        <XAxis type="number" domain={[0, "dataMax"]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 12, fill: "#6b7280" }} />
+        <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12, fill: "#374151" }} />
+        <Tooltip
+          formatter={(value: number) => [`${value}%`, "Ownership"]}
+          contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13 }}
+        />
+        <Bar dataKey="ownership" fill={BAR_COLOR} radius={[0, 4, 4, 0]} barSize={20} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
 
 export default function FundOverviewPage() {
   const [tab, setTab] = useState("Overview");
@@ -66,13 +163,20 @@ export default function FundOverviewPage() {
               { label: "Eligible Wallets", value: String(data.eligibleWalletCount) },
               { label: "Settled Subscriptions", value: String(data.settledSubscriptions) },
               { label: "Token Symbol", value: data.tokenContract?.deploymentStatus === "DEPLOYED" ? "KDRA" : "Not deployed" },
-              { label: "Contract", value: data.tokenContract?.contractAddress ? `${data.tokenContract.contractAddress.slice(0, 6)}...${data.tokenContract.contractAddress.slice(-4)}` : "N/A" },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-border bg-card p-4">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{item.label}</p>
                 <p className="mt-1 text-sm font-semibold text-card-foreground">{item.value}</p>
               </div>
             ))}
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contract</p>
+              <div className="mt-1 text-sm font-semibold text-card-foreground">
+                {data.tokenContract?.contractAddress
+                  ? <ExplorerLink value={data.tokenContract.contractAddress} type="address" />
+                  : "N/A"}
+              </div>
+            </div>
           </div>
 
           {/* Key Dates */}
@@ -121,7 +225,6 @@ export default function FundOverviewPage() {
               <dl className="space-y-3">
                 {[
                   ["Deployment Status", data.tokenContract?.deploymentStatus ?? "Not deployed"],
-                  ["Contract Address", data.tokenContract?.contractAddress ?? "N/A"],
                   ["Chain ID", data.tokenContract?.chainId ? String(data.tokenContract.chainId) : "N/A"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between border-b border-border pb-2 last:border-0">
@@ -129,6 +232,14 @@ export default function FundOverviewPage() {
                     <dd className="text-sm font-medium text-card-foreground font-mono text-xs">{v}</dd>
                   </div>
                 ))}
+                <div className="flex justify-between border-b border-border pb-2 last:border-0">
+                  <dt className="text-sm text-muted-foreground">Contract Address</dt>
+                  <dd className="text-sm font-medium text-card-foreground">
+                    {data.tokenContract?.contractAddress
+                      ? <ExplorerLink value={data.tokenContract.contractAddress} type="address" truncate={false} />
+                      : "N/A"}
+                  </dd>
+                </div>
               </dl>
             </SectionCard>
           </div>
@@ -148,23 +259,12 @@ export default function FundOverviewPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <SectionCard title="Capital Breakdown">
               <div className="space-y-4">
-                {/* Settlement progress bar */}
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Settlement Progress</span>
-                    <span className="font-medium">{pct(settlementRate)}</span>
-                  </div>
-                  <div className="h-3 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(settlementRate, 100)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>{fmt(settledCapital)} settled</span>
-                    <span>{fmt(committedCapital)} committed</span>
-                  </div>
-                </div>
+                {/* Donut chart */}
+                <CapitalDonutChart
+                  settledCapital={settledCapital}
+                  pendingCapital={pendingCapital}
+                  committedCapital={committedCapital}
+                />
 
                 <div className="border-t border-border pt-4">
                   <dl className="space-y-3">
@@ -229,20 +329,7 @@ export default function FundOverviewPage() {
           {/* Ownership Distribution from cap table */}
           {capTable && capTable.rows.length > 0 && (
             <SectionCard title="Ownership Distribution">
-              <div className="space-y-3">
-                {capTable.rows.map((row) => (
-                  <div key={row.investorId} className="flex items-center gap-4">
-                    <span className="text-sm text-muted-foreground w-40 truncate">{row.investorName}</span>
-                    <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full"
-                        style={{ width: `${row.ownershipPct}%` }}
-                      />
-                    </div>
-                    <span className="text-sm font-medium w-16 text-right">{pct(row.ownershipPct)}</span>
-                  </div>
-                ))}
-              </div>
+              <OwnershipBarChart rows={capTable.rows} />
             </SectionCard>
           )}
         </>
@@ -281,9 +368,9 @@ export default function FundOverviewPage() {
                         <tr key={inv.investorId} className="hover:bg-muted/50 transition-colors">
                           <td className="px-6 py-3 font-medium">{inv.legalName}</td>
                           <td className="px-6 py-3 text-muted-foreground">{inv.email}</td>
-                          <td className="px-6 py-3 font-mono text-xs text-muted-foreground">
+                          <td className="px-6 py-3 text-muted-foreground">
                             {inv.wallets?.[0]?.address
-                              ? `${inv.wallets[0].address.slice(0, 6)}...${inv.wallets[0].address.slice(-4)}`
+                              ? <ExplorerLink value={inv.wallets[0].address} type="address" />
                               : "No wallet"}
                           </td>
                           <td className="px-6 py-3"><StatusBadge status={inv.verificationStatus} /></td>

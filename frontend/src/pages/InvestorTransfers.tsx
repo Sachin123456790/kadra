@@ -7,20 +7,18 @@ import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMyTransfers } from "@/services";
+import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import type { InvestorTransferRequest } from "@/services/investor-portal.service";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
-const truncAddr = (addr: string) =>
-  addr.length > 12 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : addr;
-
 const columns: Column<InvestorTransferRequest>[] = [
-  { key: "fromWalletAddress", header: "From", className: "font-mono text-xs", render: (r) => truncAddr(r.fromWalletAddress) },
-  { key: "toWalletAddress", header: "To", className: "font-mono text-xs", render: (r) => truncAddr(r.toWalletAddress) },
+  { key: "fromWalletAddress", header: "From", render: (r) => <ExplorerLink value={r.fromWalletAddress ?? ""} type="address" /> },
+  { key: "toWalletAddress", header: "To", render: (r) => <ExplorerLink value={r.toWalletAddress ?? ""} type="address" /> },
   { key: "tokenAmount", header: "Amount", render: (r) => fmt(Number(r.tokenAmount)) },
   { key: "requestStatus", header: "Status", render: (r) => <StatusBadge status={r.requestStatus} /> },
-  { key: "submittedTxHash", header: "Tx Hash", className: "font-mono text-xs", render: (r) => r.submittedTxHash ? truncAddr(r.submittedTxHash) : "--" },
+  { key: "submittedTxHash", header: "Tx Hash", render: (r) => <ExplorerLink value={r.submittedTxHash ?? ""} type="tx" /> },
   { key: "createdAt", header: "Date", render: (r) => new Date(r.createdAt).toLocaleDateString() },
 ];
 

@@ -13,6 +13,7 @@ import { Calendar, FileText as FileTextIcon } from "lucide-react";
 import type { Investor } from "@/services/investors.service";
 import type { InvestorRow } from "@/types/api";
 import { X, User, Wallet, Shield, Mail } from "lucide-react";
+import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 
 export default function InvestorsPage() {
   const fundId = DEFAULT_FUND_CODE;
@@ -53,7 +54,7 @@ export default function InvestorsPage() {
 
   const columns: Column<InvestorRow>[] = [
     { key: "name", header: "Investor Name" },
-    { key: "wallet", header: "Wallet Address", className: "font-mono text-xs" },
+    { key: "wallet", header: "Wallet Address", render: (r) => <ExplorerLink value={r.wallet} type="address" /> },
     { key: "verificationStatus", header: "Status", render: (r) => <StatusBadge status={r.verificationStatus} /> },
     { key: "fundEligibility", header: "Fund Eligibility" },
     { key: "ownership", header: "Ownership %", render: (r) => `${r.ownership}%` },
@@ -147,7 +148,7 @@ export default function InvestorsPage() {
                       <div key={w.walletId} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30">
                         <Wallet className="h-4 w-4 text-muted-foreground shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-mono text-xs truncate">{w.address}</p>
+                          <div className="text-sm"><ExplorerLink value={w.address} type="address" /></div>
                           <p className="text-xs text-muted-foreground">
                             Chain {w.chainId} {w.isPrimary && "· Primary"} · {w.status}
                           </p>

@@ -1,4 +1,9 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, Legend, ResponsiveContainer,
+  AreaChart, Area,
+} from "recharts";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { DataTable, Column } from "@/components/kadra/DataTable";
@@ -20,6 +25,78 @@ const columns: Column<InvestorDistributionLineItem>[] = [
   { key: "netAmount", header: "Net Amount", render: (r) => fmt(Number(r.netAmount)) },
   { key: "currency", header: "Currency" },
 ];
+
+interface BarEntry {
+  date: string;
+  gross: number;
+  net: number;
+}
+
+interface CumulativeEntry {
+  date: string;
+  cumulative: number;
+}
+
+function DistributionBarChart({ items }: { items: InvestorDistributionLineItem[] }) {
+  const barData: BarEntry[] = items.map((item) => ({
+    date: new Date(item.run.asOfTimestamp).toLocaleDateString(),
+    gross: Number(item.grossAmount),
+    net: Number(item.netAmount),
+  }));
+
+  return (
+    <SectionCard>
+      <h3 className="text-sm font-medium text-gray-600 mb-4">Distribution History</h3>
+      <ResponsiveContainer width="100%" height={250}>
+        <BarChart data={barData}>
+          <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#6b7280" }} />
+          <YAxis tick={{ fontSize: 12, fill: "#6b7280" }} tickFormatter={(v: number) => fmt(v)} />
+          <ReTooltip formatter={(value: number) => fmt(value)} />
+          <Legend />
+          <Bar dataKey="gross" name="Gross" fill="#a5b4fc" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="net" name="Net" fill="#4338ca" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </SectionCard>
+  );
+}
+
+function CumulativeAreaChart({ items }: { items: InvestorDistributionLineItem[] }) {
+  const areaData: CumulativeEntry[] = useMemo(() => {
+    const sorted = [...items].sort(
+      (a, b) => new Date(a.run.asOfTimestamp).getTime() - new Date(b.run.asOfTimestamp).getTime()
+    );
+    let cumulative = 0;
+    return sorted.map((item) => {
+      cumulative += Number(item.netAmount);
+      return {
+        date: new Date(item.run.asOfTimestamp).toLocaleDateString(),
+        cumulative,
+      };
+    });
+  }, [items]);
+
+  return (
+    <SectionCard>
+      <h3 className="text-sm font-medium text-gray-600 mb-4">Cumulative Distributions</h3>
+      <ResponsiveContainer width="100%" height={200}>
+        <AreaChart data={areaData}>
+          <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#6b7280" }} />
+          <YAxis tick={{ fontSize: 12, fill: "#6b7280" }} tickFormatter={(v: number) => fmt(v)} />
+          <ReTooltip formatter={(value: number) => fmt(value)} />
+          <Area
+            type="monotone"
+            dataKey="cumulative"
+            name="Cumulative Net"
+            stroke="#4f46e5"
+            fill="#4f46e5"
+            fillOpacity={0.3}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </SectionCard>
+  );
+}
 
 export default function InvestorDistributionsPage() {
   const fundId = DEFAULT_FUND_CODE;
@@ -43,6 +120,10 @@ export default function InvestorDistributionsPage() {
   return (
     <div>
       <PageHeader title="My Distributions" subtitle="Your distribution history" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <DistributionBarChart items={data} />
+        <CumulativeAreaChart items={data} />
+      </div>
       <SectionCard>
         <DataTable columns={columns} data={data} getRowId={(r) => r.id} />
       </SectionCard>

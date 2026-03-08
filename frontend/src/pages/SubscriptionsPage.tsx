@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from "recharts";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { DataTable, Column } from "@/components/kadra/DataTable";
@@ -9,6 +10,11 @@ import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getSubscriptions } from "@/services";
 import type { SubscriptionRow } from "@/types/api";
+
+const STATUS_COLORS: Record<string, string> = {
+  SETTLED: "#4f46e5",
+  PENDING: "#fbbf24",
+};
 
 const fmt = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
@@ -48,11 +54,45 @@ export default function SubscriptionsPage() {
 
   if (isLoading) return <div className="p-6">Loading...</div>;
   if (error) return <ErrorAlert title="Failed to load subscriptions" message={(error as Error).message} />;
+  const statusChartData = useMemo(() => {
+    if (!subscriptions) return [];
+    const counts: Record<string, number> = {};
+    for (const sub of subscriptions) {
+      const key = sub.status.toUpperCase();
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [subscriptions]);
+
   if (!subscriptions || subscriptions.length === 0) return <EmptyState title="No subscriptions" message="No subscription records exist yet." />;
 
   return (
     <div>
-      <PageHeader title="Subscriptions" subtitle="Track subscription commitments and settlement status" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <PageHeader title="Subscriptions" subtitle="Track subscription commitments and settlement status" />
+        <SectionCard className="w-full sm:w-72 flex-shrink-0">
+          <h3 className="text-sm font-medium text-gray-500 mb-2 text-center">Status Breakdown</h3>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie
+                data={statusChartData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={70}
+              >
+                {statusChartData.map((entry) => (
+                  <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#94a3b8"} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </SectionCard>
+      </div>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2">
           <SectionCard>

@@ -8,6 +8,7 @@ import { QUERY_KEYS } from "@/config/constants";
 import { getMyProfile, getMyWallets, createWalletChallenge, verifyWalletLink } from "@/services";
 import type { LinkedWallet } from "@/services/wallet-profile.service";
 import { useWallet } from "@/hooks/useWallet";
+import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import {
   Dialog,
   DialogContent,
@@ -16,9 +17,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Wallet, CheckCircle, AlertCircle, Copy, ExternalLink, Shield } from "lucide-react";
-
-const truncAddr = (addr: string) =>
-  addr.length > 12 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : addr;
 
 const chainName = (id: number) => {
   const chains: Record<number, string> = {
@@ -188,7 +186,7 @@ export default function InvestorProfile() {
                     <tr key={w.walletId} className="border-b border-border last:border-0">
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs">{truncAddr(w.address)}</span>
+                          <ExplorerLink value={w.address ?? ""} type="address" />
                           <button
                             onClick={() => copyAddress(w.address)}
                             className="text-muted-foreground hover:text-foreground transition-colors"
@@ -336,7 +334,7 @@ export default function InvestorProfile() {
               <div className="space-y-4">
                 <div className="rounded-lg bg-muted p-4">
                   <p className="text-xs text-muted-foreground mb-1">Connected Address</p>
-                  <p className="font-mono text-sm break-all">{connectedAddr}</p>
+                  <ExplorerLink value={connectedAddr ?? ""} type="address" truncate={false} />
                 </div>
                 <div className="rounded-lg bg-muted p-4">
                   <p className="text-xs text-muted-foreground mb-1">Network</p>
