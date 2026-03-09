@@ -52,11 +52,10 @@ export default function InvestorDashboardPage() {
     queryFn: () => getMyDashboard(fundId).then((r) => r.data),
   });
 
-  if (isLoading) return <div className="p-6">Loading...</div>;
-  if (error) return <ErrorAlert title="Failed to load portfolio" message={(error as Error).message} />;
-  if (!data) return <EmptyState title="No portfolio data" message="Your portfolio overview is not available yet." />;
-
-  const { summary, subscriptions, tokenPositions, capitalAccount } = data;
+  const summary = data?.summary;
+  const subscriptions = data?.subscriptions ?? [];
+  const tokenPositions = data?.tokenPositions ?? [];
+  const capitalAccount = data?.capitalAccount;
 
   const capitalBarData = useMemo(() => {
     if (!capitalAccount) return [];
@@ -78,6 +77,10 @@ export default function InvestorDashboardPage() {
       fullAddress: pos.walletAddress,
     }));
   }, [tokenPositions]);
+
+  if (isLoading) return <div className="p-6">Loading...</div>;
+  if (error) return <ErrorAlert title="Failed to load portfolio" message={(error as Error).message} />;
+  if (!data || !summary) return <EmptyState title="No portfolio data" message="Your portfolio overview is not available yet." />;
 
   return (
     <div>
