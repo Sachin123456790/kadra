@@ -72,6 +72,7 @@ export class IdentityService {
         label: input.label ?? null,
         isPrimary: input.isPrimary ?? false,
         walletStatus: 'ACTIVE',
+        walletSource: 'SYSTEM_GENERATED',
       },
     });
 

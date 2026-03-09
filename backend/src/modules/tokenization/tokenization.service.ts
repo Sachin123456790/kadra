@@ -38,7 +38,9 @@ export class TokenizationService {
     const result = await this.tokenAdapter.deploy({
       name: fund.name + ' Token',
       symbol: 'KDRA',
-      identityRegistryAddress: '0x0000000000000000000000000000000000000000', // Mock for MVP
+      identityRegistryAddress:
+        process.env.IDENTITY_REGISTRY_ADDRESS ||
+        '0x0000000000000000000000000000000000000000',
     });
 
     const contract = await this.prisma.tokenContract.create({
@@ -207,7 +209,12 @@ export class TokenizationService {
     }
   }
 
-  async initiateTransfer(
+  /**
+   * Validate a transfer (pre-checks only). Does NOT submit to chain.
+   * Returns a transferRequestId with status PENDING_SIGNATURE if pre-checks pass.
+   * The frontend must then sign the tx with the investor's wallet and call confirmTransfer.
+   */
+  async validateTransfer(
     fundId: string,
     input: {
       fromWalletAddress: string;
@@ -293,7 +300,6 @@ export class TokenizationService {
     else if (!sufficientBalance) failureCode = 'INSUFFICIENT_BALANCE';
 
     if (failureCode) {
-      // Pre-check failed
       await this.prisma.transferRequest.update({
         where: { id: transferRequest.id },
         data: {
@@ -342,213 +348,88 @@ export class TokenizationService {
           senderEligible: !!senderEligible,
           sufficientBalance,
         },
+        contractAddress: contract.contractAddress,
         txHash: null,
       };
     }
 
-    // Pre-check passed — submit to chain
+    // Pre-checks passed — waiting for frontend to sign and submit
+    await this.prisma.transferRequest.update({
+      where: { id: transferRequest.id },
+      data: {
+        requestStatus: 'PENDING_SIGNATURE',
+        precheckPassed: true,
+      },
+    });
+
+    return {
+      transferRequestId: transferRequest.id,
+      requestStatus: 'PENDING_SIGNATURE',
+      precheck: {
+        recipientEligible: true,
+        senderEligible: true,
+        sufficientBalance: true,
+      },
+      contractAddress: contract.contractAddress,
+      txHash: null,
+    };
+  }
+
+  /**
+   * Confirm a transfer after the investor has signed and submitted the tx from their wallet.
+   * Records the on-chain result and updates positions/capital accounts.
+   */
+  async confirmTransfer(transferRequestId: string, txHash: string) {
+    const transferRequest = await this.prisma.transferRequest.findUnique({
+      where: { id: transferRequestId },
+    });
+    if (!transferRequest)
+      throw new NotFoundError('TransferRequest', transferRequestId);
+    if (
+      transferRequest.requestStatus !== 'PENDING_SIGNATURE' &&
+      transferRequest.requestStatus !== 'REQUESTED'
+    ) {
+      throw new ConflictError(
+        'TRANSFER_NOT_PENDING',
+        `Transfer is in ${transferRequest.requestStatus} state, not PENDING_SIGNATURE`,
+      );
+    }
+
+    const fundId = transferRequest.fundId;
+    const contract = await this.prisma.tokenContract.findFirst({
+      where: {
+        id: transferRequest.tokenContractId,
+        deploymentStatus: 'DEPLOYED',
+        deletedAt: null,
+      },
+    });
+    if (!contract)
+      throw new NotFoundError('TokenContract', transferRequest.tokenContractId);
+
+    // Verify the transaction on-chain
+    const adapter = this.tokenAdapter as any;
+    if (typeof adapter.verifyTransferTx !== 'function') {
+      throw new ExternalDependencyError(
+        'Blockchain',
+        'Adapter does not support verifyTransferTx',
+      );
+    }
+    let receipt: { txHash: string; blockNumber: number; status: string };
     try {
-      const result = await this.tokenAdapter.transfer({
-        contractAddress: contract.contractAddress,
-        fromAddress: input.fromWalletAddress,
-        toAddress: input.toWalletAddress,
-        amount: input.tokenAmount,
-      });
-
-      await this.prisma.transferRequest.update({
-        where: { id: transferRequest.id },
-        data: {
-          requestStatus: 'MINED',
-          precheckPassed: true,
-          submittedTxHash: result.txHash,
-          submittedAt: new Date(),
-          finalizedAt: new Date(),
-        },
-      });
-
-      // Record transfer event
-      await this.prisma.transferEvent.create({
-        data: {
-          transferRequestId: transferRequest.id,
-          fundId,
-          tokenContractId: contract.id,
-          eventKind: 'MINED',
-          txHash: result.txHash,
-          blockNumber: BigInt(result.blockNumber),
-          blockTimestamp: new Date(),
-          payload: {
-            fromWallet: input.fromWalletAddress,
-            toWallet: input.toWalletAddress,
-            amount: input.tokenAmount,
-          },
-        },
-      });
-
-      // Record token position event
-      await this.prisma.tokenPositionEvent.create({
-        data: {
-          fundId,
-          tokenContractId: contract.id,
-          chainId: parseInt(process.env.CHAIN_ID || '11155111'),
-          blockNumber: BigInt(result.blockNumber),
-          blockTimestamp: new Date(),
-          txHash: result.txHash,
-          logIndex: 0,
-          eventType: 'TRANSFER',
-          fromWalletAddress: input.fromWalletAddress,
-          toWalletAddress: input.toWalletAddress,
-          tokenAmount: amount,
-          relatedTransferRequestId: transferRequest.id,
-          ingestStatus: 'CONFIRMED',
-          rawEvent: {
-            type: 'TRANSFER',
-            from: input.fromWalletAddress,
-            to: input.toWalletAddress,
-            amount,
-          },
-        },
-      });
-
-      // Update positions and capital accounts atomically
-      await this.prisma.$transaction(async (tx) => {
-        if (position) {
-          await tx.tokenPosition.update({
-            where: { id: position.id },
-            data: { settledTokenBalance: { decrement: amount } },
-          });
-        }
-
-        const recipientPosition = await tx.tokenPosition.findFirst({
-          where: {
-            tokenContractId: contract.id,
-            walletAddressNorm: input.toWalletAddress.toLowerCase(),
-          },
-        });
-        if (recipientPosition) {
-          await tx.tokenPosition.update({
-            where: { id: recipientPosition.id },
-            data: { settledTokenBalance: { increment: amount } },
-          });
-        } else {
-          await tx.tokenPosition.create({
-            data: {
-              fundId,
-              tokenContractId: contract.id,
-              walletId: recipientWallet?.id,
-              walletAddress: input.toWalletAddress,
-              walletAddressNorm: input.toWalletAddress.toLowerCase(),
-              settledTokenBalance: amount,
-            },
-          });
-        }
-
-        // Proportionally adjust capital accounts for transfer
-        const transferFraction = balance > 0 ? amount / balance : 0;
-        let transferredCapital = 0;
-
-        // Read sender account and compute transferred capital before any updates
-        const senderAccount = senderWallet
-          ? await tx.capitalAccount.findFirst({
-              where: {
-                fundId,
-                investorId: senderWallet.investorId,
-                isCurrent: true,
-                deletedAt: null,
-              },
-            })
-          : null;
-
-        if (senderAccount) {
-          const senderBalance = parseFloat(
-            senderAccount.endingCapitalBalance.toString(),
-          );
-          transferredCapital = senderBalance * transferFraction;
-          await tx.capitalAccount.update({
-            where: { id: senderAccount.id },
-            data: {
-              endingCapitalBalance: senderBalance - transferredCapital,
-              asOfDate: new Date(),
-            },
-          });
-        }
-
-        if (recipientWallet && transferredCapital > 0) {
-          const recipientAccount = await tx.capitalAccount.findFirst({
-            where: {
-              fundId,
-              investorId: recipientWallet.investorId,
-              isCurrent: true,
-              deletedAt: null,
-            },
-          });
-
-          if (recipientAccount) {
-            await tx.capitalAccount.update({
-              where: { id: recipientAccount.id },
-              data: {
-                endingCapitalBalance: {
-                  increment: transferredCapital,
-                },
-                asOfDate: new Date(),
-              },
-            });
-          } else {
-            await tx.capitalAccount.create({
-              data: {
-                fundId,
-                investorId: recipientWallet.investorId,
-                openingBalance: 0,
-                initialContribution: 0,
-                contributedAt: new Date(),
-                capitalReturned: 0,
-                accruedPref: 0,
-                residualAllocation: 0,
-                endingCapitalBalance: transferredCapital,
-                asOfDate: new Date(),
-                isCurrent: true,
-              },
-            });
-          }
-        }
-      });
-
-      await this.eventLog.log({
-        eventType: 'TRANSFER_COMPLETED',
-        aggregateType: 'TRANSFER_REQUEST',
-        aggregateId: transferRequest.id,
-        fundId,
-        payload: {
-          fromWallet: input.fromWalletAddress,
-          toWallet: input.toWalletAddress,
-          tokenAmount: input.tokenAmount,
-        },
-        txHash: result.txHash,
-        blockNumber: result.blockNumber,
-      });
-
-      return {
-        transferRequestId: transferRequest.id,
-        requestStatus: 'MINED',
-        precheck: {
-          recipientEligible: true,
-          senderEligible: true,
-          sufficientBalance: true,
-        },
-        txHash: result.txHash,
-      };
+      receipt = await adapter.verifyTransferTx(txHash);
     } catch (error) {
+      // Transaction failed or not found
       await this.prisma.transferRequest.update({
-        where: { id: transferRequest.id },
+        where: { id: transferRequestId },
         data: {
           requestStatus: 'CHAIN_REVERTED',
-          precheckPassed: true,
           finalizedAt: new Date(),
         },
       });
 
       await this.prisma.transferEvent.create({
         data: {
-          transferRequestId: transferRequest.id,
+          transferRequestId,
           fundId,
           tokenContractId: contract.id,
           eventKind: 'CHAIN_REVERTED',
@@ -561,28 +442,223 @@ export class TokenizationService {
       await this.eventLog.log({
         eventType: 'TRANSFER_FAILED',
         aggregateType: 'TRANSFER_REQUEST',
-        aggregateId: transferRequest.id,
+        aggregateId: transferRequestId,
         fundId,
         payload: {
           stage: 'CHAIN',
           reason: error instanceof Error ? error.message : 'unknown',
-          fromWallet: input.fromWalletAddress,
-          toWallet: input.toWalletAddress,
-          tokenAmount: input.tokenAmount,
+          txHash,
         },
       });
 
       return {
-        transferRequestId: transferRequest.id,
+        transferRequestId,
         requestStatus: 'CHAIN_REVERTED',
-        precheck: {
-          recipientEligible: true,
-          senderEligible: true,
-          sufficientBalance: true,
-        },
-        txHash: null,
+        txHash,
       };
     }
+
+    if (receipt.status === 'REVERTED') {
+      await this.prisma.transferRequest.update({
+        where: { id: transferRequestId },
+        data: {
+          requestStatus: 'CHAIN_REVERTED',
+          submittedTxHash: txHash,
+          finalizedAt: new Date(),
+        },
+      });
+
+      return { transferRequestId, requestStatus: 'CHAIN_REVERTED', txHash };
+    }
+
+    // Transaction confirmed — record everything
+    const amount = Number(transferRequest.tokenAmount);
+    const fromAddress = transferRequest.fromWalletAddress;
+    const toAddress = transferRequest.toWalletAddress;
+
+    await this.prisma.transferRequest.update({
+      where: { id: transferRequestId },
+      data: {
+        requestStatus: 'MINED',
+        submittedTxHash: receipt.txHash,
+        submittedAt: new Date(),
+        finalizedAt: new Date(),
+      },
+    });
+
+    await this.prisma.transferEvent.create({
+      data: {
+        transferRequestId,
+        fundId,
+        tokenContractId: contract.id,
+        eventKind: 'MINED',
+        txHash: receipt.txHash,
+        blockNumber: BigInt(receipt.blockNumber),
+        blockTimestamp: new Date(),
+        payload: {
+          fromWallet: fromAddress,
+          toWallet: toAddress,
+          amount: amount.toString(),
+        },
+      },
+    });
+
+    await this.prisma.tokenPositionEvent.create({
+      data: {
+        fundId,
+        tokenContractId: contract.id,
+        chainId: parseInt(process.env.CHAIN_ID || '11155111'),
+        blockNumber: BigInt(receipt.blockNumber),
+        blockTimestamp: new Date(),
+        txHash: receipt.txHash,
+        logIndex: 0,
+        eventType: 'TRANSFER',
+        fromWalletAddress: fromAddress,
+        toWalletAddress: toAddress,
+        tokenAmount: amount,
+        relatedTransferRequestId: transferRequestId,
+        ingestStatus: 'CONFIRMED',
+        rawEvent: {
+          type: 'TRANSFER',
+          from: fromAddress,
+          to: toAddress,
+          amount,
+        },
+      },
+    });
+
+    // Update positions and capital accounts atomically
+    const senderWallet = await this.prisma.wallet.findFirst({
+      where: { addressNorm: fromAddress.toLowerCase(), deletedAt: null },
+    });
+    const recipientWallet = await this.prisma.wallet.findFirst({
+      where: { addressNorm: toAddress.toLowerCase(), deletedAt: null },
+    });
+    const position = await this.prisma.tokenPosition.findFirst({
+      where: {
+        tokenContractId: contract.id,
+        walletAddressNorm: fromAddress.toLowerCase(),
+      },
+    });
+    const balance = position ? Number(position.settledTokenBalance) : 0;
+
+    await this.prisma.$transaction(async (tx) => {
+      if (position) {
+        await tx.tokenPosition.update({
+          where: { id: position.id },
+          data: { settledTokenBalance: { decrement: amount } },
+        });
+      }
+
+      const recipientPosition = await tx.tokenPosition.findFirst({
+        where: {
+          tokenContractId: contract.id,
+          walletAddressNorm: toAddress.toLowerCase(),
+        },
+      });
+      if (recipientPosition) {
+        await tx.tokenPosition.update({
+          where: { id: recipientPosition.id },
+          data: { settledTokenBalance: { increment: amount } },
+        });
+      } else {
+        await tx.tokenPosition.create({
+          data: {
+            fundId,
+            tokenContractId: contract.id,
+            walletId: recipientWallet?.id,
+            walletAddress: toAddress,
+            walletAddressNorm: toAddress.toLowerCase(),
+            settledTokenBalance: amount,
+          },
+        });
+      }
+
+      const transferFraction = balance > 0 ? amount / balance : 0;
+      let transferredCapital = 0;
+
+      const senderAccount = senderWallet
+        ? await tx.capitalAccount.findFirst({
+            where: {
+              fundId,
+              investorId: senderWallet.investorId,
+              isCurrent: true,
+              deletedAt: null,
+            },
+          })
+        : null;
+
+      if (senderAccount) {
+        const senderBalance = parseFloat(
+          senderAccount.endingCapitalBalance.toString(),
+        );
+        transferredCapital = senderBalance * transferFraction;
+        await tx.capitalAccount.update({
+          where: { id: senderAccount.id },
+          data: {
+            endingCapitalBalance: senderBalance - transferredCapital,
+            asOfDate: new Date(),
+          },
+        });
+      }
+
+      if (recipientWallet && transferredCapital > 0) {
+        const recipientAccount = await tx.capitalAccount.findFirst({
+          where: {
+            fundId,
+            investorId: recipientWallet.investorId,
+            isCurrent: true,
+            deletedAt: null,
+          },
+        });
+
+        if (recipientAccount) {
+          await tx.capitalAccount.update({
+            where: { id: recipientAccount.id },
+            data: {
+              endingCapitalBalance: { increment: transferredCapital },
+              asOfDate: new Date(),
+            },
+          });
+        } else {
+          await tx.capitalAccount.create({
+            data: {
+              fundId,
+              investorId: recipientWallet.investorId,
+              openingBalance: 0,
+              initialContribution: 0,
+              contributedAt: new Date(),
+              capitalReturned: 0,
+              accruedPref: 0,
+              residualAllocation: 0,
+              endingCapitalBalance: transferredCapital,
+              asOfDate: new Date(),
+              isCurrent: true,
+            },
+          });
+        }
+      }
+    });
+
+    await this.eventLog.log({
+      eventType: 'TRANSFER_COMPLETED',
+      aggregateType: 'TRANSFER_REQUEST',
+      aggregateId: transferRequestId,
+      fundId,
+      payload: {
+        fromWallet: fromAddress,
+        toWallet: toAddress,
+        tokenAmount: amount.toString(),
+      },
+      txHash: receipt.txHash,
+      blockNumber: receipt.blockNumber,
+    });
+
+    return {
+      transferRequestId,
+      requestStatus: 'MINED',
+      txHash: receipt.txHash,
+    };
   }
 
   async getTransferValidation(transferRequestId: string) {

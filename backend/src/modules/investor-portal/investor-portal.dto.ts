@@ -1,8 +1,10 @@
-import { IsString, IsInt, Matches, Min } from 'class-validator';
+import { IsString, IsInt, IsOptional, Matches, Min } from 'class-validator';
 
 export class CreateChallengeDto {
   @IsString()
-  @Matches(/^0x[a-fA-F0-9]{40}$/, { message: 'Invalid Ethereum address format' })
+  @Matches(/^0x[a-fA-F0-9]{40}$/, {
+    message: 'Invalid Ethereum address format',
+  })
   address!: string;
 
   @IsInt()
@@ -15,7 +17,9 @@ export class VerifyWalletDto {
   challengeId!: string;
 
   @IsString()
-  @Matches(/^0x[a-fA-F0-9]{40}$/, { message: 'Invalid Ethereum address format' })
+  @Matches(/^0x[a-fA-F0-9]{40}$/, {
+    message: 'Invalid Ethereum address format',
+  })
   address!: string;
 
   @IsInt()
@@ -25,4 +29,8 @@ export class VerifyWalletDto {
   @IsString()
   @Matches(/^0x[a-fA-F0-9]+$/, { message: 'Invalid signature format' })
   signature!: string;
+
+  @IsOptional()
+  @IsString()
+  walletSource?: string; // METAMASK | PHANTOM | SYSTEM_GENERATED | IMPORTED
 }

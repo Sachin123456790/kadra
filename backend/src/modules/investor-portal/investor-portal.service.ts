@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError } from '../../common/errors';
 import { SignatureVerificationService } from './signature-verification.service';
@@ -131,8 +135,7 @@ export class InvestorPortalService {
         currency: s.currency,
         status: s.status,
         settledAt: s.settledAt?.toISOString() ?? null,
-        latestSettlementStatus:
-          s.settlementRecords[0]?.status ?? null,
+        latestSettlementStatus: s.settlementRecords[0]?.status ?? null,
       })),
       tokenPositions,
       capitalAccount: capitalAccount
@@ -239,8 +242,7 @@ export class InvestorPortalService {
     for (const sub of pendingSubs) {
       const existingRow = rows.find(
         (r) =>
-          r.walletAddress.toLowerCase() ===
-          sub.wallet.address.toLowerCase(),
+          r.walletAddress.toLowerCase() === sub.wallet.address.toLowerCase(),
       );
       if (existingRow) {
         existingRow.pendingAllocationPct = Number(sub.allocationPct);
@@ -308,7 +310,8 @@ export class InvestorPortalService {
         runStatus: li.distributionRun.runStatus,
         asOfTimestamp: li.distributionRun.asOfTimestamp.toISOString(),
         completedAt: li.distributionRun.completedAt?.toISOString() ?? null,
-        totalGrossAmount: li.distributionRun.totalGrossAmount?.toString() ?? null,
+        totalGrossAmount:
+          li.distributionRun.totalGrossAmount?.toString() ?? null,
         totalNetAmount: li.distributionRun.totalNetAmount?.toString() ?? null,
         currency: li.distributionRun.currency,
       },
@@ -358,7 +361,9 @@ export class InvestorPortalService {
       where: { addressNorm, chainId: input.chainId, deletedAt: null },
     });
     if (existing && existing.investorId !== investor.id) {
-      throw new ConflictException('This wallet is already linked to another account');
+      throw new ConflictException(
+        'This wallet is already linked to another account',
+      );
     }
 
     const nonce = this.signatureService.generateNonce();
@@ -404,6 +409,7 @@ export class InvestorPortalService {
       address: string;
       chainId: number;
       signature: string;
+      walletSource?: string;
     },
   ) {
     const investor = await this.resolveInvestor(email);
@@ -416,13 +422,17 @@ export class InvestorPortalService {
       throw new BadRequestException('Challenge not found');
     }
     if (challenge.authUserId !== authUserId) {
-      throw new BadRequestException('Challenge does not belong to this account');
+      throw new BadRequestException(
+        'Challenge does not belong to this account',
+      );
     }
     if (challenge.usedAt) {
       throw new BadRequestException('Challenge has already been used');
     }
     if (new Date() > challenge.expiresAt) {
-      throw new BadRequestException('Challenge has expired. Please request a new one.');
+      throw new BadRequestException(
+        'Challenge has expired. Please request a new one.',
+      );
     }
     if (challenge.walletAddressNorm !== input.address.toLowerCase()) {
       throw new BadRequestException('Address does not match challenge');
@@ -488,6 +498,7 @@ export class InvestorPortalService {
           addressNorm,
           isPrimary: walletCount === 0,
           walletStatus: 'ACTIVE',
+          walletSource: input.walletSource || 'METAMASK',
           label: walletCount === 0 ? 'Primary' : null,
         },
       });

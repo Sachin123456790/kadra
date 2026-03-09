@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { InvestorPortalService } from './investor-portal.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
@@ -131,12 +139,17 @@ export class InvestorPortalController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: VerifyWalletDto,
   ) {
-    const data = await this.portalService.verifyWalletLink(user.id, user.email, {
-      challengeId: dto.challengeId,
-      address: dto.address,
-      chainId: dto.chainId,
-      signature: dto.signature,
-    });
+    const data = await this.portalService.verifyWalletLink(
+      user.id,
+      user.email,
+      {
+        challengeId: dto.challengeId,
+        address: dto.address,
+        chainId: dto.chainId,
+        signature: dto.signature,
+        walletSource: dto.walletSource,
+      },
+    );
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },

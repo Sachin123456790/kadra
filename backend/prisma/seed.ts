@@ -75,16 +75,17 @@ async function main() {
       },
     });
 
-    // Realistic wallet addresses (derived from keccak-like hashes for demo)
-    const realisticAddresses = [
-      '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
-      '0x2B5AD5c4795c026514f8317c7a215E218DcCD6cF',
-      '0x9E63B020ae098E73cF201EE1357EDc72DFEaA518',
-      '0xA7d9ddBE1f17865597fBD27EC712455208B6B76d',
-      '0xFCAd0B19bB29D4674531d6f115237E16AfCE377c',
-      '0x03C6FcED478cBbC9a4FAB34eF9f40767739D1Ff7',
+    // Real Sepolia wallet addresses — env-driven, with fallbacks
+    const defaultAddresses = [
+      '0x47F430D7d898F8bf8BB6A89938C066C30a75D326',
+      '0xd11B2Ab28610F2E22Db7B51cd26DfF91618f2A5C',
+      '0xe552DE75e93Eca51c2b58BC3b0bA6628DC3eadc6',
+      '0xBCA2A58A8827C4b6b66Fc08258761951A21f70c7',
+      '0x8031B890dd4a302FBF6f1a9E50ce7848DBC3B027',
+      '0xaB427a8b61aa17f672D902F593f13Fe8945f1513',
     ];
-    const walletAddress = realisticAddresses[i];
+    const walletAddress =
+      process.env[`INVESTOR_${i + 1}_ADDRESS`] || defaultAddresses[i];
     const chainId = 11155111; // Sepolia
 
     // Delete old wallets for this investor that don't match the realistic address

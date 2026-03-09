@@ -1,6 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError } from '../../common/errors';
+import { ViemClientProvider } from '../../adapters/blockchain/viem-client.provider';
+import { KADRA_TOKEN_ABI } from '../../adapters/blockchain/abi/kadra-token.abi';
+import type { Address } from 'viem';
 
 export interface RunSummary {
   processed: number;
@@ -30,7 +33,12 @@ export interface TxSyncSummary {
 export class JobsService {
   private readonly logger = new Logger(JobsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    @Inject(ViemClientProvider)
+    private readonly viem?: ViemClientProvider,
+  ) {}
 
   async runPendingJobs(
     batchSize: number = 10,
@@ -85,8 +93,7 @@ export class JobsService {
         });
         summary.succeeded++;
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : String(err);
+        const errorMessage = err instanceof Error ? err.message : String(err);
         const newAttempts = job.attempts + 1;
 
         if (newAttempts >= job.maxAttempts) {
@@ -158,8 +165,7 @@ export class JobsService {
       });
       return { jobId: job.id, status: 'COMPLETED' };
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : String(err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
       await this.prisma.job.update({
         where: { id: job.id },
         data: { status: 'FAILED', lastError: errorMessage },
@@ -204,15 +210,74 @@ export class JobsService {
       where: whereClause,
     });
 
-    this.logger.log(
-      `[STUB] Chain ingest called for ${contracts.length} contract(s)` +
-        (fundId ? ` (fundId=${fundId})` : ''),
-    );
+    if (!this.viem) {
+      this.logger.warn(
+        'ViemClientProvider not available, skipping chain ingest',
+      );
+      return { contractsProcessed: contracts.length, eventsIngested: 0 };
+    }
 
-    // Stub: real implementation will use ethers to fetch events
+    let totalIngested = 0;
+    for (const contract of contracts) {
+      try {
+        const currentBlock = await this.viem.publicClient.getBlockNumber();
+        // Look back 1000 blocks max
+        const fromBlock = currentBlock > 1000n ? currentBlock - 1000n : 0n;
+
+        const logs = await this.viem.publicClient.getContractEvents({
+          address: contract.contractAddress as Address,
+          abi: KADRA_TOKEN_ABI,
+          eventName: 'Transfer',
+          fromBlock,
+          toBlock: currentBlock,
+        });
+
+        for (const log of logs) {
+          const existing = await this.prisma.tokenPositionEvent.findFirst({
+            where: {
+              txHash: log.transactionHash,
+              logIndex: log.logIndex ?? 0,
+            },
+          });
+          if (existing) continue;
+
+          await this.prisma.tokenPositionEvent.create({
+            data: {
+              fundId: contract.fundId,
+              tokenContractId: contract.id,
+              chainId: contract.chainId,
+              blockNumber: BigInt(log.blockNumber ?? 0),
+              blockTimestamp: new Date(),
+              txHash: log.transactionHash ?? '',
+              logIndex: log.logIndex ?? 0,
+              eventType: 'TRANSFER',
+              fromWalletAddress: (log.args as any)?.from ?? '',
+              toWalletAddress: (log.args as any)?.to ?? '',
+              tokenAmount: Number((log.args as any)?.value ?? 0) / 1e18,
+              ingestStatus: 'CONFIRMED',
+              rawEvent: {
+                type: 'CHAIN_INGEST',
+                log: JSON.parse(
+                  JSON.stringify(log, (_k, v) =>
+                    typeof v === 'bigint' ? v.toString() : v,
+                  ),
+                ),
+              },
+            },
+          });
+          totalIngested++;
+        }
+      } catch (e) {
+        this.logger.error(
+          `Chain ingest error for ${contract.contractAddress}:`,
+          e,
+        );
+      }
+    }
+
     return {
       contractsProcessed: contracts.length,
-      eventsIngested: 0,
+      eventsIngested: totalIngested,
     };
   }
 
@@ -221,16 +286,40 @@ export class JobsService {
       where: { requestStatus: 'SUBMITTED' },
     });
 
-    this.logger.log(
-      `[STUB] Tx sync called, found ${pending.length} pending transaction(s)`,
-    );
+    if (!this.viem || pending.length === 0) {
+      return { checked: pending.length, confirmed: 0, reverted: 0 };
+    }
 
-    // Stub: real implementation will check tx receipts via ethers
-    return {
-      checked: pending.length,
-      confirmed: 0,
-      reverted: 0,
-    };
+    let confirmed = 0;
+    let reverted = 0;
+
+    for (const tx of pending) {
+      if (!tx.submittedTxHash) continue;
+      try {
+        const receipt = await this.viem.publicClient.getTransactionReceipt({
+          hash: tx.submittedTxHash as `0x${string}`,
+        });
+
+        if (receipt.status === 'success') {
+          await this.prisma.transferRequest.update({
+            where: { id: tx.id },
+            data: { requestStatus: 'MINED', finalizedAt: new Date() },
+          });
+          confirmed++;
+        } else {
+          await this.prisma.transferRequest.update({
+            where: { id: tx.id },
+            data: { requestStatus: 'CHAIN_REVERTED', finalizedAt: new Date() },
+          });
+          reverted++;
+        }
+      } catch (e) {
+        // Receipt not available yet — still pending
+        this.logger.debug(`Tx ${tx.submittedTxHash} still pending`);
+      }
+    }
+
+    return { checked: pending.length, confirmed, reverted };
   }
 
   private async executeJob(job: { jobType: string; payload: unknown }) {

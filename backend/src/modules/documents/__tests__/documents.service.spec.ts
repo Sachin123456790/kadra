@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { STORAGE_ADAPTER } from '../../../adapters/storage/storage.adapter';
 import { HASH_PROVIDER } from '../../../adapters/hash/hash.provider';
 import { PARSER_ADAPTER } from '../../../adapters/parser/parser.adapter';
+import { DOCUMENT_REGISTRY_ADAPTER } from '../../../adapters/blockchain/viem-document-registry.adapter';
 import { EventLogService } from '../../../common/event-log.service';
 import { NotFoundError, ValidationError } from '../../../common/errors';
 
@@ -44,6 +45,14 @@ describe('DocumentsService', () => {
     hash: jest.fn().mockReturnValue(mockHashHex),
   };
 
+  const mockDocumentRegistry = {
+    registerDocument: jest.fn().mockResolvedValue({
+      txHash: '0x' + 'ab'.repeat(32),
+      blockNumber: 100,
+    }),
+    documentExists: jest.fn().mockResolvedValue(false),
+  };
+
   const mockParser = {
     parse: jest.fn().mockResolvedValue([
       {
@@ -77,6 +86,7 @@ describe('DocumentsService', () => {
         { provide: STORAGE_ADAPTER, useValue: mockStorage },
         { provide: HASH_PROVIDER, useValue: mockHashProvider },
         { provide: PARSER_ADAPTER, useValue: mockParser },
+        { provide: DOCUMENT_REGISTRY_ADAPTER, useValue: mockDocumentRegistry },
         {
           provide: EventLogService,
           useValue: { log: jest.fn().mockResolvedValue({}) },

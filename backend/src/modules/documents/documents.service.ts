@@ -10,6 +10,8 @@ import { NotFoundError, ValidationError } from '../../common/errors';
 import { EventLogService } from '../../common/event-log.service';
 import { randomUUID } from 'crypto';
 import { AddManualExtractedFieldsDto } from './documents.dto';
+import type { DocumentRegistryAdapter } from '../../adapters/blockchain/viem-document-registry.adapter';
+import { DOCUMENT_REGISTRY_ADAPTER } from '../../adapters/blockchain/viem-document-registry.adapter';
 
 @Injectable()
 export class DocumentsService {
@@ -18,6 +20,8 @@ export class DocumentsService {
     @Inject(STORAGE_ADAPTER) private readonly storage: DocumentStorageAdapter,
     @Inject(HASH_PROVIDER) private readonly hashProvider: HashProvider,
     @Inject(PARSER_ADAPTER) private readonly parser: DocumentParserAdapter,
+    @Inject(DOCUMENT_REGISTRY_ADAPTER)
+    private readonly documentRegistry: DocumentRegistryAdapter,
     private readonly eventLog: EventLogService,
   ) {}
 
@@ -105,21 +109,11 @@ export class DocumentsService {
     documentId: string,
     hashHex: string,
   ): Promise<void> {
-    const rpcUrl = process.env.CHAIN_RPC_URL;
-    if (
-      !rpcUrl ||
-      rpcUrl.includes('localhost') ||
-      rpcUrl.includes('127.0.0.1')
-    ) {
-      return;
-    }
-
     try {
-      const { ethers } = await import('ethers');
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const blockNumber = await provider.getBlockNumber();
-      const anchorTxHash = ethers.keccak256(
-        ethers.toUtf8Bytes('anchor-' + hashHex + '-' + blockNumber),
+      const docHash = `0x${hashHex}` as `0x${string}`;
+      const result = await this.documentRegistry.registerDocument(
+        docHash,
+        'MASTER_LPA',
       );
 
       const documentHash = await this.prisma.documentHash.findFirst({
@@ -130,8 +124,9 @@ export class DocumentsService {
           where: { id: documentHash.id },
           data: {
             anchoredOnchain: true,
-            anchorTxHash,
-            anchorBlockNumber: BigInt(blockNumber),
+            anchorTxHash: result.txHash,
+            anchorBlockNumber: BigInt(result.blockNumber),
+            anchorChainId: parseInt(process.env.CHAIN_ID || '11155111'),
             anchorConfirmedAt: new Date(),
           },
         });

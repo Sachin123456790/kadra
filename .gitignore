@@ -16,7 +16,7 @@ backend/node_modules
 backend/coverage
 backend/storage
 backend/supabase
-
+.playwright-mcp/
 # Frontend
 frontend/node_modules
 frontend/dist

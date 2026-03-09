@@ -4,7 +4,7 @@ import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { Public } from '../../common/auth/public.decorator';
 import type { AuthenticatedUser } from '../../common/auth/auth.types';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
-import { LoginDto, SignupDto } from './auth.dto';
+import { LoginDto, RefreshDto, SignupDto } from './auth.dto';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
@@ -25,6 +25,16 @@ export class AuthController {
   @Post('login')
   async login(@Body() body: LoginDto) {
     const data = await this.authService.login(body);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Public()
+  @Post('refresh')
+  async refresh(@Body() body: RefreshDto) {
+    const data = await this.authService.refresh(body.refreshToken);
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },

@@ -7,7 +7,7 @@ export interface MintResult {
   tokenAmount: string;
 }
 
-export interface TransferResult {
+export interface TransferValidateResult {
   transferRequestId: string;
   requestStatus: string;
   precheck: {
@@ -15,7 +15,14 @@ export interface TransferResult {
     senderEligible: boolean;
     sufficientBalance: boolean;
   };
+  contractAddress: string;
   txHash: string | null;
+}
+
+export interface TransferConfirmResult {
+  transferRequestId: string;
+  requestStatus: string;
+  txHash: string;
 }
 
 export interface TransferValidation {
@@ -57,7 +64,7 @@ export function mintTokens(subscriptionId: string) {
   );
 }
 
-export function initiateTransfer(
+export function validateTransfer(
   fundId: string,
   input: {
     fromWalletAddress: string;
@@ -66,7 +73,11 @@ export function initiateTransfer(
     reason?: string;
   },
 ) {
-  return post<TransferResult>(`/investor/funds/${fundId}/transfers`, input);
+  return post<TransferValidateResult>(`/investor/funds/${fundId}/transfers/validate`, input);
+}
+
+export function confirmTransfer(transferRequestId: string, txHash: string) {
+  return post<TransferConfirmResult>(`/investor/transfers/${transferRequestId}/confirm`, { txHash });
 }
 
 export function getTransferValidation(transferRequestId: string) {

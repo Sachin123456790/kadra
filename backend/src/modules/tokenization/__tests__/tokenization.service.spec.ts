@@ -1,6 +1,6 @@
 import { TokenizationService } from '../tokenization.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { MockTokenContractAdapter } from '../../../adapters/blockchain/mock-token-contract.adapter';
+// Mock adapter removed — tests use inline mocks
 import { EventLogService } from '../../../common/event-log.service';
 import {
   NotFoundError,
@@ -31,7 +31,7 @@ const mockPrisma = () => ({
 describe('TokenizationService', () => {
   let service: TokenizationService;
   let prisma: ReturnType<typeof mockPrisma>;
-  let adapter: MockTokenContractAdapter;
+  let adapter: any;
 
   const fundId = 'fund-1';
   const subscriptionId = 'sub-1';
@@ -62,7 +62,19 @@ describe('TokenizationService', () => {
 
   beforeEach(() => {
     prisma = mockPrisma();
-    adapter = new MockTokenContractAdapter();
+    adapter = {
+      deploy: jest.fn().mockResolvedValue({
+        contractAddress: contractAddress,
+        txHash: '0x' + 'ab'.repeat(32),
+        blockNumber: 100,
+      }),
+      mint: jest.fn().mockResolvedValue({
+        txHash: '0x' + 'cd'.repeat(32),
+        blockNumber: 101,
+      }),
+      transfer: jest.fn(),
+      getBalance: jest.fn(),
+    };
     const mockEventLog = {
       log: jest.fn().mockResolvedValue({}),
     } as unknown as EventLogService;

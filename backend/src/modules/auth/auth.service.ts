@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ExternalDependencyError, ValidationError } from '../../common/errors';
 import {
-  ExternalDependencyError,
-  ValidationError,
-} from '../../common/errors';
-import { AuthenticatedUser, ADMIN_ROLES, UserRole } from '../../common/auth/auth.types';
+  AuthenticatedUser,
+  ADMIN_ROLES,
+  UserRole,
+} from '../../common/auth/auth.types';
 import { LoginDto, SignupDto } from './auth.dto';
 
 interface SupabaseAuthUser {
@@ -70,8 +71,13 @@ export class AuthService {
         throw new ValidationError(`Signup failed: ${message}`);
       }
 
-      this.logger.error(`Supabase signup failed: ${response.status} ${message}`);
-      throw new ExternalDependencyError('SupabaseAuth', `signup failed: ${message}`);
+      this.logger.error(
+        `Supabase signup failed: ${response.status} ${message}`,
+      );
+      throw new ExternalDependencyError(
+        'SupabaseAuth',
+        `signup failed: ${message}`,
+      );
     }
 
     return this.login({ email: dto.email, password: dto.password });
@@ -99,7 +105,10 @@ export class AuthService {
 
     if (!response.ok) {
       const message =
-        body?.msg ?? body?.error_description ?? body?.toString() ?? 'Invalid credentials';
+        body?.msg ??
+        body?.error_description ??
+        body?.toString() ??
+        'Invalid credentials';
       throw new ValidationError(`Login failed: ${message}`);
     }
 
@@ -107,6 +116,50 @@ export class AuthService {
       throw new ExternalDependencyError(
         'SupabaseAuth',
         'login response missing access token or user payload',
+      );
+    }
+
+    const user = this.mapUser(body.user);
+
+    return {
+      accessToken: body.access_token,
+      refreshToken: body.refresh_token,
+      expiresIn: body.expires_in,
+      tokenType: body.token_type,
+      user,
+    };
+  }
+
+  async refresh(refreshToken: string) {
+    this.assertSupabaseConfigured();
+
+    const response = await fetch(
+      `${this.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: this.supabaseAnonKey,
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      },
+    );
+
+    const body = (await this.safeJson(response)) as SupabaseLoginResponse & {
+      error_description?: string;
+      msg?: string;
+    };
+
+    if (!response.ok) {
+      const message =
+        body?.msg ?? body?.error_description ?? 'Token refresh failed';
+      throw new ValidationError(`Refresh failed: ${message}`);
+    }
+
+    if (!body?.access_token || !body?.user) {
+      throw new ExternalDependencyError(
+        'SupabaseAuth',
+        'refresh response missing access token or user payload',
       );
     }
 
@@ -146,7 +199,11 @@ export class AuthService {
   }
 
   private assertSupabaseConfigured() {
-    if (!this.supabaseUrl || !this.supabaseAnonKey || !this.supabaseServiceRoleKey) {
+    if (
+      !this.supabaseUrl ||
+      !this.supabaseAnonKey ||
+      !this.supabaseServiceRoleKey
+    ) {
       throw new ExternalDependencyError(
         'SupabaseAuth',
         'SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY must be configured',
@@ -177,7 +234,8 @@ export class AuthService {
       id: raw.id,
       email: raw.email,
       role: metadataRole ?? 'investor',
-      fullName: (raw.user_metadata?.full_name as string | undefined) ?? undefined,
+      fullName:
+        (raw.user_metadata?.full_name as string | undefined) ?? undefined,
     };
   }
 

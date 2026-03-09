@@ -27,9 +27,9 @@ export class TokenizationController {
     };
   }
 
-  @Post('investor/funds/:fundId/transfers')
+  @Post('investor/funds/:fundId/transfers/validate')
   @Roles('investor', ...ADMIN_ROLES)
-  async initiateTransfer(
+  async validateTransfer(
     @Param('fundId') fundIdOrCode: string,
     @Body()
     body: {
@@ -40,7 +40,23 @@ export class TokenizationController {
     },
   ) {
     const fundId = await resolveFundId(this.prisma, fundIdOrCode);
-    const data = await this.tokenizationService.initiateTransfer(fundId, body);
+    const data = await this.tokenizationService.validateTransfer(fundId, body);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Post('investor/transfers/:transferRequestId/confirm')
+  @Roles('investor', ...ADMIN_ROLES)
+  async confirmTransfer(
+    @Param('transferRequestId') transferRequestId: string,
+    @Body() body: { txHash: string },
+  ) {
+    const data = await this.tokenizationService.confirmTransfer(
+      transferRequestId,
+      body.txHash,
+    );
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },

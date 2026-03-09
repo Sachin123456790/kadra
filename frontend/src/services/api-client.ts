@@ -1,4 +1,4 @@
-import { API_BASE_URL, AUTH_TOKEN_KEY, HTTP_STATUS } from '@/config/constants';
+import { API_BASE_URL, AUTH_TOKEN_KEY, AUTH_REFRESH_TOKEN_KEY, AUTH_USER_KEY, HTTP_STATUS } from '@/config/constants';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -33,6 +33,51 @@ export function setOnUnauthorized(listener: UnauthorizedListener | null) {
   onUnauthorized = listener;
 }
 
+// ── Token refresh ──────────────────────────────────────────
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem(AUTH_REFRESH_TOKEN_KEY);
+  if (!refreshToken) return false;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!res.ok) return false;
+
+    const body = await res.json();
+    const data = body?.data;
+    if (!data?.accessToken) return false;
+
+    // Update stored tokens
+    localStorage.setItem(AUTH_TOKEN_KEY, data.accessToken);
+    if (data.refreshToken) {
+      localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, data.refreshToken);
+    }
+    if (data.user) {
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Deduplicated refresh — only one in-flight refresh at a time. */
+function refreshOnce(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = tryRefreshToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
 // ── Helpers ────────────────────────────────────────────────
 
 function getAuthHeaders(): Record<string, string> {
@@ -40,7 +85,26 @@ function getAuthHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
+async function handleResponse<T>(res: Response, retryFn?: () => Promise<Response>): Promise<T> {
+  if (res.status === HTTP_STATUS.UNAUTHORIZED && retryFn) {
+    // Attempt silent refresh before giving up
+    const refreshed = await refreshOnce();
+    if (refreshed) {
+      const retryRes = await retryFn();
+      // Recursive call without retryFn to avoid infinite loop
+      return handleResponse<T>(retryRes);
+    }
+    // Refresh failed — trigger logout
+    onUnauthorized?.();
+    const body = await res.json().catch(() => ({}));
+    throw new ApiRequestError(
+      res.status,
+      body?.error?.code ?? 'UNAUTHORIZED',
+      body?.error?.message ?? 'Session expired',
+      body?.meta?.requestId,
+    );
+  }
+
   if (res.status === HTTP_STATUS.UNAUTHORIZED) {
     onUnauthorized?.();
     const body = await res.json().catch(() => ({}));
@@ -69,18 +133,19 @@ async function handleResponse<T>(res: Response): Promise<T> {
 // ── GET / POST / Upload wrappers ───────────────────────────
 
 export async function get<T>(path: string): Promise<ApiResponse<T>> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const doFetch = () => fetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
     headers: {
       'Accept': 'application/json',
       ...getAuthHeaders(),
     },
   });
-  return handleResponse<ApiResponse<T>>(res);
+  const res = await doFetch();
+  return handleResponse<ApiResponse<T>>(res, doFetch);
 }
 
 export async function post<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const doFetch = () => fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -89,20 +154,23 @@ export async function post<T>(path: string, body?: unknown): Promise<ApiResponse
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  return handleResponse<ApiResponse<T>>(res);
+  const res = await doFetch();
+  return handleResponse<ApiResponse<T>>(res, doFetch);
 }
 
 export async function upload<T>(path: string, file: File, fieldName = 'file'): Promise<ApiResponse<T>> {
-  const formData = new FormData();
-  formData.append(fieldName, file);
-
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      ...getAuthHeaders(),
-      // Do NOT set Content-Type — browser sets multipart boundary automatically
-    },
-    body: formData,
-  });
-  return handleResponse<ApiResponse<T>>(res);
+  const doFetch = () => {
+    const formData = new FormData();
+    formData.append(fieldName, file);
+    return fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+        // Do NOT set Content-Type — browser sets multipart boundary automatically
+      },
+      body: formData,
+    });
+  };
+  const res = await doFetch();
+  return handleResponse<ApiResponse<T>>(res, doFetch);
 }

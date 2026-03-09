@@ -5,6 +5,7 @@ export const API_BASE_URL =
   import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '/api/v1';
 
 export const AUTH_TOKEN_KEY = 'kadra_auth_token';
+export const AUTH_REFRESH_TOKEN_KEY = 'kadra_auth_refresh_token';
 export const AUTH_USER_KEY = 'kadra_auth_user';
 
 export const FUND_ID_KEY = 'kadra_active_fund_id';

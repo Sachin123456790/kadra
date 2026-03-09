@@ -106,7 +106,7 @@ export default function LoginPage() {
             })
           : await loginRequest(payload);
 
-      login(response.data.accessToken, response.data.user);
+      login(response.data.accessToken, response.data.user, response.data.refreshToken);
       const userRole = response.data.user.role;
       const destination = (fromState && isSafeRedirect(fromState, userRole))
         ? fromState

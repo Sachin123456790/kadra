@@ -1,6 +1,6 @@
 import { TokenizationService } from '../tokenization.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { MockTokenContractAdapter } from '../../../adapters/blockchain/mock-token-contract.adapter';
+// Mock adapter removed — tests use inline mocks
 import { EventLogService } from '../../../common/event-log.service';
 import { NotFoundError } from '../../../common/errors';
 
@@ -54,7 +54,7 @@ const mockPrisma = () => {
 describe('TokenizationService – Transfer Enforcement', () => {
   let service: TokenizationService;
   let prisma: ReturnType<typeof mockPrisma>;
-  let adapter: MockTokenContractAdapter;
+  let adapter: any;
 
   const fundId = 'fund-1';
   const contractId = 'tc-1';
@@ -113,7 +113,12 @@ describe('TokenizationService – Transfer Enforcement', () => {
 
   beforeEach(() => {
     prisma = mockPrisma();
-    adapter = new MockTokenContractAdapter();
+    adapter = {
+      deploy: jest.fn(),
+      mint: jest.fn(),
+      transfer: jest.fn(),
+      getBalance: jest.fn(),
+    };
     const mockEventLog = {
       log: jest.fn().mockResolvedValue({}),
     } as unknown as EventLogService;
@@ -156,22 +161,21 @@ describe('TokenizationService – Transfer Enforcement', () => {
     });
   }
 
-  describe('initiateTransfer', () => {
-    it('succeeds between eligible wallets with sufficient balance', async () => {
+  describe('validateTransfer', () => {
+    it('returns PENDING_SIGNATURE for eligible wallets with sufficient balance', async () => {
       setupSuccessfulTransfer();
 
-      const result = await service.initiateTransfer(fundId, transferInput);
+      const result = await service.validateTransfer(fundId, transferInput);
 
-      expect(result.requestStatus).toBe('MINED');
-      expect(result.txHash).toMatch(/^0x[a-f0-9]{64}$/);
+      expect(result.requestStatus).toBe('PENDING_SIGNATURE');
+      expect(result.txHash).toBeNull();
       expect(result.precheck.senderEligible).toBe(true);
       expect(result.precheck.recipientEligible).toBe(true);
       expect(result.precheck.sufficientBalance).toBe(true);
+      expect(result.contractAddress).toBe(contractAddress);
       expect(prisma.transferRequest.create).toHaveBeenCalledTimes(1);
-      expect(prisma.transferEvent.create).toHaveBeenCalledTimes(1);
-      expect(prisma.tokenPositionEvent.create).toHaveBeenCalledTimes(1);
-      // Both sender and recipient positions updated inside transaction
-      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      // No chain submission — that happens via confirmTransfer after frontend signs
+      expect(adapter.transfer).not.toHaveBeenCalled();
     });
 
     it('fails pre-check when recipient is not eligible', async () => {
@@ -191,7 +195,7 @@ describe('TokenizationService – Transfer Enforcement', () => {
       prisma.transferRequest.update.mockResolvedValue({ id: 'tr-2' });
       prisma.transferEvent.create.mockResolvedValue({ id: 'te-2' });
 
-      const result = await service.initiateTransfer(fundId, transferInput);
+      const result = await service.validateTransfer(fundId, transferInput);
 
       expect(result.requestStatus).toBe('PRECHECK_FAILED');
       expect(result.precheck.recipientEligible).toBe(false);
@@ -224,7 +228,7 @@ describe('TokenizationService – Transfer Enforcement', () => {
       prisma.transferRequest.update.mockResolvedValue({ id: 'tr-3' });
       prisma.transferEvent.create.mockResolvedValue({ id: 'te-3' });
 
-      const result = await service.initiateTransfer(fundId, transferInput);
+      const result = await service.validateTransfer(fundId, transferInput);
 
       expect(result.requestStatus).toBe('PRECHECK_FAILED');
       expect(result.precheck.senderEligible).toBe(false);
@@ -251,7 +255,7 @@ describe('TokenizationService – Transfer Enforcement', () => {
       prisma.transferRequest.update.mockResolvedValue({ id: 'tr-4' });
       prisma.transferEvent.create.mockResolvedValue({ id: 'te-4' });
 
-      const result = await service.initiateTransfer(fundId, transferInput);
+      const result = await service.validateTransfer(fundId, transferInput);
 
       expect(result.requestStatus).toBe('PRECHECK_FAILED');
       expect(result.precheck.sufficientBalance).toBe(false);
@@ -260,40 +264,15 @@ describe('TokenizationService – Transfer Enforcement', () => {
       expect(result.txHash).toBeNull();
     });
 
-    it('returns CHAIN_REVERTED when adapter throws', async () => {
-      prisma.fund.findUnique.mockResolvedValue(mockFund);
-      prisma.tokenContract.findFirst.mockResolvedValue(deployedContract);
-      prisma.wallet.findFirst
-        .mockResolvedValueOnce(senderWallet)
-        .mockResolvedValueOnce(recipientWallet);
-      prisma.investorFundEligibility.findFirst
-        .mockResolvedValueOnce(senderEligibility)
-        .mockResolvedValueOnce(recipientEligibility);
-      prisma.tokenPosition.findFirst.mockResolvedValueOnce(senderPosition);
-      prisma.transferRequest.create.mockResolvedValue({
-        id: 'tr-5',
-        requestStatus: 'REQUESTED',
-      });
-      prisma.transferRequest.update.mockResolvedValue({ id: 'tr-5' });
-      prisma.transferEvent.create.mockResolvedValue({ id: 'te-5' });
+    it('returns contractAddress in PENDING_SIGNATURE response', async () => {
+      setupSuccessfulTransfer();
 
-      // Mock adapter to throw
-      jest
-        .spyOn(adapter, 'transfer')
-        .mockRejectedValue(new Error('execution reverted'));
+      const result = await service.validateTransfer(fundId, transferInput);
 
-      const result = await service.initiateTransfer(fundId, transferInput);
-
-      expect(result.requestStatus).toBe('CHAIN_REVERTED');
-      expect(result.txHash).toBeNull();
-      expect(prisma.transferEvent.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            eventKind: 'CHAIN_REVERTED',
-            reasonCode: 'CONTRACT_REVERT',
-          }),
-        }),
-      );
+      expect(result.requestStatus).toBe('PENDING_SIGNATURE');
+      expect(result.contractAddress).toBe(contractAddress);
+      // Adapter transfer is never called — frontend signs the tx
+      expect(adapter.transfer).not.toHaveBeenCalled();
     });
   });
 

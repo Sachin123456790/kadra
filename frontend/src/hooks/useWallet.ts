@@ -17,6 +17,7 @@ interface UseWalletReturn {
   availableProviders: WalletProvider[];
   connectWallet: (provider?: any) => Promise<string>;
   signMessage: (message: string) => Promise<string>;
+  sendTransaction: (tx: { to: string; data: string; value?: string }) => Promise<string>;
   disconnect: () => void;
 }
 
@@ -113,6 +114,30 @@ export function useWallet(): UseWalletReturn {
     }
   }, [activeProvider, address]);
 
+  const sendTransaction = useCallback(async (tx: { to: string; data: string; value?: string }): Promise<string> => {
+    const p = activeProvider || (window as any).ethereum;
+    if (!p || !address) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      const txHash: string = await p.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: address,
+          to: tx.to,
+          data: tx.data,
+          value: tx.value || '0x0',
+        }],
+      });
+      return txHash;
+    } catch (err: any) {
+      const msg = err?.code === 4001 ? 'Transaction was rejected by user' : (err?.message || 'Failed to send transaction');
+      setError(msg);
+      throw new Error(msg);
+    }
+  }, [activeProvider, address]);
+
   const disconnect = useCallback(() => {
     setStatus('disconnected');
     setAddress(null);
@@ -121,5 +146,5 @@ export function useWallet(): UseWalletReturn {
     setActiveProvider(null);
   }, []);
 
-  return { status, address, chainId, error, availableProviders, connectWallet, signMessage, disconnect };
+  return { status, address, chainId, error, availableProviders, connectWallet, signMessage, sendTransaction, disconnect };
 }

@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext, AuthUser } from '@/hooks/useAuth';
-import { AUTH_TOKEN_KEY, AUTH_USER_KEY, ROUTES } from '@/config/constants';
+import { AUTH_TOKEN_KEY, AUTH_REFRESH_TOKEN_KEY, AUTH_USER_KEY, ROUTES } from '@/config/constants';
 import { setOnUnauthorized } from '@/services/api-client';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -19,6 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         localStorage.removeItem(AUTH_USER_KEY);
         localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
       }
     }
     setIsLoading(false);
@@ -29,20 +30,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOnUnauthorized(() => {
       setUser(null);
       localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
       localStorage.removeItem(AUTH_USER_KEY);
       navigate(ROUTES.LOGIN, { replace: true });
     });
     return () => setOnUnauthorized(null);
   }, [navigate]);
 
-  const login = useCallback((token: string, authUser: AuthUser) => {
+  const login = useCallback((token: string, authUser: AuthUser, refreshToken?: string) => {
     localStorage.setItem(AUTH_TOKEN_KEY, token);
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(authUser));
+    if (refreshToken) {
+      localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, refreshToken);
+    }
     setUser(authUser);
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
     localStorage.removeItem(AUTH_USER_KEY);
     setUser(null);
     navigate(ROUTES.LOGIN, { replace: true });

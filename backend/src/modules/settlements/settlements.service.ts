@@ -307,18 +307,21 @@ export class SettlementsService {
       },
     });
 
-    // Generate ECDSA mint authorization
+    // Generate ECDSA mint authorization using viem
     let mintAuthSignature: string | null = null;
     const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
     if (privateKey) {
       try {
-        const { ethers } = await import('ethers');
-        const wallet = new ethers.Wallet(privateKey);
-        const message = ethers.solidityPackedKeccak256(
-          ['string', 'string', 'uint256'],
-          [subscriptionId, subscription.walletId ?? '', BigInt(Date.now())],
+        const { privateKeyToAccount } = await import('viem/accounts');
+        const { keccak256, encodePacked } = await import('viem');
+        const account = privateKeyToAccount(privateKey as `0x${string}`);
+        const message = keccak256(
+          encodePacked(
+            ['string', 'string', 'uint256'],
+            [subscriptionId, subscription.walletId ?? '', BigInt(Date.now())],
+          ),
         );
-        mintAuthSignature = await wallet.signMessage(ethers.getBytes(message));
+        mintAuthSignature = await account.signMessage({ message });
       } catch (e) {
         console.warn('ECDSA signature generation failed:', e);
       }

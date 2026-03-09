@@ -9,11 +9,15 @@ import { Sha256HashProvider } from '../../adapters/hash/sha256.provider';
 import { PARSER_ADAPTER } from '../../adapters/parser/parser.adapter';
 import { MockParserAdapter } from '../../adapters/parser/mock-parser.adapter';
 import { GeminiParserAdapter } from '../../adapters/parser/gemini-parser.adapter';
+import { DOCUMENT_REGISTRY_ADAPTER } from '../../adapters/blockchain/viem-document-registry.adapter';
+import { ViemDocumentRegistryAdapter } from '../../adapters/blockchain/viem-document-registry.adapter';
+import { ViemClientProvider } from '../../adapters/blockchain/viem-client.provider';
 
 @Module({
   controllers: [DocumentsController],
   providers: [
     DocumentsService,
+    ViemClientProvider,
     {
       provide: STORAGE_ADAPTER,
       useClass: process.env.SUPABASE_URL
@@ -28,6 +32,10 @@ import { GeminiParserAdapter } from '../../adapters/parser/gemini-parser.adapter
           'gemini' && !!process.env.GEMINI_API_KEY
           ? GeminiParserAdapter
           : MockParserAdapter,
+    },
+    {
+      provide: DOCUMENT_REGISTRY_ADAPTER,
+      useClass: ViemDocumentRegistryAdapter,
     },
   ],
   exports: [DocumentsService],

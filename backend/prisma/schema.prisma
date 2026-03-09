@@ -86,6 +86,7 @@ model Wallet {
   addressNorm  String    @map("address_norm") // lower(address), set in application code
   isPrimary    Boolean   @default(false) @map("is_primary")
   walletStatus String    @default("ACTIVE") @map("wallet_status") // ACTIVE | INACTIVE | BLOCKED
+  walletSource String    @default("SEED") @map("wallet_source") // METAMASK | PHANTOM | SYSTEM_GENERATED | SEED | IMPORTED
   label        String?
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()

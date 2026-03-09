@@ -1,4 +1,10 @@
-import { IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 import type { UserRole } from '../../common/auth/auth.types';
 
 export class SignupDto {
@@ -14,7 +20,13 @@ export class SignupDto {
   fullName?: string;
 
   @IsOptional()
-  @IsIn(['admin', 'platform_admin', 'fund_admin', 'operations_analyst', 'investor'])
+  @IsIn([
+    'admin',
+    'platform_admin',
+    'fund_admin',
+    'operations_analyst',
+    'investor',
+  ])
   role?: UserRole;
 
   @IsOptional()
@@ -28,4 +40,9 @@ export class LoginDto {
 
   @IsString()
   password!: string;
+}
+
+export class RefreshDto {
+  @IsString()
+  refreshToken!: string;
 }
