@@ -258,21 +258,43 @@ export class DistributionService {
       where: { fundId, deploymentStatus: 'DEPLOYED', deletedAt: null },
     });
 
-    const positions = contract
+    let positions: PositionWithInvestor[] = contract
       ? await this.prisma.tokenPosition.findMany({
           where: { tokenContractId: contract.id },
           include: { wallet: { include: { investor: true } } },
         })
       : [];
 
-    const totalSupply = positions.reduce(
+    let totalSupply = positions.reduce(
       (sum, p) => sum + Number(p.settledTokenBalance),
       0,
     );
+
+    // Fallback: build positions from SETTLED subscriptions if no token positions
     if (totalSupply === 0) {
-      throw new ConflictError(
-        'NO_SETTLED_OWNERSHIP',
-        'No settled ownership found for distribution',
+      const settledSubs = await this.prisma.subscription.findMany({
+        where: { fundId, status: 'SETTLED', deletedAt: null },
+        include: { investor: true, wallet: true },
+      });
+
+      if (settledSubs.length === 0) {
+        throw new ConflictError(
+          'NO_SETTLED_OWNERSHIP',
+          'No settled ownership found for distribution',
+        );
+      }
+
+      positions = settledSubs.map((s) => ({
+        walletAddress: s.wallet?.address ?? '',
+        walletId: s.walletId,
+        settledTokenBalance: s.committedAmount,
+        wallet: s.wallet
+          ? { investor: { id: s.investorId, legalName: s.investor.legalName } }
+          : null,
+      }));
+      totalSupply = positions.reduce(
+        (sum, p) => sum + Number(p.settledTokenBalance),
+        0,
       );
     }
 

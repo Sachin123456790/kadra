@@ -81,6 +81,14 @@ export default function SettlementPage() {
       })),
   });
 
+  const {
+    data: settledSubs,
+    isLoading: settledLoading,
+  } = useQuery({
+    queryKey: [...QUERY_KEYS.subscriptions(fundId), "SETTLED"],
+    queryFn: () => getSubscriptions(fundId, "SETTLED").then((r) => r.data),
+  });
+
   const selected =
     queue?.find((q) => q.id === selectedId) ?? queue?.[0] ?? null;
 
@@ -148,13 +156,8 @@ export default function SettlementPage() {
         message={(error as Error).message}
       />
     );
-  if (!queue || queue.length === 0)
-    return (
-      <EmptyState
-        title="No pending settlements"
-        message="All subscriptions have been settled."
-      />
-    );
+
+  const hasPending = queue && queue.length > 0;
 
   const currentValidation = selected
     ? validationResults[selected.id]
@@ -179,6 +182,47 @@ export default function SettlementPage() {
         title="Settlement"
         subtitle="Upload wire confirmations and verify payment evidence against subscription terms"
       />
+
+      {/* Settlement History */}
+      {settledSubs && settledSubs.length > 0 && (
+        <SectionCard title={`Settlement History (${settledSubs.length})`} className="mb-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Investor</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Reference</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Allocation</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Settled At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {settledSubs.map((sub) => (
+                  <tr key={sub.subscriptionId} className="border-b border-gray-100">
+                    <td className="px-4 py-3 font-medium text-gray-900">{sub.investorName || sub.investorId}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{sub.subscriptionRef}</td>
+                    <td className="px-4 py-3 text-gray-900">${Number(sub.committedAmount).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-gray-900">{Number(sub.allocationPct)}%</td>
+                    <td className="px-4 py-3"><StatusBadge status="Settled" /></td>
+                    <td className="px-4 py-3 text-gray-600">{sub.settledAt ? new Date(sub.settledAt).toLocaleString() : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      )}
+
+      {!hasPending && (!settledSubs || settledSubs.length === 0) && (
+        <EmptyState
+          title="No settlements"
+          message="No subscriptions have been created yet."
+        />
+      )}
+
+      {hasPending && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SectionCard title="Payment Evidence Queue">
           <div className="space-y-2">
@@ -377,6 +421,7 @@ export default function SettlementPage() {
           )}
         </SectionCard>
       </div>
+      )}
     </div>
   );
 }

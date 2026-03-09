@@ -126,20 +126,50 @@ export class AuditService {
         },
       };
 
-      // Build CSV for cap table
-      const capTableCsv = [
-        'investor_id,investor_name,wallet_address,token_balance,ownership_pct',
-        ...positions.map((p) => {
-          const totalSupply = positions.reduce(
-            (s, pos) => s + Number(pos.settledTokenBalance),
-            0,
-          );
-          const pct =
+      // Build CSV for cap table — fall back to settled subscriptions if no token positions
+      let capTableRows: Array<{
+        investorId: string;
+        investorName: string;
+        walletAddress: string;
+        balance: number;
+        pct: string;
+      }> = [];
+      if (positions.length > 0) {
+        const totalSupply = positions.reduce(
+          (s, pos) => s + Number(pos.settledTokenBalance),
+          0,
+        );
+        capTableRows = positions.map((p) => ({
+          investorId: p.wallet?.investor?.id ?? '',
+          investorName: p.wallet?.investor?.legalName ?? '',
+          walletAddress: p.walletAddress,
+          balance: Number(p.settledTokenBalance),
+          pct:
             totalSupply > 0
               ? ((Number(p.settledTokenBalance) / totalSupply) * 100).toFixed(4)
-              : '0';
-          return `${p.wallet?.investor?.id ?? ''},${p.wallet?.investor?.legalName ?? ''},${p.walletAddress},${Number(p.settledTokenBalance)},${pct}`;
-        }),
+              : '0',
+        }));
+      } else {
+        // Fallback: use settled subscriptions
+        const settledSubs = await this.prisma.subscription.findMany({
+          where: { fundId, status: 'SETTLED', deletedAt: null },
+          include: { investor: true, wallet: true },
+        });
+        capTableRows = settledSubs.map((s) => ({
+          investorId: s.investorId,
+          investorName: s.investor.legalName,
+          walletAddress: s.wallet?.address ?? '',
+          balance: Number(s.committedAmount),
+          pct: Number(s.allocationPct).toFixed(4),
+        }));
+      }
+
+      const capTableCsv = [
+        'investor_id,investor_name,wallet_address,token_balance,ownership_pct',
+        ...capTableRows.map(
+          (r) =>
+            `${r.investorId},${r.investorName},${r.walletAddress},${r.balance},${r.pct}`,
+        ),
       ].join('\n');
 
       // Build CSV for document hashes

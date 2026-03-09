@@ -6,7 +6,10 @@ import { NotFoundError } from '../../common/errors';
 export class OwnershipService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getCapTable(fundId: string, options?: { asOfTimestamp?: string; includePending?: boolean }) {
+  async getCapTable(
+    fundId: string,
+    options?: { asOfTimestamp?: string; includePending?: boolean },
+  ) {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);
 
@@ -23,7 +26,51 @@ export class OwnershipService {
       : [];
 
     // Calculate total supply for ownership %
-    const totalSupply = positions.reduce((sum, p) => sum + Number(p.settledTokenBalance), 0);
+    const totalSupply = positions.reduce(
+      (sum, p) => sum + Number(p.settledTokenBalance),
+      0,
+    );
+
+    // Fallback: if no token positions, build cap table from SETTLED subscriptions
+    if (positions.length === 0) {
+      const settledSubs = await this.prisma.subscription.findMany({
+        where: { fundId, status: 'SETTLED', deletedAt: null },
+        include: { investor: true, wallet: true },
+      });
+
+      if (settledSubs.length > 0) {
+        const totalCommitted = settledSubs.reduce(
+          (sum, s) => sum + Number(s.committedAmount),
+          0,
+        );
+        const rows = settledSubs.map((s) => ({
+          investorId: s.investorId,
+          investorName: s.investor.legalName,
+          walletAddress: s.wallet?.address ?? '',
+          pendingAllocationPct: 0,
+          settledTokenBalance: Number(s.committedAmount).toString(),
+          ownershipPct: Number(s.allocationPct),
+        }));
+
+        // Also add any PENDING subscriptions
+        const pendingSubs = await this.prisma.subscription.findMany({
+          where: { fundId, status: 'PENDING', deletedAt: null },
+          include: { investor: true, wallet: true },
+        });
+        for (const sub of pendingSubs) {
+          rows.push({
+            investorId: sub.investorId,
+            investorName: sub.investor.legalName,
+            walletAddress: sub.wallet?.address ?? '',
+            pendingAllocationPct: Number(sub.allocationPct),
+            settledTokenBalance: '0',
+            ownershipPct: 0,
+          });
+        }
+
+        return { fundId, asOfTimestamp: new Date().toISOString(), rows };
+      }
+    }
 
     // Get pending subscriptions if requested
     let pendingSubs: any[] = [];
@@ -40,13 +87,17 @@ export class OwnershipService {
       walletAddress: p.walletAddress,
       pendingAllocationPct: 0,
       settledTokenBalance: Number(p.settledTokenBalance).toString(),
-      ownershipPct: totalSupply > 0 ? (Number(p.settledTokenBalance) / totalSupply) * 100 : 0,
+      ownershipPct:
+        totalSupply > 0
+          ? (Number(p.settledTokenBalance) / totalSupply) * 100
+          : 0,
     }));
 
     // Add pending entries
     for (const sub of pendingSubs) {
       const existingRow = rows.find(
-        (r) => r.walletAddress.toLowerCase() === sub.wallet.address.toLowerCase(),
+        (r) =>
+          r.walletAddress.toLowerCase() === sub.wallet?.address?.toLowerCase(),
       );
       if (existingRow) {
         existingRow.pendingAllocationPct = Number(sub.allocationPct);
@@ -54,7 +105,7 @@ export class OwnershipService {
         rows.push({
           investorId: sub.investorId,
           investorName: sub.investor.legalName,
-          walletAddress: sub.wallet.address,
+          walletAddress: sub.wallet?.address ?? '',
           pendingAllocationPct: Number(sub.allocationPct),
           settledTokenBalance: '0',
           ownershipPct: 0,
@@ -84,14 +135,30 @@ export class OwnershipService {
     const where: any = { fundId };
     if (filters?.walletAddress) {
       where.OR = [
-        { fromWalletAddress: { equals: filters.walletAddress, mode: 'insensitive' } },
-        { toWalletAddress: { equals: filters.walletAddress, mode: 'insensitive' } },
+        {
+          fromWalletAddress: {
+            equals: filters.walletAddress,
+            mode: 'insensitive',
+          },
+        },
+        {
+          toWalletAddress: {
+            equals: filters.walletAddress,
+            mode: 'insensitive',
+          },
+        },
       ];
     }
     if (filters?.from)
-      where.blockTimestamp = { ...where.blockTimestamp, gte: new Date(filters.from) };
+      where.blockTimestamp = {
+        ...where.blockTimestamp,
+        gte: new Date(filters.from),
+      };
     if (filters?.to)
-      where.blockTimestamp = { ...where.blockTimestamp, lte: new Date(filters.to) };
+      where.blockTimestamp = {
+        ...where.blockTimestamp,
+        lte: new Date(filters.to),
+      };
 
     const events = await this.prisma.tokenPositionEvent.findMany({
       where,
@@ -130,14 +197,27 @@ export class OwnershipService {
     });
 
     // Rebuild balances from events
-    const balanceMap = new Map<string, { balance: number; lastEventId: string; blockNumber: bigint | null; blockTimestamp: Date }>();
+    const balanceMap = new Map<
+      string,
+      {
+        balance: number;
+        lastEventId: string;
+        blockNumber: bigint | null;
+        blockTimestamp: Date;
+      }
+    >();
 
     for (const event of events) {
       const amount = Number(event.tokenAmount);
 
       if (event.fromWalletAddress) {
         const fromNorm = event.fromWalletAddress.toLowerCase();
-        const existing = balanceMap.get(fromNorm) ?? { balance: 0, lastEventId: event.id, blockNumber: event.blockNumber, blockTimestamp: event.blockTimestamp };
+        const existing = balanceMap.get(fromNorm) ?? {
+          balance: 0,
+          lastEventId: event.id,
+          blockNumber: event.blockNumber,
+          blockTimestamp: event.blockTimestamp,
+        };
         existing.balance -= amount;
         existing.lastEventId = event.id;
         existing.blockNumber = event.blockNumber;
@@ -147,7 +227,12 @@ export class OwnershipService {
 
       if (event.toWalletAddress) {
         const toNorm = event.toWalletAddress.toLowerCase();
-        const existing = balanceMap.get(toNorm) ?? { balance: 0, lastEventId: event.id, blockNumber: event.blockNumber, blockTimestamp: event.blockTimestamp };
+        const existing = balanceMap.get(toNorm) ?? {
+          balance: 0,
+          lastEventId: event.id,
+          blockNumber: event.blockNumber,
+          blockTimestamp: event.blockTimestamp,
+        };
         existing.balance += amount;
         existing.lastEventId = event.id;
         existing.blockNumber = event.blockNumber;
