@@ -538,13 +538,15 @@ export default function DocumentsPage() {
           />
         )}
         {documents && documents.length > 0 && (
-          <DataTable
-            columns={documentColumns}
-            data={documents}
-            getRowId={(row) => row.documentId}
-            onRowClick={(row) => setSelectedDocId(row.documentId)}
-            selectedId={selectedDocId ?? undefined}
-          />
+          <div className="max-h-80 overflow-y-auto">
+            <DataTable
+              columns={documentColumns}
+              data={documents}
+              getRowId={(row) => row.documentId}
+              onRowClick={(row) => setSelectedDocId(row.documentId)}
+              selectedId={selectedDocId ?? undefined}
+            />
+          </div>
         )}
       </SectionCard>
 
@@ -804,8 +806,8 @@ export default function DocumentsPage() {
             </SectionCard>
           )}
 
-          {/* Eligible Investors + Approve Button (MASTER_LPA only, not yet approved) */}
-          {isParsed && isMasterLpa && !isApproved && (
+          {/* Eligible Investors (MASTER_LPA only) */}
+          {isParsed && isMasterLpa && (
             <SectionCard title="Eligible Investors" className="mb-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                 <MetricCard
@@ -901,15 +903,17 @@ export default function DocumentsPage() {
                     </table>
                   </div>
 
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={openApproveModal}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      Review & Create Subscriptions
-                    </Button>
-                  </div>
+                  {!isApproved && (
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={openApproveModal}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Review & Create Subscriptions
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
             </SectionCard>
