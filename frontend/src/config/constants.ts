@@ -33,6 +33,7 @@ export const QUERY_KEYS = {
   documents: (fundId: string) => ['fund', fundId, 'documents'] as const,
   documentHashes: (docId: string) => ['document', docId, 'hashes'] as const,
   documentParseStatus: (docId: string) => ['document', docId, 'parse-status'] as const,
+  extractedFields: (docId: string) => ['document', docId, 'extracted-fields'] as const,
   investorDashboard: (fundId: string) => ['investor', fundId, 'dashboard'] as const,
   investorSubscriptions: (fundId: string) => ['investor', fundId, 'subscriptions'] as const,
   investorCapTable: (fundId: string) => ['investor', fundId, 'cap-table'] as const,

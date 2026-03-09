@@ -12,7 +12,14 @@ export class PrismaService
     if (!connectionString) {
       throw new Error('DATABASE_URL environment variable is required');
     }
-    const adapter = new PrismaPg({ connectionString });
+    // Serverless: 1 connection per function instance to avoid exhausting Supabase pooler
+    // Session mode pooler required for interactive transactions ($transaction)
+    const poolSize = process.env.VERCEL ? 1 : 10;
+    const adapter = new PrismaPg({
+      connectionString,
+      max: poolSize,
+      idleTimeoutMillis: process.env.VERCEL ? 5000 : 30000,
+    });
     super({ adapter });
   }
 

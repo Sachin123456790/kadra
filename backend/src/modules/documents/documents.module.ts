@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { STORAGE_ADAPTER } from '../../adapters/storage/storage.adapter';
 import { LocalFsStorageAdapter } from '../../adapters/storage/local-fs.adapter';
 import { SupabaseStorageAdapter } from '../../adapters/storage/supabase-storage.adapter';
@@ -11,9 +12,12 @@ import { MockParserAdapter } from '../../adapters/parser/mock-parser.adapter';
 import { GeminiParserAdapter } from '../../adapters/parser/gemini-parser.adapter';
 import { DOCUMENT_REGISTRY_ADAPTER } from '../../adapters/blockchain/viem-document-registry.adapter';
 import { ViemDocumentRegistryAdapter } from '../../adapters/blockchain/viem-document-registry.adapter';
+import { FUND_TERMS_REGISTRY_ADAPTER } from '../../adapters/blockchain/viem-fund-terms-registry.adapter';
+import { ViemFundTermsRegistryAdapter } from '../../adapters/blockchain/viem-fund-terms-registry.adapter';
 import { ViemClientProvider } from '../../adapters/blockchain/viem-client.provider';
 
 @Module({
+  imports: [SubscriptionsModule],
   controllers: [DocumentsController],
   providers: [
     DocumentsService,
@@ -36,6 +40,10 @@ import { ViemClientProvider } from '../../adapters/blockchain/viem-client.provid
     {
       provide: DOCUMENT_REGISTRY_ADAPTER,
       useClass: ViemDocumentRegistryAdapter,
+    },
+    {
+      provide: FUND_TERMS_REGISTRY_ADAPTER,
+      useClass: ViemFundTermsRegistryAdapter,
     },
   ],
   exports: [DocumentsService],

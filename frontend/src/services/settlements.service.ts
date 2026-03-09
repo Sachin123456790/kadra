@@ -1,4 +1,4 @@
-import { post } from './api-client';
+import { post, upload } from './api-client';
 
 export interface ValidationResult {
   settlementRecordId: string;
@@ -55,6 +55,17 @@ export function uploadPaymentEvidence(
   return post<{ paymentEvidenceId: string }>(
     `/admin/subscriptions/${subscriptionId}/payment-evidence`,
     body,
+  );
+}
+
+export function uploadWireConfirmation(
+  fundId: string,
+  investorId: string,
+  file: File,
+) {
+  return upload<{ documentId: string; hashHex: string }>(
+    `/admin/funds/${fundId}/investors/${investorId}/documents/wire-confirmation`,
+    file,
   );
 }
 

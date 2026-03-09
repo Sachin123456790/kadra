@@ -1,6 +1,6 @@
 import { ExternalLink } from "lucide-react";
 
-const BASESCAN_URL = "https://sepolia.basescan.org";
+const ETHERSCAN_URL = "https://sepolia.etherscan.io";
 
 type ExplorerType = "address" | "tx";
 
@@ -17,7 +17,7 @@ function truncateHex(hex: string): string {
 }
 
 function getExplorerUrl(value: string, type: ExplorerType): string {
-  return `${BASESCAN_URL}/${type}/${value}`;
+  return `${ETHERSCAN_URL}/${type}/${value}`;
 }
 
 export function ExplorerLink({
@@ -38,7 +38,7 @@ export function ExplorerLink({
         target="_blank"
         rel="noopener noreferrer"
         className="text-indigo-600 hover:text-indigo-800 inline-flex"
-        title={`View on BaseScan: ${value}`}
+        title={`View on Etherscan: ${value}`}
       >
         <ExternalLink className="h-3.5 w-3.5" />
       </a>

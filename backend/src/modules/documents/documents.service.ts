@@ -12,6 +12,8 @@ import { randomUUID } from 'crypto';
 import { AddManualExtractedFieldsDto } from './documents.dto';
 import type { DocumentRegistryAdapter } from '../../adapters/blockchain/viem-document-registry.adapter';
 import { DOCUMENT_REGISTRY_ADAPTER } from '../../adapters/blockchain/viem-document-registry.adapter';
+import type { FundTermsRegistryAdapter } from '../../adapters/blockchain/viem-fund-terms-registry.adapter';
+import { FUND_TERMS_REGISTRY_ADAPTER } from '../../adapters/blockchain/viem-fund-terms-registry.adapter';
 
 @Injectable()
 export class DocumentsService {
@@ -22,6 +24,8 @@ export class DocumentsService {
     @Inject(PARSER_ADAPTER) private readonly parser: DocumentParserAdapter,
     @Inject(DOCUMENT_REGISTRY_ADAPTER)
     private readonly documentRegistry: DocumentRegistryAdapter,
+    @Inject(FUND_TERMS_REGISTRY_ADAPTER)
+    private readonly fundTermsRegistry: FundTermsRegistryAdapter,
     private readonly eventLog: EventLogService,
   ) {}
 
@@ -78,9 +82,6 @@ export class DocumentsService {
       return doc;
     });
 
-    // Anchor document hash on-chain if remote RPC is available
-    await this.anchorOnChain(document.id, hashHex);
-
     // Run parse synchronously for MVP (small files)
     await this.parseDocument(document.id);
 
@@ -101,19 +102,116 @@ export class DocumentsService {
     return {
       documentId: document.id,
       parseStatus: 'COMPLETED',
-      hashStatus: 'COMPLETED',
+      hashStatus: 'PENDING',
+    };
+  }
+
+  async uploadWireConfirmation(
+    fundId: string,
+    investorId: string,
+    file: Buffer,
+    filename: string,
+    mimeType: string,
+    uploadedBy?: string,
+  ) {
+    if (mimeType !== 'application/pdf') {
+      throw new ValidationError(
+        'Invalid file type. Only PDF files are accepted.',
+        { field: 'file', issue: 'invalid_mime_type' },
+      );
+    }
+
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    const investor = await this.prisma.investor.findUnique({
+      where: { id: investorId },
+    });
+    if (!investor) throw new NotFoundError('Investor', investorId);
+
+    const storageKey = `funds/${fundId}/wires/${randomUUID()}-${filename}`;
+    await this.storage.save(storageKey, file, mimeType);
+
+    const hashHex = this.hashProvider.hash(file);
+
+    const document = await this.prisma.$transaction(async (tx) => {
+      const doc = await tx.document.create({
+        data: {
+          fundId,
+          documentType: 'WIRE_CONFIRMATION',
+          storageProvider: process.env.SUPABASE_URL ? 'SUPABASE' : 'LOCAL_FS',
+          storageKey,
+          originalFilename: filename,
+          mimeType,
+          byteSize: BigInt(file.length),
+          uploadedBy,
+          parseStatus: 'COMPLETED',
+          linkedEntityType: 'INVESTOR',
+          linkedEntityId: investorId,
+          metadata: { hashHex, investorId },
+        },
+      });
+
+      // Check if hash already exists (same file uploaded as another doc)
+      const existingHash = await tx.documentHash.findUnique({
+        where: {
+          hashAlgorithm_hashHex: {
+            hashAlgorithm: 'SHA256',
+            hashHex,
+          },
+        },
+      });
+
+      if (!existingHash) {
+        await tx.documentHash.create({
+          data: {
+            documentId: doc.id,
+            hashAlgorithm: 'SHA256',
+            hashHex,
+            isPrimary: true,
+          },
+        });
+      }
+
+      return doc;
+    });
+
+    // Anchor wire confirmation hash on-chain (non-blocking)
+    this.anchorOnChain(document.id, hashHex, 'WIRE_CONFIRMATION').catch(
+      () => {},
+    );
+
+    await this.eventLog.log({
+      eventType: 'DOCUMENT_UPLOADED',
+      aggregateType: 'DOCUMENT',
+      aggregateId: document.id,
+      fundId,
+      payload: {
+        filename,
+        mimeType,
+        hashHex,
+        documentType: 'WIRE_CONFIRMATION',
+        investorId,
+        uploadedBy,
+      },
+    });
+
+    return {
+      documentId: document.id,
+      hashHex,
     };
   }
 
   private async anchorOnChain(
     documentId: string,
     hashHex: string,
+    docType: string = 'MASTER_LPA',
   ): Promise<void> {
     try {
       const docHash = `0x${hashHex}` as `0x${string}`;
       const result = await this.documentRegistry.registerDocument(
         docHash,
-        'MASTER_LPA',
+        docType,
       );
 
       const documentHash = await this.prisma.documentHash.findFirst({
@@ -126,7 +224,7 @@ export class DocumentsService {
             anchoredOnchain: true,
             anchorTxHash: result.txHash,
             anchorBlockNumber: BigInt(result.blockNumber),
-            anchorChainId: parseInt(process.env.CHAIN_ID || '11155111'),
+            anchorChainId: 11155111,
             anchorConfirmedAt: new Date(),
           },
         });
@@ -183,10 +281,109 @@ export class DocumentsService {
     }
   }
 
+  async retryPendingAnchors(): Promise<{
+    processed: number;
+    anchored: number;
+    failed: string[];
+  }> {
+    // Find all unanchored primary hashes
+    const pendingHashes = await this.prisma.documentHash.findMany({
+      where: { isPrimary: true, anchoredOnchain: false },
+      include: { document: { select: { id: true, documentType: true } } },
+    });
+
+    let anchored = 0;
+    const failed: string[] = [];
+
+    for (const hash of pendingHashes) {
+      try {
+        const docHash = `0x${hash.hashHex}` as `0x${string}`;
+        const result = await this.documentRegistry.registerDocument(
+          docHash,
+          hash.document.documentType,
+        );
+
+        await this.prisma.documentHash.update({
+          where: { id: hash.id },
+          data: {
+            anchoredOnchain: true,
+            anchorTxHash: result.txHash,
+            anchorBlockNumber: BigInt(result.blockNumber),
+            anchorChainId: 11155111,
+            anchorConfirmedAt: new Date(),
+          },
+        });
+        anchored++;
+      } catch (e) {
+        console.warn(`Anchoring failed for hash ${hash.id}:`, e);
+        failed.push(hash.id);
+      }
+    }
+
+    // Fix documents without hash records (e.g. wire confirmations sharing
+    // the same SHA-256 as another doc). Store hashHex in metadata so
+    // listDocumentsForFund can resolve the shared hash.
+    const docsWithoutHash = await this.prisma.document.findMany({
+      where: {
+        hashes: { none: {} },
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        storageKey: true,
+        documentType: true,
+        metadata: true,
+      },
+    });
+
+    for (const doc of docsWithoutHash) {
+      try {
+        const meta = doc.metadata as Record<string, unknown> | null;
+        if (meta?.hashHex) continue; // already has hashHex in metadata
+
+        const fileData = await this.storage.read(doc.storageKey);
+        const hashHex = this.hashProvider.hash(fileData);
+
+        // Store hashHex in metadata for resolution
+        await this.prisma.document.update({
+          where: { id: doc.id },
+          data: {
+            metadata: { ...(meta ?? {}), hashHex },
+          },
+        });
+
+        // Ensure the shared hash is anchored
+        const existingHash = await this.prisma.documentHash.findFirst({
+          where: { hashAlgorithm: 'SHA256', hashHex },
+        });
+        if (existingHash && !existingHash.anchoredOnchain) {
+          await this.anchorOnChain(
+            existingHash.documentId,
+            hashHex,
+            doc.documentType,
+          );
+          anchored++;
+        }
+      } catch (e) {
+        console.warn(`Hash fix failed for doc ${doc.id}:`, e);
+        failed.push(doc.id);
+      }
+    }
+
+    return {
+      processed: pendingHashes.length + docsWithoutHash.length,
+      anchored,
+      failed,
+    };
+  }
+
   async getParseStatus(documentId: string) {
     const doc = await this.prisma.document.findUnique({
       where: { id: documentId },
-      include: { extractedFields: true },
+      include: {
+        extractedFields: true,
+        hashes: { where: { isPrimary: true } },
+      },
     });
     if (!doc) throw new NotFoundError('Document', documentId);
 
@@ -194,10 +391,24 @@ export class DocumentsService {
       (f) => f.confidence != null && Number(f.confidence) < 0.9,
     ).length;
 
+    let primaryHash: { anchoredOnchain: boolean } | null =
+      doc.hashes[0] ?? null;
+    // Fall back to looking up shared hash via metadata
+    if (!primaryHash) {
+      const meta = doc.metadata as Record<string, unknown> | null;
+      const hex = meta?.hashHex as string | undefined;
+      if (hex) {
+        primaryHash = await this.prisma.documentHash.findFirst({
+          where: { hashAlgorithm: 'SHA256', hashHex: hex },
+        });
+      }
+    }
+    const hashStatus = primaryHash?.anchoredOnchain ? 'ANCHORED' : 'PENDING';
+
     return {
       documentId: doc.id,
       parseStatus: doc.parseStatus,
-      hashStatus: 'COMPLETED',
+      hashStatus,
       extractionSummary: {
         fieldsExtracted: doc.extractedFields.length,
         lowConfidenceFields: lowConfidenceCount,
@@ -212,9 +423,21 @@ export class DocumentsService {
     });
     if (!doc) throw new NotFoundError('Document', documentId);
 
-    const hashes = await this.prisma.documentHash.findMany({
+    let hashes = await this.prisma.documentHash.findMany({
       where: { documentId },
     });
+
+    // Fall back to shared hash via metadata (for docs sharing the same file content)
+    if (hashes.length === 0) {
+      const meta = doc.metadata as Record<string, unknown> | null;
+      const hex = meta?.hashHex as string | undefined;
+      if (hex) {
+        const shared = await this.prisma.documentHash.findMany({
+          where: { hashAlgorithm: 'SHA256', hashHex: hex },
+        });
+        hashes = shared;
+      }
+    }
 
     return hashes.map((h) => ({
       hashId: h.id,
@@ -231,6 +454,242 @@ export class DocumentsService {
           }
         : null,
     }));
+  }
+
+  async listDocumentsForFund(fundId: string) {
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    const documents = await this.prisma.document.findMany({
+      where: { fundId, deletedAt: null },
+      include: {
+        hashes: { where: { isPrimary: true } },
+        _count: { select: { extractedFields: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // For documents without a direct hash relation (e.g. wire confirmations
+    // sharing the same file hash as another doc), look up by hashHex in metadata
+    const hashHexesNeeded = documents
+      .filter((doc) => doc.hashes.length === 0)
+      .map((doc) => {
+        const meta = doc.metadata as Record<string, unknown> | null;
+        return meta?.hashHex as string | undefined;
+      })
+      .filter((h): h is string => !!h);
+
+    const sharedHashes =
+      hashHexesNeeded.length > 0
+        ? await this.prisma.documentHash.findMany({
+            where: {
+              hashHex: { in: hashHexesNeeded },
+              hashAlgorithm: 'SHA256',
+            },
+          })
+        : [];
+    const sharedHashMap = new Map(sharedHashes.map((h) => [h.hashHex, h]));
+
+    return documents.map((doc) => {
+      let hashInfo: {
+        hashHex: string;
+        hashAlgorithm: string;
+        anchoredOnchain: boolean;
+      } | null = doc.hashes[0] ?? null;
+      if (!hashInfo) {
+        const meta = doc.metadata as Record<string, unknown> | null;
+        const hex = meta?.hashHex as string | undefined;
+        if (hex) hashInfo = sharedHashMap.get(hex) ?? null;
+      }
+
+      return {
+        documentId: doc.id,
+        documentType: doc.documentType,
+        originalFilename: doc.originalFilename,
+        mimeType: doc.mimeType,
+        byteSize: Number(doc.byteSize),
+        parseStatus: doc.parseStatus,
+        uploadedBy: doc.uploadedBy,
+        hash: hashInfo
+          ? {
+              hashHex: hashInfo.hashHex,
+              algorithm: hashInfo.hashAlgorithm,
+              anchoredOnchain: hashInfo.anchoredOnchain,
+            }
+          : null,
+        extractedFieldCount: doc._count.extractedFields,
+        metadata: doc.metadata,
+        createdAt: doc.createdAt.toISOString(),
+        updatedAt: doc.updatedAt.toISOString(),
+      };
+    });
+  }
+
+  async getExtractedFields(documentId: string) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc) throw new NotFoundError('Document', documentId);
+
+    const fields = await this.prisma.extractedDocumentField.findMany({
+      where: { documentId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return fields.map((f) => ({
+      fieldId: f.id,
+      fieldName: f.fieldName,
+      fieldValueText: f.fieldValueText,
+      fieldValueNumeric:
+        f.fieldValueNumeric != null ? Number(f.fieldValueNumeric) : null,
+      fieldValueJson: f.fieldValueJson,
+      confidence: f.confidence != null ? Number(f.confidence) : null,
+      sourcePage: f.sourcePage,
+      extractionRunRef: f.extractionRunRef,
+      createdAt: f.createdAt.toISOString(),
+    }));
+  }
+
+  async approveDocument(
+    documentId: string,
+    options?: {
+      notes?: string;
+      fieldUpdates?: Array<{
+        fieldId: string;
+        fieldValueText?: string;
+        fieldValueNumeric?: number;
+      }>;
+    },
+  ) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc) throw new NotFoundError('Document', documentId);
+
+    if (doc.parseStatus !== 'COMPLETED') {
+      throw new ValidationError(
+        `Document parse status must be COMPLETED to approve, current status: ${doc.parseStatus}`,
+        { field: 'parseStatus', issue: 'invalid_status' },
+      );
+    }
+
+    // Apply field updates if provided
+    if (options?.fieldUpdates && options.fieldUpdates.length > 0) {
+      await this.prisma.$transaction(async (tx) => {
+        for (const update of options.fieldUpdates!) {
+          await tx.extractedDocumentField.update({
+            where: { id: update.fieldId },
+            data: {
+              ...(update.fieldValueText !== undefined
+                ? { fieldValueText: update.fieldValueText }
+                : {}),
+              ...(update.fieldValueNumeric !== undefined
+                ? { fieldValueNumeric: update.fieldValueNumeric }
+                : {}),
+            },
+          });
+        }
+      });
+    }
+
+    const existingMeta =
+      typeof doc.metadata === 'object' && doc.metadata !== null
+        ? doc.metadata
+        : {};
+
+    const updated = await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        metadata: {
+          ...existingMeta,
+          approved: true,
+          approvedAt: new Date().toISOString(),
+          ...(options?.notes ? { notes: options.notes } : {}),
+        },
+      },
+    });
+
+    // Anchor document hash on-chain now that admin has approved
+    const primaryHash = await this.prisma.documentHash.findFirst({
+      where: { documentId, isPrimary: true },
+    });
+    if (primaryHash) {
+      await this.anchorOnChain(documentId, primaryHash.hashHex);
+
+      // Write extracted fields on-chain via FundTermsRegistry
+      const fields = await this.prisma.extractedDocumentField.findMany({
+        where: { documentId },
+      });
+      if (fields.length > 0) {
+        const docHash = `0x${primaryHash.hashHex}` as `0x${string}`;
+        this.fundTermsRegistry
+          .writeExtractedFields(
+            doc.fundId,
+            fields.map((f) => ({
+              fieldName: f.fieldName,
+              fieldValueText: f.fieldValueText,
+              fieldValueNumeric:
+                f.fieldValueNumeric != null
+                  ? Number(f.fieldValueNumeric)
+                  : null,
+            })),
+            docHash,
+          )
+          .catch((e) =>
+            console.warn('Writing extracted fields on-chain failed:', e),
+          );
+      }
+    }
+
+    await this.eventLog.log({
+      eventType: 'DOCUMENT_APPROVED',
+      aggregateType: 'DOCUMENT',
+      aggregateId: documentId,
+      fundId: doc.fundId,
+      payload: { documentType: doc.documentType },
+    });
+
+    return updated;
+  }
+
+  async updateExtractedFields(
+    documentId: string,
+    fieldUpdates: Array<{
+      fieldId: string;
+      fieldValueText?: string;
+      fieldValueNumeric?: number;
+    }>,
+  ) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc) throw new NotFoundError('Document', documentId);
+
+    const meta = doc.metadata as Record<string, unknown> | null;
+    if (meta?.approved) {
+      throw new ValidationError('Cannot edit fields of an approved document', {
+        field: 'metadata.approved',
+        issue: 'already_approved',
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const update of fieldUpdates) {
+        await tx.extractedDocumentField.update({
+          where: { id: update.fieldId },
+          data: {
+            ...(update.fieldValueText !== undefined
+              ? { fieldValueText: update.fieldValueText }
+              : {}),
+            ...(update.fieldValueNumeric !== undefined
+              ? { fieldValueNumeric: update.fieldValueNumeric }
+              : {}),
+          },
+        });
+      }
+    });
+
+    return { documentId, fieldsUpdated: fieldUpdates.length };
   }
 
   async addManualExtractedFields(

@@ -5,6 +5,7 @@ import { STORAGE_ADAPTER } from '../../../adapters/storage/storage.adapter';
 import { HASH_PROVIDER } from '../../../adapters/hash/hash.provider';
 import { PARSER_ADAPTER } from '../../../adapters/parser/parser.adapter';
 import { DOCUMENT_REGISTRY_ADAPTER } from '../../../adapters/blockchain/viem-document-registry.adapter';
+import { FUND_TERMS_REGISTRY_ADAPTER } from '../../../adapters/blockchain/viem-fund-terms-registry.adapter';
 import { EventLogService } from '../../../common/event-log.service';
 import { NotFoundError, ValidationError } from '../../../common/errors';
 
@@ -53,6 +54,19 @@ describe('DocumentsService', () => {
     documentExists: jest.fn().mockResolvedValue(false),
   };
 
+  const mockFundTermsRegistry = {
+    writeExtractedFields: jest.fn().mockResolvedValue({
+      txHashes: ['0x' + 'cd'.repeat(32)],
+      fieldsWritten: 3,
+    }),
+    setStringTerm: jest
+      .fn()
+      .mockResolvedValue({ txHash: '0x' + 'cd'.repeat(32) }),
+    setUintTerm: jest
+      .fn()
+      .mockResolvedValue({ txHash: '0x' + 'cd'.repeat(32) }),
+  };
+
   const mockParser = {
     parse: jest.fn().mockResolvedValue([
       {
@@ -87,6 +101,10 @@ describe('DocumentsService', () => {
         { provide: HASH_PROVIDER, useValue: mockHashProvider },
         { provide: PARSER_ADAPTER, useValue: mockParser },
         { provide: DOCUMENT_REGISTRY_ADAPTER, useValue: mockDocumentRegistry },
+        {
+          provide: FUND_TERMS_REGISTRY_ADAPTER,
+          useValue: mockFundTermsRegistry,
+        },
         {
           provide: EventLogService,
           useValue: { log: jest.fn().mockResolvedValue({}) },
@@ -149,7 +167,7 @@ describe('DocumentsService', () => {
 
       expect(result.documentId).toBe(mockDocId);
       expect(result.parseStatus).toBe('COMPLETED');
-      expect(result.hashStatus).toBe('COMPLETED');
+      expect(result.hashStatus).toBe('PENDING');
       expect(mockStorage.save).toHaveBeenCalledTimes(1);
       expect(mockHashProvider.hash).toHaveBeenCalledWith(pdfBuffer);
       expect(mockPrisma.fund.findUnique).toHaveBeenCalledWith({
@@ -200,13 +218,14 @@ describe('DocumentsService', () => {
           { fieldName: 'total_commitment', confidence: 0.92 },
           { fieldName: 'preferred_return', confidence: 0.85 },
         ],
+        hashes: [{ anchoredOnchain: true }],
       });
 
       const result = await service.getParseStatus(mockDocId);
 
       expect(result.documentId).toBe(mockDocId);
       expect(result.parseStatus).toBe('COMPLETED');
-      expect(result.hashStatus).toBe('COMPLETED');
+      expect(result.hashStatus).toBe('ANCHORED');
       expect(result.extractionSummary.fieldsExtracted).toBe(3);
       expect(result.extractionSummary.lowConfidenceFields).toBe(1); // 0.85 < 0.9
     });

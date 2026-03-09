@@ -158,6 +158,20 @@ export async function post<T>(path: string, body?: unknown): Promise<ApiResponse
   return handleResponse<ApiResponse<T>>(res, doFetch);
 }
 
+export async function put<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
+  const doFetch = () => fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const res = await doFetch();
+  return handleResponse<ApiResponse<T>>(res, doFetch);
+}
+
 export async function upload<T>(path: string, file: File, fieldName = 'file'): Promise<ApiResponse<T>> {
   const doFetch = () => {
     const formData = new FormData();

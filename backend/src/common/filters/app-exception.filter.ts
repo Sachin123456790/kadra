@@ -16,14 +16,18 @@ export class AppExceptionFilter implements ExceptionFilter {
 
     let statusCode = 500;
     let code = 'INTERNAL_ERROR';
-    let message = 'An unexpected error occurred';
+    let message =
+      exception instanceof Error
+        ? exception.message
+        : 'An unexpected error occurred';
 
-    if (
-      !(exception instanceof AppError) &&
-      !(exception instanceof HttpException)
-    ) {
-      console.error('Unhandled exception:', exception);
-    }
+    // Always log full error details for debugging
+    console.error('Exception caught:', {
+      type: exception?.constructor?.name,
+      message:
+        exception instanceof Error ? exception.message : String(exception),
+      stack: exception instanceof Error ? exception.stack : undefined,
+    });
 
     if (exception instanceof AppError) {
       statusCode = exception.statusCode;

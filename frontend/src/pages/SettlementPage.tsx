@@ -1,14 +1,25 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
-import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Upload,
+  FileText,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
-import { getSubscriptions, requestPaymentValidation, confirmSettlement } from "@/services";
+import {
+  getSubscriptions,
+  requestPaymentValidation,
+  confirmSettlement,
+  uploadWireConfirmation,
+} from "@/services";
 import type { ValidationResult } from "@/services/settlements.service";
 
 const checkItems = [
@@ -19,9 +30,9 @@ const checkItems = [
 ];
 
 const StatusIcon = ({ s }: { s: string }) => {
-  if (s === "pass") return <CheckCircle2 className="h-4 w-4 text-success" />;
-  if (s === "fail") return <XCircle className="h-4 w-4 text-destructive" />;
-  return <Loader2 className="h-4 w-4 text-warning animate-spin" />;
+  if (s === "pass") return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+  if (s === "fail") return <XCircle className="h-4 w-4 text-red-600" />;
+  return <Loader2 className="h-4 w-4 text-amber-500 animate-spin" />;
 };
 
 interface QueueItem {
@@ -30,6 +41,7 @@ interface QueueItem {
   investor: string;
   investorId: string;
   amount: string;
+  rawAmount: string;
   ref: string;
   status: string;
 }
@@ -37,14 +49,25 @@ interface QueueItem {
 export default function SettlementPage() {
   const fundId = DEFAULT_FUND_CODE;
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [validationResults, setValidationResults] = useState<Record<string, ValidationResult>>({});
-  const [paymentDocIds, setPaymentDocIds] = useState<Record<string, string>>({});
+  const [validationResults, setValidationResults] = useState<
+    Record<string, ValidationResult>
+  >({});
+  const [paymentDocIds, setPaymentDocIds] = useState<Record<string, string>>(
+    {},
+  );
+  const [uploadedFiles, setUploadedFiles] = useState<
+    Record<string, { name: string; documentId: string }>
+  >({});
 
-  // Fetch pending subscriptions as the payment queue
-  const { data: queue, isLoading, error } = useQuery({
-    queryKey: [...QUERY_KEYS.subscriptions(fundId), 'PENDING'],
-    queryFn: () => getSubscriptions(fundId, 'PENDING').then(r => r.data),
+  const {
+    data: queue,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: [...QUERY_KEYS.subscriptions(fundId), "PENDING"],
+    queryFn: () => getSubscriptions(fundId, "PENDING").then((r) => r.data),
     select: (data): QueueItem[] =>
       data.map((sub) => ({
         id: sub.subscriptionId,
@@ -52,105 +75,234 @@ export default function SettlementPage() {
         investor: sub.investorName || sub.investorId,
         investorId: sub.investorId,
         amount: `$${Number(sub.committedAmount).toLocaleString()}`,
+        rawAmount: String(sub.committedAmount),
         ref: sub.subscriptionRef,
         status: sub.latestSettlementStatus ?? "Pending",
       })),
   });
 
-  const selected = queue?.find(q => q.id === selectedId) ?? queue?.[0] ?? null;
+  const selected =
+    queue?.find((q) => q.id === selectedId) ?? queue?.[0] ?? null;
+
+  // Mutation: upload wire confirmation
+  const uploadMutation = useMutation({
+    mutationFn: ({
+      investorId,
+      file,
+    }: {
+      investorId: string;
+      file: File;
+      itemId: string;
+    }) => uploadWireConfirmation(fundId, investorId, file).then((r) => r.data),
+    onSuccess: (result, variables) => {
+      setUploadedFiles((prev) => ({
+        ...prev,
+        [variables.itemId]: {
+          name: variables.file.name,
+          documentId: result.documentId,
+        },
+      }));
+      setPaymentDocIds((prev) => ({
+        ...prev,
+        [variables.itemId]: result.documentId,
+      }));
+    },
+  });
 
   // Mutation: validate payment
   const validateMutation = useMutation({
     mutationFn: (item: QueueItem) =>
       requestPaymentValidation(item.subscriptionId, {
-        paymentDocumentId: paymentDocIds[item.id] || '',
-        declaredAmount: item.amount.replace(/[$,]/g, ''),
-        declaredCurrency: 'USD',
+        paymentDocumentId: paymentDocIds[item.id] || "",
+        declaredAmount: item.rawAmount,
+        declaredCurrency: "USD",
         declaredReference: item.ref,
-      }).then(r => r.data),
+      }).then((r) => r.data),
     onSuccess: (result, item) => {
-      setValidationResults(prev => ({ ...prev, [item.id]: result }));
+      setValidationResults((prev) => ({ ...prev, [item.id]: result }));
     },
   });
 
   // Mutation: confirm settlement
   const confirmMutation = useMutation({
-    mutationFn: ({ subscriptionId, settlementRecordId }: { subscriptionId: string; settlementRecordId: string }) =>
-      confirmSettlement(subscriptionId, settlementRecordId).then(r => r.data),
+    mutationFn: ({
+      subscriptionId,
+      settlementRecordId,
+    }: {
+      subscriptionId: string;
+      settlementRecordId: string;
+    }) =>
+      confirmSettlement(subscriptionId, settlementRecordId).then((r) => r.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions(fundId) });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.subscriptions(fundId),
+      });
     },
   });
 
   if (isLoading) return <div className="p-6">Loading...</div>;
-  if (error) return <ErrorAlert title="Failed to load settlement queue" message={(error as Error).message} />;
-  if (!queue || queue.length === 0) return <EmptyState title="No pending settlements" message="All subscriptions have been settled." />;
+  if (error)
+    return (
+      <ErrorAlert
+        title="Failed to load settlement queue"
+        message={(error as Error).message}
+      />
+    );
+  if (!queue || queue.length === 0)
+    return (
+      <EmptyState
+        title="No pending settlements"
+        message="All subscriptions have been settled."
+      />
+    );
 
-  const currentValidation = selected ? validationResults[selected.id] : null;
+  const currentValidation = selected
+    ? validationResults[selected.id]
+    : null;
+  const currentUpload = selected ? uploadedFiles[selected.id] : null;
+  const hasPaymentDoc = !!(selected && paymentDocIds[selected.id]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selected) return;
+    uploadMutation.mutate({
+      investorId: selected.investorId,
+      file,
+      itemId: selected.id,
+    });
+    e.target.value = "";
+  };
 
   return (
     <div>
-      <PageHeader title="Settlement" subtitle="Verify payment evidence against subscription terms" />
+      <PageHeader
+        title="Settlement"
+        subtitle="Upload wire confirmations and verify payment evidence against subscription terms"
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SectionCard title="Payment Evidence Queue">
           <div className="space-y-2">
-            {queue.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedId(p.id)}
-                className={cn(
-                  "w-full flex items-center justify-between rounded-md border border-border p-3 text-left transition-colors",
-                  selected?.id === p.id ? "bg-sidebar-accent border-primary/30" : "hover:bg-muted"
-                )}
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{p.investor}</p>
-                  <p className="text-xs text-gray-500">{p.amount} · {p.ref}</p>
-                </div>
-                <StatusBadge status={p.status} />
-              </button>
-            ))}
+            {queue.map((p) => {
+              const uploaded = uploadedFiles[p.id];
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedId(p.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between rounded-md border border-border p-3 text-left transition-colors",
+                    selected?.id === p.id
+                      ? "bg-sidebar-accent border-primary/30"
+                      : "hover:bg-muted",
+                  )}
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {p.investor}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {p.amount} · {p.ref}
+                    </p>
+                    {uploaded && (
+                      <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1">
+                        <FileText className="h-3 w-3" />
+                        {uploaded.name}
+                      </p>
+                    )}
+                  </div>
+                  <StatusBadge status={p.status} />
+                </button>
+              );
+            })}
           </div>
         </SectionCard>
 
         <SectionCard title="Validation Checklist">
           {selected && (
             <>
-              {/* Payment Document Reference */}
+              {/* Wire Upload */}
               <div className="mb-4">
-                <label htmlFor="paymentDocId" className="block text-sm font-medium text-gray-600 mb-1">
-                  Payment Document ID
+                <label className="block text-sm font-medium text-gray-600 mb-2">
+                  Wire Confirmation (PDF)
                 </label>
+                {currentUpload ? (
+                  <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 p-3">
+                    <FileText className="h-4 w-4 text-green-600" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {currentUpload.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        ID: {currentUpload.documentId.slice(0, 8)}...
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Replace
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadMutation.isPending}
+                    className="w-full flex items-center justify-center gap-2 rounded-md border-2 border-dashed border-gray-300 p-4 text-sm text-gray-500 hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
+                  >
+                    {uploadMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4" />
+                        Upload wire confirmation PDF
+                      </>
+                    )}
+                  </button>
+                )}
                 <input
-                  id="paymentDocId"
-                  type="text"
-                  placeholder="Paste document reference or leave blank"
-                  value={paymentDocIds[selected.id] || ''}
-                  onChange={(e) =>
-                    setPaymentDocIds(prev => ({ ...prev, [selected.id]: e.target.value }))
-                  }
-                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={handleFileSelect}
                 />
-                {!paymentDocIds[selected.id] && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    No document reference provided. Validation will proceed without it.
+                {uploadMutation.isError && (
+                  <p className="mt-1 text-xs text-red-600">
+                    Upload failed:{" "}
+                    {(uploadMutation.error as Error).message}
                   </p>
                 )}
               </div>
 
+              {/* Validation Checks */}
               <div className="space-y-3 mb-4">
                 {checkItems.map((ci) => {
                   let result: "pass" | "fail" | "pending" = "pending";
                   if (currentValidation) {
-                    const checkValue = currentValidation.checks[ci.key as keyof typeof currentValidation.checks];
-                    result = checkValue === true ? "pass" : checkValue === false ? "fail" : "pending";
+                    const checkValue =
+                      currentValidation.checks[
+                        ci.key as keyof typeof currentValidation.checks
+                      ];
+                    result =
+                      checkValue === true
+                        ? "pass"
+                        : checkValue === false
+                          ? "fail"
+                          : "pending";
                   }
                   return (
-                    <div key={ci.key} className="flex items-center justify-between rounded-md border border-border p-3">
-                      <span className="text-sm text-card-foreground">{ci.label}</span>
+                    <div
+                      key={ci.key}
+                      className="flex items-center justify-between rounded-md border border-border p-3"
+                    >
+                      <span className="text-sm text-gray-700">{ci.label}</span>
                       <div className="flex items-center gap-2">
                         <StatusIcon s={result} />
-                        <span className="text-xs font-medium capitalize text-muted-foreground">{result}</span>
+                        <span className="text-xs font-medium capitalize text-gray-500">
+                          {result}
+                        </span>
                       </div>
                     </div>
                   );
@@ -160,14 +312,19 @@ export default function SettlementPage() {
               {currentValidation?.status === "FAILED" && (
                 <ErrorAlert
                   title="Validation Failed"
-                  message={currentValidation.failureReasonCode ?? "One or more checks did not pass. Manual review required."}
+                  message={
+                    currentValidation.failureReasonCode ??
+                    "One or more checks did not pass. Manual review required."
+                  }
                 />
               )}
 
               <div className="flex gap-3 mt-4">
                 <button
                   onClick={() => selected && validateMutation.mutate(selected)}
-                  disabled={validateMutation.isPending}
+                  disabled={
+                    !hasPaymentDoc || validateMutation.isPending
+                  }
                   className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   {validateMutation.isPending ? "Validating..." : "Validate"}
@@ -177,16 +334,29 @@ export default function SettlementPage() {
                     if (selected && currentValidation?.settlementRecordId) {
                       confirmMutation.mutate({
                         subscriptionId: selected.subscriptionId,
-                        settlementRecordId: currentValidation.settlementRecordId,
+                        settlementRecordId:
+                          currentValidation.settlementRecordId,
                       });
                     }
                   }}
-                  disabled={!currentValidation || currentValidation.status !== "PASSED" || confirmMutation.isPending}
+                  disabled={
+                    !currentValidation ||
+                    currentValidation.status !== "PASSED" ||
+                    confirmMutation.isPending
+                  }
                   className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
                 >
-                  {confirmMutation.isPending ? "Confirming..." : "Confirm Settlement"}
+                  {confirmMutation.isPending
+                    ? "Confirming..."
+                    : "Confirm Settlement"}
                 </button>
               </div>
+
+              {!hasPaymentDoc && !uploadMutation.isPending && (
+                <p className="mt-2 text-xs text-amber-600">
+                  Upload a wire confirmation PDF before validating.
+                </p>
+              )}
 
               {confirmMutation.isError && (
                 <ErrorAlert

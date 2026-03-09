@@ -46,7 +46,7 @@ export class TokenizationService {
     const contract = await this.prisma.tokenContract.create({
       data: {
         fundId,
-        chainId: parseInt(process.env.CHAIN_ID || '11155111'),
+        chainId: 11155111,
         contractAddress: result.contractAddress,
         contractAddressNorm: result.contractAddress.toLowerCase(),
         tokenStandard: 'ERC-3643',
@@ -125,7 +125,7 @@ export class TokenizationService {
         data: {
           fundId: subscription.fundId,
           tokenContractId: contract.id,
-          chainId: parseInt(process.env.CHAIN_ID || '11155111'),
+          chainId: 11155111,
           blockNumber: BigInt(result.blockNumber),
           blockTimestamp: new Date(),
           txHash: result.txHash,
@@ -507,7 +507,7 @@ export class TokenizationService {
       data: {
         fundId,
         tokenContractId: contract.id,
-        chainId: parseInt(process.env.CHAIN_ID || '11155111'),
+        chainId: 11155111,
         blockNumber: BigInt(receipt.blockNumber),
         blockTimestamp: new Date(),
         txHash: receipt.txHash,
