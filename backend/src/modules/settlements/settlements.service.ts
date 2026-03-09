@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError, ConflictError } from '../../common/errors';
 import { EventLogService } from '../../common/event-log.service';
+import { TokenizationService } from '../tokenization/tokenization.service';
 
 @Injectable()
 export class SettlementsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventLog: EventLogService,
+    private readonly tokenizationService: TokenizationService,
   ) {}
 
   async requestValidation(
@@ -339,6 +341,21 @@ export class SettlementsService {
         mintAuthSignature,
       },
     });
+
+    // Auto-mint tokens for the settled subscription (non-blocking)
+    this.tokenizationService
+      .mintForSubscription(subscriptionId)
+      .then((mintResult) => {
+        console.log(
+          `Auto-mint completed for ${subscriptionId}: txHash=${mintResult.txHash}, tokens=${mintResult.tokenAmount}`,
+        );
+      })
+      .catch((e) => {
+        console.warn(
+          `Auto-mint failed for ${subscriptionId}:`,
+          e?.message ?? e,
+        );
+      });
 
     return {
       subscriptionId: updated.id,

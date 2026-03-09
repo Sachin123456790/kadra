@@ -27,6 +27,48 @@ export class TokenizationController {
     };
   }
 
+  @Post('admin/funds/:fundId/mint-all-settled')
+  @Roles(...ADMIN_ROLES)
+  async mintAllSettled(@Param('fundId') fundIdOrCode: string) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
+    const settled = await this.prisma.subscription.findMany({
+      where: { fundId, status: 'SETTLED', deletedAt: null },
+    });
+
+    const results: Array<{
+      subscriptionId: string;
+      status: string;
+      txHash?: string;
+      error?: string;
+    }> = [];
+    for (const sub of settled) {
+      try {
+        const result = await this.tokenizationService.mintForSubscription(
+          sub.id,
+        );
+        results.push({
+          subscriptionId: sub.id,
+          status: 'MINTED',
+          txHash: result.txHash,
+        });
+      } catch (e: any) {
+        results.push({
+          subscriptionId: sub.id,
+          status: 'SKIPPED',
+          error: e?.message,
+        });
+      }
+    }
+
+    return {
+      data: {
+        mintedCount: results.filter((r) => r.status === 'MINTED').length,
+        results,
+      },
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
   @Post('investor/funds/:fundId/transfers/validate')
   @Roles('investor', ...ADMIN_ROLES)
   async validateTransfer(
