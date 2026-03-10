@@ -40,6 +40,9 @@ model Fund {
   distributionRuns    DistributionRun[]
   auditExports        AuditExport[]
   systemEventLogs     SystemEventLog[]
+  capitalCalls        CapitalCall[]
+  notices             Notice[]
+  taxReports          TaxReport[]
 
   @@map("funds")
 }
@@ -71,6 +74,9 @@ model Investor {
   ownershipSnapshotRows OwnershipSnapshotRow[]
   distributionLineItems DistributionLineItem[]
   walletLinkChallenges  WalletLinkChallenge[]
+  capitalCallResponses CapitalCallResponse[]
+  notices              Notice[]
+  taxReports           TaxReport[]
 
   @@map("investors")
 }
@@ -194,6 +200,7 @@ model Document {
   extractedFields   ExtractedDocumentField[]
   governedSubscriptions Subscription[] @relation("governingDocument")
   settlementEvidence SettlementEvidence[]
+  capitalCallResponses CapitalCallResponse[]
 
   @@index([fundId, documentType, uploadedAt(sort: Desc)])
   @@map("documents")
@@ -819,4 +826,133 @@ model JobDeadLetter {
 
   @@index([jobType, failedAt(sort: Desc)])
   @@map("jobs_dead_letter")
+}
+
+// ─────────────────────────────────────────────────────────
+// 27. capital_calls
+// ─────────────────────────────────────────────────────────
+model CapitalCall {
+  id               String    @id @default(uuid())
+  fundId           String    @map("fund_id")
+  callNumber       Int       @map("call_number")
+  amountDue        Decimal   @map("amount_due") @db.Decimal(20, 2)
+  currency         String    @default("USD") @db.VarChar(3)
+  dueDate          DateTime  @map("due_date") @db.Timestamptz()
+  wireInstructions String?   @map("wire_instructions") @db.Text
+  status           String    @default("ISSUED") @db.VarChar(30)
+  createdBy        String?   @map("created_by")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  fund      Fund                  @relation(fields: [fundId], references: [id])
+  responses CapitalCallResponse[]
+  notices   Notice[]
+
+  @@index([fundId, status])
+  @@index([fundId, dueDate(sort: Desc)])
+  @@map("capital_calls")
+}
+
+// ─────────────────────────────────────────────────────────
+// 28. capital_call_responses
+// ─────────────────────────────────────────────────────────
+model CapitalCallResponse {
+  id             String   @id @default(uuid())
+  capitalCallId  String   @map("capital_call_id")
+  investorId     String   @map("investor_id")
+  amountReceived Decimal  @map("amount_received") @db.Decimal(20, 2)
+  currency       String   @default("USD") @db.VarChar(3)
+  wireDocumentId String?  @map("wire_document_id")
+  status         String   @default("RECEIVED") @db.VarChar(30)
+  receivedAt     DateTime @map("received_at") @db.Timestamptz()
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  capitalCall CapitalCall @relation(fields: [capitalCallId], references: [id])
+  investor    Investor    @relation(fields: [investorId], references: [id])
+  document    Document?   @relation(fields: [wireDocumentId], references: [id])
+
+  @@index([capitalCallId])
+  @@index([investorId])
+  @@map("capital_call_responses")
+}
+
+// ─────────────────────────────────────────────────────────
+// 29. notices
+// ─────────────────────────────────────────────────────────
+model Notice {
+  id                  String    @id @default(uuid())
+  fundId              String    @map("fund_id")
+  type                String    @db.VarChar(50)
+  recipientInvestorId String    @map("recipient_investor_id")
+  capitalCallId       String?   @map("capital_call_id")
+  distributionRunId   String?   @map("distribution_run_id")
+  documentHash        String?   @map("document_hash") @db.VarChar(128)
+  anchorTxHash        String?   @map("anchor_tx_hash") @db.VarChar(66)
+  generatedAt         DateTime  @default(now()) @map("generated_at") @db.Timestamptz()
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  fund        Fund           @relation(fields: [fundId], references: [id])
+  investor    Investor       @relation(fields: [recipientInvestorId], references: [id])
+  capitalCall CapitalCall?   @relation(fields: [capitalCallId], references: [id])
+  deliveries  NoticeDelivery[]
+
+  @@index([fundId, type])
+  @@index([recipientInvestorId])
+  @@map("notices")
+}
+
+// ─────────────────────────────────────────────────────────
+// 30. notice_deliveries
+// ─────────────────────────────────────────────────────────
+model NoticeDelivery {
+  id           String    @id @default(uuid())
+  noticeId     String    @map("notice_id")
+  status       String    @default("GENERATED") @db.VarChar(30)
+  sentAt       DateTime? @map("sent_at") @db.Timestamptz()
+  openedAt     DateTime? @map("opened_at") @db.Timestamptz()
+  downloadedAt DateTime? @map("downloaded_at") @db.Timestamptz()
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  notice Notice @relation(fields: [noticeId], references: [id])
+
+  @@index([noticeId])
+  @@index([status])
+  @@map("notice_deliveries")
+}
+
+// ─────────────────────────────────────────────────────────
+// 31. tax_reports
+// ─────────────────────────────────────────────────────────
+model TaxReport {
+  id                 String   @id @default(uuid())
+  investorId         String   @map("investor_id")
+  fundId             String   @map("fund_id")
+  taxYear            Int      @map("tax_year")
+  taxEntityName      String   @map("tax_entity_name") @db.VarChar(255)
+  ordinaryIncome     Decimal  @default(0) @map("ordinary_income") @db.Decimal(20, 2)
+  returnOfCapital    Decimal  @default(0) @map("return_of_capital") @db.Decimal(20, 2)
+  ltcg               Decimal  @default(0) @db.Decimal(20, 2)
+  stcg               Decimal  @default(0) @db.Decimal(20, 2)
+  totalDistributions Decimal  @default(0) @map("total_distributions") @db.Decimal(20, 2)
+  generatedAt        DateTime @default(now()) @map("generated_at") @db.Timestamptz()
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  investor Investor @relation(fields: [investorId], references: [id])
+  fund     Fund     @relation(fields: [fundId], references: [id])
+
+  @@unique([investorId, fundId, taxYear])
+  @@index([investorId])
+  @@index([fundId, taxYear])
+  @@map("tax_reports")
 }
