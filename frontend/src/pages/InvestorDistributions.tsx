@@ -1,9 +1,5 @@
-import { useMemo } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, Legend, ResponsiveContainer,
-  AreaChart, Area,
-} from "recharts";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { DataTable, Column } from "@/components/kadra/DataTable";
@@ -11,122 +7,337 @@ import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
-import { getMyDistributions } from "@/services";
-import type { InvestorDistributionLineItem } from "@/services/investor-portal.service";
+import { getMyDistributions, getInvestorWaterfallBreakdown } from "@/services";
+import type { InvestorDistributionLineItem, WaterfallBreakdown } from "@/services/investor-portal.service";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
-const columns: Column<InvestorDistributionLineItem>[] = [
-  { key: "run", header: "Run Date", render: (r) => new Date(r.run.asOfTimestamp).toLocaleDateString() },
-  { key: "run", header: "Status", render: (r) => <StatusBadge status={r.run.runStatus} /> },
-  { key: "ownershipPctUsed", header: "Ownership %", render: (r) => r.ownershipPctUsed != null ? `${r.ownershipPctUsed}%` : "--" },
-  { key: "grossAmount", header: "Gross Amount", render: (r) => fmt(Number(r.grossAmount)) },
-  { key: "netAmount", header: "Net Amount", render: (r) => fmt(Number(r.netAmount)) },
-  { key: "currency", header: "Currency" },
+const fmtPct = (n: number) => `${n}%`;
+
+// ── Waterfall tier definitions ──────────────────────────────
+
+interface WaterfallTier {
+  tier: number;
+  name: string;
+  description: string;
+  lpShare: string;
+  gpShare: string;
+}
+
+const WATERFALL_TIERS: WaterfallTier[] = [
+  { tier: 1, name: "Return of Capital", description: "100% of distributions to LPs until contributed capital is returned", lpShare: "100%", gpShare: "0%" },
+  { tier: 2, name: "Preferred Return", description: "8% simple annual preferred return to LPs", lpShare: "100%", gpShare: "0%" },
+  { tier: 3, name: "GP Catch-up", description: "100% to GP until GP has received 20% of total profits", lpShare: "0%", gpShare: "100%" },
+  { tier: 4, name: "Carried Interest", description: "Remaining profits split 80/20", lpShare: "80%", gpShare: "20%" },
 ];
 
-interface BarEntry {
-  date: string;
-  gross: number;
-  net: number;
+// ── Tooltip number display ──────────────────────────────────
+
+function TooltipNumber({ value, breakdown }: { value: string; breakdown: string }) {
+  const numValue = Number(value);
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-help border-b border-dotted border-gray-400">
+            {fmt(numValue)}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <p className="text-xs">{breakdown}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
-interface CumulativeEntry {
-  date: string;
-  cumulative: number;
-}
+// ── Waterfall Breakdown Section ─────────────────────────────
 
-function DistributionBarChart({ items }: { items: InvestorDistributionLineItem[] }) {
-  const barData: BarEntry[] = items.map((item) => ({
-    date: new Date(item.run.asOfTimestamp).toLocaleDateString(),
-    gross: Number(item.grossAmount),
-    net: Number(item.netAmount),
-  }));
+function WaterfallBreakdownSection({
+  breakdown,
+  distributions,
+  selectedRunId,
+  onSelectRun,
+}: {
+  breakdown: WaterfallBreakdown | null;
+  distributions: InvestorDistributionLineItem[];
+  selectedRunId: string | null;
+  onSelectRun: (id: string) => void;
+}) {
+  const selectedItem = distributions.find((d) => d.run.id === selectedRunId) ?? distributions[0] ?? null;
+
+  const waterfallConfig = breakdown?.waterfallConfig as Record<string, unknown> | undefined;
+  const prefRate = waterfallConfig?.preferredReturnRate
+    ? `${waterfallConfig.preferredReturnRate}%`
+    : "8%";
 
   return (
-    <SectionCard>
-      <h3 className="text-sm font-medium text-gray-600 mb-4">Distribution History</h3>
-      <ResponsiveContainer width="100%" height={250}>
-        <BarChart data={barData}>
-          <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#6b7280" }} />
-          <YAxis tick={{ fontSize: 12, fill: "#6b7280" }} tickFormatter={(v: number) => fmt(v)} />
-          <ReTooltip formatter={(value: number) => fmt(value)} />
-          <Legend />
-          <Bar dataKey="gross" name="Gross" fill="#a5b4fc" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="net" name="Net" fill="#4338ca" radius={[4, 4, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+    <SectionCard title="Waterfall Breakdown">
+      {distributions.length > 1 && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Select Distribution Event
+          </label>
+          <select
+            value={selectedRunId ?? selectedItem?.run.id ?? ""}
+            onChange={(e) => onSelectRun(e.target.value)}
+            className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+          >
+            {distributions.map((d) => (
+              <option key={d.run.id} value={d.run.id}>
+                {new Date(d.run.asOfTimestamp).toLocaleDateString()} - {d.run.runStatus}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Tier cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {WATERFALL_TIERS.map((tier) => (
+          <div
+            key={tier.tier}
+            className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                {tier.tier}
+              </span>
+              <h4 className="text-sm font-semibold text-gray-900">{tier.name}</h4>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">{tier.description}</p>
+            <div className="flex gap-4 text-xs">
+              <div>
+                <span className="text-gray-500">LP Share: </span>
+                <span className="font-medium text-gray-900">{tier.lpShare}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">GP Share: </span>
+                <span className="font-medium text-gray-900">{tier.gpShare}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Investor-specific numbers from selected distribution */}
+      {selectedItem ? (
+        <div className="border border-gray-200 rounded-lg p-5 bg-white">
+          <div className="flex items-center gap-2 mb-4">
+            <h4 className="text-sm font-semibold text-gray-900">
+              Your Distribution — {new Date(selectedItem.run.asOfTimestamp).toLocaleDateString()}
+            </h4>
+            <StatusBadge status={selectedItem.run.runStatus} />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Ownership %</p>
+              <p className="text-sm font-medium text-gray-900">
+                {selectedItem.ownershipPctUsed != null ? fmtPct(selectedItem.ownershipPctUsed) : "--"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Return of Capital</p>
+              <p className="text-sm font-medium text-gray-900">
+                <TooltipNumber
+                  value={selectedItem.returnOfCapitalAmount}
+                  breakdown={`Tier 1: 100% to LP. Your share based on ${selectedItem.ownershipPctUsed ?? 0}% ownership.`}
+                />
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Preferred Return</p>
+              <p className="text-sm font-medium text-gray-900">
+                <TooltipNumber
+                  value={selectedItem.prefAmount}
+                  breakdown={`Tier 2: ${prefRate} simple annual preferred return on contributed capital.`}
+                />
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">GP Promote</p>
+              <p className="text-sm font-medium text-gray-900">
+                <TooltipNumber
+                  value={selectedItem.promoteAmount}
+                  breakdown="Tier 3-4: GP catch-up and carried interest (20% GP share of profits above pref)."
+                />
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Gross Amount</p>
+              <p className="text-sm font-medium text-gray-900">
+                <TooltipNumber
+                  value={selectedItem.grossAmount}
+                  breakdown="Total gross distribution before any withholding or adjustments."
+                />
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Net Amount</p>
+              <p className="text-lg font-semibold text-gray-900">
+                <TooltipNumber
+                  value={selectedItem.netAmount}
+                  breakdown={`Net amount received: Gross (${fmt(Number(selectedItem.grossAmount))}) minus any withholding.`}
+                />
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-6">
+          <Info className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+          <p className="text-sm text-gray-500">Select a distribution event to view your breakdown.</p>
+        </div>
+      )}
     </SectionCard>
   );
 }
 
-function CumulativeAreaChart({ items }: { items: InvestorDistributionLineItem[] }) {
-  const areaData: CumulativeEntry[] = useMemo(() => {
-    const sorted = [...items].sort(
-      (a, b) => new Date(a.run.asOfTimestamp).getTime() - new Date(b.run.asOfTimestamp).getTime()
-    );
-    let cumulative = 0;
-    return sorted.map((item) => {
-      cumulative += Number(item.netAmount);
-      return {
-        date: new Date(item.run.asOfTimestamp).toLocaleDateString(),
-        cumulative,
-      };
-    });
-  }, [items]);
+// ── Distribution History Table ───────────────────────────────
+
+function DistributionHistoryTable({
+  items,
+  onRowClick,
+}: {
+  items: InvestorDistributionLineItem[];
+  onRowClick: (item: InvestorDistributionLineItem) => void;
+}) {
+  const columns: Column<InvestorDistributionLineItem>[] = [
+    {
+      key: "distributionDate",
+      header: "Distribution Date",
+      render: (r) => new Date(r.run.asOfTimestamp).toLocaleDateString(),
+    },
+    {
+      key: "runStatus",
+      header: "Event Type",
+      render: (r) => <StatusBadge status={r.run.runStatus} />,
+    },
+    {
+      key: "returnOfCapitalAmount",
+      header: "Capital Returned",
+      render: (r) => fmt(Number(r.returnOfCapitalAmount)),
+    },
+    {
+      key: "prefAmount",
+      header: "Preferred Return",
+      render: (r) => fmt(Number(r.prefAmount)),
+    },
+    {
+      key: "residualShare",
+      header: "Residual Share",
+      render: (r) => {
+        const residual = Number(r.netAmount) - Number(r.returnOfCapitalAmount) - Number(r.prefAmount);
+        return fmt(Math.max(0, residual));
+      },
+    },
+    {
+      key: "promoteAmount",
+      header: "GP Promote",
+      render: (r) => fmt(Number(r.promoteAmount)),
+    },
+    {
+      key: "netAmount",
+      header: "Total Received",
+      render: (r) => (
+        <span className="font-semibold">{fmt(Number(r.netAmount))}</span>
+      ),
+    },
+    {
+      key: "currency",
+      header: "Currency",
+    },
+    {
+      key: "id",
+      header: "Reference",
+      render: (r) => (
+        <span className="font-mono text-xs text-gray-500">
+          {r.id.slice(0, 8)}...
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <SectionCard>
-      <h3 className="text-sm font-medium text-gray-600 mb-4">Cumulative Distributions</h3>
-      <ResponsiveContainer width="100%" height={200}>
-        <AreaChart data={areaData}>
-          <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#6b7280" }} />
-          <YAxis tick={{ fontSize: 12, fill: "#6b7280" }} tickFormatter={(v: number) => fmt(v)} />
-          <ReTooltip formatter={(value: number) => fmt(value)} />
-          <Area
-            type="monotone"
-            dataKey="cumulative"
-            name="Cumulative Net"
-            stroke="#4f46e5"
-            fill="#4f46e5"
-            fillOpacity={0.3}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+    <SectionCard title="Distribution History">
+      <DataTable
+        columns={columns}
+        data={items}
+        getRowId={(r) => r.id}
+        onRowClick={onRowClick}
+        emptyMessage="No distribution records found."
+      />
     </SectionCard>
   );
 }
+
+// ── Main Page Component ──────────────────────────────────────
 
 export default function InvestorDistributionsPage() {
   const fundId = DEFAULT_FUND_CODE;
+  const waterfallRef = useRef<HTMLDivElement>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
-  const { data, isLoading, error } = useQuery({
+  const { data: distributions, isLoading: distLoading, error: distError } = useQuery({
     queryKey: QUERY_KEYS.investorDistributions(fundId),
     queryFn: () => getMyDistributions(fundId).then((r) => r.data),
   });
 
-  if (isLoading) return <div className="p-6">Loading...</div>;
-  if (error) return <ErrorAlert title="Failed to load distributions" message={(error as Error).message} />;
-  if (!data || data.length === 0) {
-    return (
-      <div>
-        <PageHeader title="My Distributions" subtitle="Your distribution history" />
-        <EmptyState title="No distributions" message="No distributions have been issued to your account yet." />
-      </div>
-    );
-  }
+  const { data: breakdown, isLoading: breakdownLoading } = useQuery({
+    queryKey: QUERY_KEYS.waterfallBreakdown(fundId),
+    queryFn: () => getInvestorWaterfallBreakdown(fundId).then((r) => r.data),
+  });
+
+  const handleRowClick = useCallback((item: InvestorDistributionLineItem) => {
+    setSelectedRunId(item.run.id);
+    waterfallRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const handleSelectRun = useCallback((runId: string) => {
+    setSelectedRunId(runId);
+  }, []);
+
+  if (distLoading || breakdownLoading) return <div className="p-6">Loading...</div>;
+  if (distError) return <ErrorAlert title="Failed to load distributions" message={(distError as Error).message} />;
+
+  const hasDistributions = distributions && distributions.length > 0;
 
   return (
     <div>
-      <PageHeader title="My Distributions" subtitle="Your distribution history" />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <DistributionBarChart items={data} />
-        <CumulativeAreaChart items={data} />
-      </div>
-      <SectionCard>
-        <DataTable columns={columns} data={data} getRowId={(r) => r.id} />
-      </SectionCard>
+      <PageHeader title="My Distributions" subtitle="Waterfall breakdown and distribution history" />
+
+      {!hasDistributions ? (
+        <EmptyState
+          title="No distributions yet"
+          message="No distributions have been issued to your account yet. Distributions will appear here once the fund begins making payouts."
+        />
+      ) : (
+        <div className="space-y-6">
+          {/* Section 1: Waterfall Breakdown */}
+          <div ref={waterfallRef}>
+            <WaterfallBreakdownSection
+              breakdown={breakdown ?? null}
+              distributions={distributions}
+              selectedRunId={selectedRunId}
+              onSelectRun={handleSelectRun}
+            />
+          </div>
+
+          {/* Section 2: Distribution History */}
+          <DistributionHistoryTable
+            items={distributions}
+            onRowClick={handleRowClick}
+          />
+        </div>
+      )}
     </div>
   );
 }

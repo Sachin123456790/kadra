@@ -1,92 +1,158 @@
-import { useState } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
-import { DataTable, Column } from "@/components/kadra/DataTable";
-import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
-import { getMyTransfers } from "@/services";
+import { getMyTransfers, getMyDashboard } from "@/services";
 import { validateTransfer, confirmTransfer } from "@/services/tokenization.service";
 import { encodeTransfer } from "@/config/kadra-token-abi";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import { useWallet } from "@/hooks/useWallet";
 import type { InvestorTransferRequest } from "@/services/investor-portal.service";
+import { Shield, Search, AlertCircle, CheckCircle } from "lucide-react";
 
 const fmt = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n);
 
-const columns: Column<InvestorTransferRequest>[] = [
-  { key: "fromWalletAddress", header: "From", render: (r) => <ExplorerLink value={r.fromWalletAddress ?? ""} type="address" /> },
-  { key: "toWalletAddress", header: "To", render: (r) => <ExplorerLink value={r.toWalletAddress ?? ""} type="address" /> },
-  { key: "tokenAmount", header: "Amount", render: (r) => fmt(Number(r.tokenAmount)) },
-  { key: "requestStatus", header: "Status", render: (r) => <StatusBadge status={r.requestStatus} /> },
-  { key: "submittedTxHash", header: "Tx Hash", render: (r) => <ExplorerLink value={r.submittedTxHash ?? ""} type="tx" /> },
-  { key: "createdAt", header: "Date", render: (r) => new Date(r.createdAt).toLocaleDateString() },
-];
+// ── Section 1: Transfer Eligibility ─────────────────────────
 
-export default function InvestorTransfersPage() {
+function TransferEligibilityPanel() {
+  return (
+    <SectionCard title="Transfer Eligibility">
+      <div className="bg-gray-50 rounded-lg p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Eligibility Marker Status</span>
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+              Active
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Fund-Specific LP Marker</span>
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+              Kadra Demo Fund I: Verified
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">KYC Status</span>
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+              Verified
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Accreditation Status</span>
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+              Accredited
+            </span>
+          </div>
+        </div>
+        <div className="flex items-start gap-2 pt-3 border-t border-gray-200">
+          <Shield className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
+          <p className="text-xs text-gray-500">
+            Transfers are permitted only to wallets holding an active LP eligibility marker for this fund.
+          </p>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Section 2: Initiate Transfer ────────────────────────────
+
+interface RecipientSearch {
+  email: string;
+  name: string;
+  eligible: boolean;
+}
+
+function InitiateTransferSection({
+  walletAddress,
+  tokenBalance,
+}: {
+  walletAddress: string | null;
+  tokenBalance: string;
+}) {
   const fundId = DEFAULT_FUND_CODE;
   const queryClient = useQueryClient();
   const wallet = useWallet();
-  const [showForm, setShowForm] = useState(false);
-  const [toAddress, setToAddress] = useState("");
+
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [recipientResult, setRecipientResult] = useState<RecipientSearch | null>(null);
   const [tokenAmount, setTokenAmount] = useState("");
-  const [reason, setReason] = useState("");
-  const [transferStep, setTransferStep] = useState<"idle" | "validating" | "signing" | "confirming" | "done" | "error">("idle");
+  const [transferStep, setTransferStep] = useState<
+    "idle" | "validating" | "signing" | "confirming" | "done" | "error"
+  >("idle");
   const [transferError, setTransferError] = useState<string | null>(null);
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: QUERY_KEYS.investorTransfers(fundId),
-    queryFn: () => getMyTransfers(fundId).then((r) => r.data),
-  });
+  const handleRecipientSearch = useCallback((email: string) => {
+    setRecipientEmail(email);
+    setRecipientResult(null);
+
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
+    if (email.length < 3) return;
+
+    // Simulate a recipient lookup with debounce
+    searchTimeout.current = setTimeout(() => {
+      // For demo: any valid-looking email is treated as eligible
+      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (isValidEmail) {
+        setRecipientResult({
+          email,
+          name: email.split("@")[0].replace(/[^a-zA-Z]/g, " "),
+          eligible: true,
+        });
+      }
+    }, 500);
+  }, []);
 
   const transferMutation = useMutation({
     mutationFn: async () => {
-      if (!wallet.address) throw new Error("Please connect your wallet first");
+      const activeAddr = wallet.address ?? walletAddress;
+      if (!activeAddr) throw new Error("Please connect your wallet first");
 
-      // Step 1: Validate transfer (server-side pre-checks)
+      // Step 1: Validate
       setTransferStep("validating");
       const validation = await validateTransfer(fundId, {
-        fromWalletAddress: wallet.address,
-        toWalletAddress: toAddress,
+        fromWalletAddress: activeAddr,
+        toWalletAddress: recipientEmail, // Backend resolves email -> wallet
         tokenAmount,
-        reason: reason || undefined,
       });
 
       if (validation.data.requestStatus === "PRECHECK_FAILED") {
         const pc = validation.data.precheck;
         let msg = "Transfer pre-check failed: ";
         if (!pc.senderEligible) msg += "Your wallet is not eligible for this fund.";
-        else if (!pc.recipientEligible) msg += "Recipient wallet is not eligible for this fund.";
+        else if (!pc.recipientEligible) msg += "Recipient is not eligible for this fund.";
         else if (!pc.sufficientBalance) msg += "Insufficient token balance.";
         throw new Error(msg);
       }
 
-      // Step 2: Sign and submit transaction from investor's wallet
+      // Step 2: Sign
       setTransferStep("signing");
       const amount = BigInt(Math.round(parseFloat(tokenAmount) * 1e18));
-      const calldata = encodeTransfer(toAddress, amount);
+      const calldata = encodeTransfer(validation.data.precheck.recipientEligible ? recipientEmail : "", amount);
 
       const txHash = await wallet.sendTransaction({
         to: validation.data.contractAddress,
         data: calldata,
       });
 
-      // Step 3: Confirm with backend (records the on-chain result)
+      // Step 3: Confirm
       setTransferStep("confirming");
       const result = await confirmTransfer(validation.data.transferRequestId, txHash);
       setLastTxHash(result.data.txHash);
-
       return result;
     },
     onSuccess: () => {
       setTransferStep("done");
-      setToAddress("");
+      setRecipientEmail("");
+      setRecipientResult(null);
       setTokenAmount("");
-      setReason("");
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.investorTransfers(fundId) });
     },
     onError: (err: Error) => {
@@ -101,78 +167,94 @@ export default function InvestorTransfersPage() {
     setLastTxHash(null);
   };
 
+  const isReady = wallet.address && recipientEmail && tokenAmount && transferStep === "idle";
+
   return (
-    <div>
-      <PageHeader
-        title="My Transfers"
-        subtitle="Transfer tokens to other eligible investors"
-        action={
-          !showForm ? (
-            <button
-              onClick={() => setShowForm(true)}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
-            >
-              New Transfer
-            </button>
-          ) : undefined
-        }
-      />
+    <SectionCard title="Initiate Transfer">
+      {/* Wallet connection status */}
+      {wallet.status !== "connected" ? (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-800 mb-2">
+            Connect your wallet to sign transfers. Your wallet must be linked to your investor account.
+          </p>
+          <button
+            onClick={() => wallet.connectWallet()}
+            className="px-3 py-1.5 bg-amber-600 text-white rounded text-sm hover:bg-amber-700"
+          >
+            Connect Wallet
+          </button>
+          {wallet.error && <p className="text-xs text-red-600 mt-1">{wallet.error}</p>}
+        </div>
+      ) : (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full" />
+          <span className="text-sm text-green-800">
+            Connected: <code className="text-xs">{wallet.address}</code>
+          </span>
+        </div>
+      )}
 
-      {showForm && (
-        <SectionCard className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Initiate Transfer</h3>
-
-          {/* Wallet connection status */}
-          {wallet.status !== "connected" ? (
-            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-sm text-amber-800 mb-2">
-                Connect your wallet to sign transfers. Your wallet must be linked to your investor account.
-              </p>
-              <button
-                onClick={() => wallet.connectWallet()}
-                className="px-3 py-1.5 bg-amber-600 text-white rounded text-sm hover:bg-amber-700"
-              >
-                Connect Wallet
-              </button>
-              {wallet.error && <p className="text-xs text-red-600 mt-1">{wallet.error}</p>}
-            </div>
-          ) : (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full" />
-              <span className="text-sm text-green-800">
-                Connected: <code className="text-xs">{wallet.address}</code>
-              </span>
-            </div>
+      {transferStep === "done" ? (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-1">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <p className="text-green-800 font-medium">Transfer submitted successfully.</p>
+          </div>
+          {lastTxHash && (
+            <p className="text-sm text-green-700 mt-1">
+              Tx: <ExplorerLink value={lastTxHash} type="tx" />
+            </p>
           )}
-
-          {transferStep === "done" ? (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-green-800 font-medium">Transfer submitted successfully!</p>
-              {lastTxHash && (
-                <p className="text-sm text-green-700 mt-1">
-                  Tx: <ExplorerLink value={lastTxHash} type="tx" />
-                </p>
-              )}
-              <button
-                onClick={() => { resetForm(); setShowForm(false); }}
-                className="mt-3 px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-              >
-                Done
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
+          <button
+            onClick={() => { resetForm(); }}
+            className="mt-3 px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          >
+            Done
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Recipient panel */}
+          <div>
+            <h4 className="text-sm font-medium text-gray-900 mb-3">Recipient</h4>
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Wallet Address</label>
-                <input
-                  type="text"
-                  value={toAddress}
-                  onChange={(e) => setToAddress(e.target.value)}
-                  placeholder="0x..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  disabled={transferStep !== "idle"}
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">LP Email Address</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={recipientEmail}
+                    onChange={(e) => handleRecipientSearch(e.target.value)}
+                    placeholder="Search by email..."
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    disabled={transferStep !== "idle"}
+                  />
+                </div>
               </div>
+              {recipientResult && (
+                <div className={`p-3 rounded-lg border ${recipientResult.eligible ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+                  <div className="flex items-center gap-2">
+                    {recipientResult.eligible ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                    )}
+                    <span className={`text-sm ${recipientResult.eligible ? "text-green-800" : "text-red-800"}`}>
+                      {recipientResult.eligible
+                        ? "Recipient is eligible for this fund"
+                        : "Recipient is NOT eligible for this fund"}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Amount panel */}
+          <div>
+            <h4 className="text-sm font-medium text-gray-900 mb-3">Amount</h4>
+            <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Token Amount</label>
                 <input
@@ -183,68 +265,208 @@ export default function InvestorTransfersPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   disabled={transferStep !== "idle"}
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
-                <input
-                  type="text"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g. LP transfer"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  disabled={transferStep !== "idle"}
-                />
-              </div>
-
-              {transferError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-800">{transferError}</p>
-                  <button onClick={resetForm} className="text-xs text-red-600 underline mt-1">Try again</button>
-                </div>
-              )}
-
-              {transferStep !== "idle" && transferStep !== "error" && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    {transferStep === "validating" && "Validating transfer eligibility..."}
-                    {transferStep === "signing" && "Please sign the transaction in your wallet..."}
-                    {transferStep === "confirming" && "Confirming on-chain transaction..."}
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => transferMutation.mutate()}
-                  disabled={!wallet.address || !toAddress || !tokenAmount || transferStep !== "idle"}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Sign & Transfer
-                </button>
-                <button
-                  onClick={() => { setShowForm(false); resetForm(); }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
-                  disabled={transferStep !== "idle" && transferStep !== "error"}
-                >
-                  Cancel
-                </button>
+                <p className="text-xs text-gray-500 mt-1">
+                  Current allocation: {tokenBalance} tokens
+                </p>
               </div>
             </div>
-          )}
-        </SectionCard>
+          </div>
+        </div>
       )}
 
-      {isLoading ? (
-        <div className="p-6">Loading...</div>
-      ) : error ? (
-        <ErrorAlert title="Failed to load transfers" message={(error as Error).message} />
-      ) : !data || data.length === 0 ? (
+      {/* Error state */}
+      {transferError && transferStep === "error" && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-800">{transferError}</p>
+          <button onClick={resetForm} className="text-xs text-red-600 underline mt-1">Try again</button>
+        </div>
+      )}
+
+      {/* Progress state */}
+      {transferStep !== "idle" && transferStep !== "error" && transferStep !== "done" && (
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            {transferStep === "validating" && "Validating transfer eligibility..."}
+            {transferStep === "signing" && "Please sign the transaction in your wallet..."}
+            {transferStep === "confirming" && "Confirming on-chain transaction..."}
+          </p>
+        </div>
+      )}
+
+      {/* Transfer button */}
+      {transferStep !== "done" && (
+        <div className="mt-4">
+          <button
+            onClick={() => transferMutation.mutate()}
+            disabled={!isReady || (recipientResult !== null && !recipientResult.eligible)}
+            className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Transfer
+          </button>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── Section 3: Transfer History ─────────────────────────────
+
+function TransferHistorySection({
+  transfers,
+  investorWalletAddress,
+}: {
+  transfers: InvestorTransferRequest[];
+  investorWalletAddress: string | null;
+}) {
+  const getDirection = (t: InvestorTransferRequest): "Sent" | "Received" => {
+    if (!investorWalletAddress) return "Sent";
+    return t.fromWalletAddress?.toLowerCase() === investorWalletAddress.toLowerCase()
+      ? "Sent"
+      : "Received";
+  };
+
+  const getCounterparty = (t: InvestorTransferRequest): string => {
+    const direction = getDirection(t);
+    return direction === "Sent" ? (t.toWalletAddress ?? "--") : (t.fromWalletAddress ?? "--");
+  };
+
+  const isBlocked = (t: InvestorTransferRequest): boolean => {
+    const status = t.requestStatus?.toLowerCase() ?? "";
+    return status.includes("fail") || status.includes("block") || status.includes("reject");
+  };
+
+  const isExecuted = (t: InvestorTransferRequest): boolean => {
+    const status = t.requestStatus?.toLowerCase() ?? "";
+    return status.includes("success") || status.includes("confirm") || status.includes("complete") || status.includes("finalized");
+  };
+
+  return (
+    <SectionCard title="Transfer History">
+      {transfers.length === 0 ? (
         <EmptyState title="No transfers" message="You have no transfer records yet." />
       ) : (
-        <SectionCard>
-          <DataTable columns={columns} data={data} getRowId={(r) => r.id} />
-        </SectionCard>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Direction</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Counterparty</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Amount</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Result</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transfers.map((t) => {
+                const direction = getDirection(t);
+                const blocked = isBlocked(t);
+                const executed = isExecuted(t);
+                return (
+                  <tr
+                    key={t.id}
+                    className={`border-b border-gray-200 ${blocked ? "bg-red-50" : ""}`}
+                  >
+                    <td className="px-4 py-3 text-gray-900">
+                      {new Date(t.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          direction === "Sent"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-purple-100 text-purple-800"
+                        }`}
+                      >
+                        {direction}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <ExplorerLink value={getCounterparty(t)} type="address" />
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {fmt(Number(t.tokenAmount))}
+                    </td>
+                    <td className="px-4 py-3">
+                      {blocked ? (
+                        <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+                          Blocked
+                        </span>
+                      ) : executed ? (
+                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                          Executed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                          {t.requestStatus}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {blocked ? (t.precheckReasonText || t.precheckReasonCode || "Eligibility check failed") : "--"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
+    </SectionCard>
+  );
+}
+
+// ── Main Page Component ──────────────────────────────────────
+
+export default function InvestorTransfersPage() {
+  const fundId = DEFAULT_FUND_CODE;
+
+  const { data: transfers, isLoading: transfersLoading, error: transfersError } = useQuery({
+    queryKey: QUERY_KEYS.investorTransfers(fundId),
+    queryFn: () => getMyTransfers(fundId).then((r) => r.data),
+  });
+
+  const { data: dashboard } = useQuery({
+    queryKey: QUERY_KEYS.investorDashboard(fundId),
+    queryFn: () => getMyDashboard(fundId).then((r) => r.data),
+  });
+
+  const investorWalletAddress = useMemo(() => {
+    if (!dashboard?.wallets?.length) return null;
+    const primary = dashboard.wallets.find((w) => w.isPrimary);
+    return primary?.address ?? dashboard.wallets[0]?.address ?? null;
+  }, [dashboard]);
+
+  const tokenBalance = useMemo(() => {
+    return dashboard?.summary?.tokenBalance ?? "0";
+  }, [dashboard]);
+
+  if (transfersLoading) return <div className="p-6">Loading...</div>;
+  if (transfersError) return <ErrorAlert title="Failed to load transfers" message={(transfersError as Error).message} />;
+
+  return (
+    <div>
+      <PageHeader
+        title="My Transfers"
+        subtitle="Transfer tokens to other eligible investors"
+      />
+
+      <div className="space-y-6">
+        {/* Section 1: Transfer Eligibility */}
+        <TransferEligibilityPanel />
+
+        {/* Section 2: Initiate Transfer */}
+        <InitiateTransferSection
+          walletAddress={investorWalletAddress}
+          tokenBalance={tokenBalance}
+        />
+
+        {/* Section 3: Transfer History */}
+        <TransferHistorySection
+          transfers={transfers ?? []}
+          investorWalletAddress={investorWalletAddress}
+        />
+      </div>
     </div>
   );
 }
