@@ -13,6 +13,8 @@ import { AuditModule } from './modules/audit/audit.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { InvestorPortalModule } from './modules/investor-portal/investor-portal.module';
+import { CapitalCallsModule } from './modules/capital-calls/capital-calls.module';
+import { NoticesModule } from './modules/notices/notices.module';
 import { HealthController } from './health.controller';
 import { EventLogModule } from './common/event-log.module';
 
@@ -33,6 +35,7 @@ import { EventLogModule } from './common/event-log.module';
     JobsModule,
     AuthModule,
     InvestorPortalModule,
+    CapitalCallsModule,
   ],
   controllers: [HealthController],
 })
