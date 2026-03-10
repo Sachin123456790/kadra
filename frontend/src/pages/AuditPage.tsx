@@ -39,9 +39,11 @@ import {
 
 // ── Helpers ──────────────────────────────────────────────
 
-function truncateHash(hash: string): string {
-  if (!hash || hash.length <= 16) return hash || "--";
-  return `${hash.slice(0, 10)}...${hash.slice(-6)}`;
+function truncateHash(hash: string | number | null | undefined): string {
+  if (hash == null) return "--";
+  const s = String(hash);
+  if (s.length <= 16) return s || "--";
+  return `${s.slice(0, 10)}...${s.slice(-6)}`;
 }
 
 function CopyButton({ value }: { readonly value: string }) {
@@ -128,7 +130,7 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
       key: "id",
       header: "Immutable Ref ID",
       render: (r) => (
-        <span className="font-mono text-xs text-gray-500" title={r.id}>
+        <span className="font-mono text-xs text-gray-500" title={String(r.id)}>
           {truncateHash(r.id)}
         </span>
       ),
@@ -157,7 +159,7 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
           <DataTable
             columns={columns}
             data={events}
-            getRowId={(r) => r.id}
+            getRowId={(r) => String(r.id)}
           />
           <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-4">
             <button
