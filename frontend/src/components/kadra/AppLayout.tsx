@@ -53,7 +53,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const profileRoute = isAdmin ? "/profile" : "/investor/profile";
 
   // Show the 5 most recent notifications in dropdown
-  const recentNotifications = notifications.slice(0, 5);
+  const recentNotifications = Array.isArray(notifications) ? notifications.slice(0, 5) : [];
   const initials = user?.email
     ? user.email.substring(0, 2).toUpperCase()
     : "KA";

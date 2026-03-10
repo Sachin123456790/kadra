@@ -139,7 +139,7 @@ export function ActivityFeed({
     );
   }
 
-  const displayed = events.slice(0, maxItems);
+  const displayed = Array.isArray(events) ? events.slice(0, maxItems) : [];
 
   return (
     <div>
