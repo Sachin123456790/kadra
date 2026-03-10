@@ -36,6 +36,7 @@ import { EventLogModule } from './common/event-log.module';
     AuthModule,
     InvestorPortalModule,
     CapitalCallsModule,
+    NoticesModule,
   ],
   controllers: [HealthController],
 })
