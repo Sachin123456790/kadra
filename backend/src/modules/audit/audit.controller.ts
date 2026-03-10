@@ -1,4 +1,12 @@
-import { Controller, Post, Get, Param, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AuditService } from './audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveFundId } from '../../common/resolve-fund-id';
@@ -16,6 +24,41 @@ export class AuditController {
     private readonly auditService: AuditService,
     private readonly prisma: PrismaService,
   ) {}
+
+  @Get('funds/:fundId/event-log')
+  async getEventLog(
+    @Param('fundId') fundIdOrCode: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
+    const data = await this.auditService.getEventLog(fundId, {
+      limit: limit ? parseInt(limit, 10) : 100,
+      offset: offset ? parseInt(offset, 10) : 0,
+    });
+    return {
+      data,
+      meta: {
+        requestId: randomUUID(),
+        timestamp: new Date().toISOString(),
+        count: data.length,
+      },
+    };
+  }
+
+  @Get('funds/:fundId/document-provenance')
+  async getDocumentProvenance(@Param('fundId') fundIdOrCode: string) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
+    const data = await this.auditService.getDocumentProvenance(fundId);
+    return {
+      data,
+      meta: {
+        requestId: randomUUID(),
+        timestamp: new Date().toISOString(),
+        count: data.length,
+      },
+    };
+  }
 
   @Post('funds/:fundId/audit-exports')
   async requestExport(

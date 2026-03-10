@@ -40,6 +40,9 @@ const mockPrisma = () => ({
   distributionRun: {
     findMany: jest.fn(),
   },
+  systemEventLog: {
+    findMany: jest.fn(),
+  },
 });
 
 describe('AuditService', () => {
@@ -182,6 +185,108 @@ describe('AuditService', () => {
       await expect(service.getExportStatus('nonexistent')).rejects.toThrow(
         NotFoundError,
       );
+    });
+  });
+
+  describe('getEventLog', () => {
+    it('returns events in chronological order', async () => {
+      const t1 = new Date('2026-01-01T00:00:00Z');
+      const t2 = new Date('2026-01-02T00:00:00Z');
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.systemEventLog.findMany.mockResolvedValue([
+        {
+          id: BigInt(1),
+          eventId: 'evt-1',
+          eventType: 'DOCUMENT_UPLOADED',
+          aggregateType: 'DOCUMENT',
+          aggregateId: 'doc-1',
+          payloadJson: { filename: 'lpa.pdf' },
+          metadataJson: {},
+          occurredAt: t1,
+          txHash: null,
+        },
+        {
+          id: BigInt(2),
+          eventId: 'evt-2',
+          eventType: 'SETTLEMENT_COMPLETED',
+          aggregateType: 'SETTLEMENT',
+          aggregateId: 'settle-1',
+          payloadJson: {},
+          metadataJson: {},
+          occurredAt: t2,
+          txHash: '0xabc',
+        },
+      ]);
+
+      const result = await service.getEventLog(fundId, {
+        limit: 100,
+        offset: 0,
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result[0].eventType).toBe('DOCUMENT_UPLOADED');
+      expect(result[1].eventType).toBe('SETTLEMENT_COMPLETED');
+      expect(prisma.systemEventLog.findMany).toHaveBeenCalledWith({
+        where: { fundId },
+        orderBy: { occurredAt: 'asc' },
+        take: 100,
+        skip: 0,
+      });
+    });
+
+    it('throws NotFoundError for missing fund', async () => {
+      prisma.fund.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.getEventLog('nonexistent', { limit: 100, offset: 0 }),
+      ).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('getDocumentProvenance', () => {
+    it('returns documents with hash info', async () => {
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.document.findMany.mockResolvedValue([
+        {
+          id: 'doc-1',
+          originalFilename: 'lpa.pdf',
+          documentType: 'MASTER_LPA',
+          createdAt: new Date('2026-01-01T00:00:00Z'),
+          hashes: [
+            {
+              hashHex: 'a'.repeat(64),
+              hashAlgorithm: 'SHA256',
+              anchorTxHash: '0xdef',
+              anchorBlockNumber: BigInt(100),
+              anchorConfirmedAt: new Date('2026-01-01T01:00:00Z'),
+            },
+          ],
+        },
+        {
+          id: 'doc-2',
+          originalFilename: 'wire.pdf',
+          documentType: 'WIRE_CONFIRMATION',
+          createdAt: new Date('2026-01-02T00:00:00Z'),
+          hashes: [],
+        },
+      ]);
+
+      const result = await service.getDocumentProvenance(fundId);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].hash).toBe('a'.repeat(64));
+      expect(result[0].anchorTxHash).toBe('0xdef');
+      expect(result[0].anchorBlockNumber).toBe(100);
+      expect(result[1].hash).toBeNull();
+      expect(result[1].anchorTxHash).toBeNull();
+    });
+
+    it('throws NotFoundError for missing fund', async () => {
+      prisma.fund.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.getDocumentProvenance('nonexistent'),
+      ).rejects.toThrow(NotFoundError);
     });
   });
 });

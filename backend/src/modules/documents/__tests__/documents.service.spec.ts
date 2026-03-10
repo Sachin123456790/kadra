@@ -29,6 +29,7 @@ describe('DocumentsService', () => {
     documentHash: {
       create: jest.fn(),
       findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
     extractedDocumentField: {
       create: jest.fn(),
@@ -296,6 +297,50 @@ describe('DocumentsService', () => {
       mockPrisma.document.findUnique.mockResolvedValue(null);
 
       await expect(service.getHashes('nonexistent')).rejects.toThrow(
+        NotFoundError,
+      );
+    });
+  });
+
+  describe('verifyDocument', () => {
+    it('should return verified true when hash is anchored on-chain', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: mockDocId });
+      mockPrisma.documentHash.findFirst.mockResolvedValue({
+        id: 'hash-1',
+        documentId: mockDocId,
+        hashAlgorithm: 'SHA256',
+        hashHex: mockHashHex,
+        isPrimary: true,
+        anchoredOnchain: true,
+        anchorTxHash: '0xabc123',
+        anchorBlockNumber: BigInt(12345),
+        anchorConfirmedAt: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      const result = await service.verifyDocument(mockDocId);
+
+      expect(result.verified).toBe(true);
+      expect(result.documentId).toBe(mockDocId);
+      expect(result.hashAlgorithm).toBe('SHA256');
+      expect(result.storedHash).toBe(mockHashHex);
+      expect(result.anchorTxHash).toBe('0xabc123');
+      expect(result.anchorBlockNumber).toBe(12345);
+    });
+
+    it('should return verified false with reason when no hash found', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ id: mockDocId });
+      mockPrisma.documentHash.findFirst.mockResolvedValue(null);
+
+      const result = await service.verifyDocument(mockDocId);
+
+      expect(result.verified).toBe(false);
+      expect(result.reason).toBe('NO_HASH_FOUND');
+    });
+
+    it('should throw NotFoundError for non-existent document', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(null);
+
+      await expect(service.verifyDocument('nonexistent')).rejects.toThrow(
         NotFoundError,
       );
     });

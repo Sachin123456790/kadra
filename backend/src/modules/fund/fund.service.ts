@@ -6,7 +6,6 @@ import { NotFoundError } from '../../common/errors';
 export class FundService {
   constructor(private readonly prisma: PrismaService) {}
 
-
   async createFund(input: {
     code: string;
     name: string;
@@ -51,28 +50,57 @@ export class FundService {
     };
   }
 
+  async getActivityFeed(
+    fundId: string,
+    options: { limit: number; offset: number },
+  ) {
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    const events = await this.prisma.systemEventLog.findMany({
+      where: { fundId },
+      orderBy: { occurredAt: 'desc' },
+      take: options.limit,
+      skip: options.offset,
+    });
+
+    return events.map((e) => ({
+      id: Number(e.id),
+      eventId: e.eventId,
+      eventType: e.eventType,
+      aggregateType: e.aggregateType,
+      aggregateId: e.aggregateId,
+      payload: e.payloadJson,
+      metadata: e.metadataJson,
+      occurredAt: e.occurredAt.toISOString(),
+      txHash: e.txHash,
+      blockNumber: e.blockNumber ? Number(e.blockNumber) : null,
+    }));
+  }
+
   async getFundOverview(fundId: string) {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);
 
-    const [lpCount, eligibleWalletCount, pendingSubs, settledSubs, contract] = await Promise.all([
-      this.prisma.investor.count({
-        where: { verificationStatus: 'VERIFIED', deletedAt: null },
-      }),
-      this.prisma.investorFundEligibility.count({
-        where: { fundId, eligibilityStatus: 'ELIGIBLE', deletedAt: null },
-      }),
-      this.prisma.subscription.count({
-        where: { fundId, status: 'PENDING', deletedAt: null },
-      }),
-      this.prisma.subscription.count({
-        where: { fundId, status: 'SETTLED', deletedAt: null },
-      }),
-      this.prisma.tokenContract.findFirst({
-        where: { fundId, deletedAt: null },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
+    const [lpCount, eligibleWalletCount, pendingSubs, settledSubs, contract] =
+      await Promise.all([
+        this.prisma.investor.count({
+          where: { verificationStatus: 'VERIFIED', deletedAt: null },
+        }),
+        this.prisma.investorFundEligibility.count({
+          where: { fundId, eligibilityStatus: 'ELIGIBLE', deletedAt: null },
+        }),
+        this.prisma.subscription.count({
+          where: { fundId, status: 'PENDING', deletedAt: null },
+        }),
+        this.prisma.subscription.count({
+          where: { fundId, status: 'SETTLED', deletedAt: null },
+        }),
+        this.prisma.tokenContract.findFirst({
+          where: { fundId, deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]);
 
     const committedAgg = await this.prisma.subscription.aggregate({
       where: { fundId, deletedAt: null },
@@ -92,7 +120,8 @@ export class FundService {
       eligibleWalletCount,
       pendingSubscriptions: pendingSubs,
       settledSubscriptions: settledSubs,
-      totalCommittedAmount: committedAgg._sum.committedAmount?.toString() ?? '0.00',
+      totalCommittedAmount:
+        committedAgg._sum.committedAmount?.toString() ?? '0.00',
       totalSettledAmount: settledAgg._sum.committedAmount?.toString() ?? '0.00',
       tokenContract: contract
         ? {

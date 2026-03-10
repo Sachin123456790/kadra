@@ -97,6 +97,15 @@ export class DocumentsController {
     };
   }
 
+  @Post('admin/documents/:documentId/verify')
+  async verifyDocument(@Param('documentId') documentId: string) {
+    const result = await this.documentsService.verifyDocument(documentId);
+    return {
+      data: result,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
   @Get('admin/documents/:documentId/hashes')
   async getHashes(@Param('documentId') documentId: string) {
     const result = await this.documentsService.getHashes(documentId);

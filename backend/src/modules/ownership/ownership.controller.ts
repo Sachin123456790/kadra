@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Param, Query, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Query,
+  Body,
+  UseGuards,
+} from '@nestjs/common';
 import { OwnershipService } from './ownership.service';
 import { RebuildProjectionDto } from './ownership.dto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -18,6 +26,20 @@ export class OwnershipController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Get(':fundId/capital-accounts')
+  async getCapitalAccounts(@Param('fundId') fundIdOrCode: string) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
+    const data = await this.ownershipService.getCapitalAccounts(fundId);
+    return {
+      data,
+      meta: {
+        requestId: randomUUID(),
+        timestamp: new Date().toISOString(),
+        count: data.length,
+      },
+    };
+  }
+
   @Get(':fundId/cap-table')
   async getCapTable(
     @Param('fundId') fundIdOrCode: string,
@@ -29,7 +51,10 @@ export class OwnershipController {
       asOfTimestamp,
       includePending: includePending !== 'false',
     });
-    return { data, meta: { requestId: randomUUID(), timestamp: new Date().toISOString() } };
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
   }
 
   @Get(':fundId/ownership-history')
@@ -49,7 +74,11 @@ export class OwnershipController {
     });
     return {
       data,
-      meta: { requestId: randomUUID(), timestamp: new Date().toISOString(), count: data.length },
+      meta: {
+        requestId: randomUUID(),
+        timestamp: new Date().toISOString(),
+        count: data.length,
+      },
     };
   }
 }

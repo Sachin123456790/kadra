@@ -11,6 +11,61 @@ export class AuditService {
     private readonly eventLog: EventLogService,
   ) {}
 
+  async getEventLog(
+    fundId: string,
+    options: { limit: number; offset: number },
+  ) {
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    const events = await this.prisma.systemEventLog.findMany({
+      where: { fundId },
+      orderBy: { occurredAt: 'asc' },
+      take: options.limit,
+      skip: options.offset,
+    });
+
+    return events.map((e) => ({
+      id: Number(e.id),
+      eventId: e.eventId,
+      eventType: e.eventType,
+      aggregateType: e.aggregateType,
+      aggregateId: e.aggregateId,
+      payload: e.payloadJson,
+      occurredAt: e.occurredAt.toISOString(),
+      txHash: e.txHash,
+      metadata: e.metadataJson,
+    }));
+  }
+
+  async getDocumentProvenance(fundId: string) {
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    const documents = await this.prisma.document.findMany({
+      where: { fundId, deletedAt: null },
+      include: { hashes: { where: { isPrimary: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return documents.map((d) => {
+      const hash = d.hashes[0] ?? null;
+      return {
+        id: d.id,
+        originalName: d.originalFilename,
+        type: d.documentType,
+        createdAt: d.createdAt.toISOString(),
+        hash: hash?.hashHex ?? null,
+        hashAlgorithm: hash?.hashAlgorithm ?? null,
+        anchorTxHash: hash?.anchorTxHash ?? null,
+        anchorBlockNumber: hash?.anchorBlockNumber
+          ? Number(hash.anchorBlockNumber)
+          : null,
+        anchorConfirmedAt: hash?.anchorConfirmedAt?.toISOString() ?? null,
+      };
+    });
+  }
+
   async requestExport(
     fundId: string,
     input: {

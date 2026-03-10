@@ -19,6 +19,9 @@ const mockPrisma = () => ({
   tokenContract: {
     findFirst: jest.fn(),
   },
+  systemEventLog: {
+    findMany: jest.fn(),
+  },
 });
 
 describe('FundService', () => {
@@ -88,7 +91,68 @@ describe('FundService', () => {
     it('throws NotFoundError for missing fund', async () => {
       prisma.fund.findUnique.mockResolvedValue(null);
 
-      await expect(service.getFundOverview('nonexistent')).rejects.toThrow(NotFoundError);
+      await expect(service.getFundOverview('nonexistent')).rejects.toThrow(
+        NotFoundError,
+      );
+    });
+  });
+
+  describe('getActivityFeed', () => {
+    it('returns events in reverse chronological order', async () => {
+      const now = new Date('2026-03-09T12:00:00Z');
+      const earlier = new Date('2026-03-09T11:00:00Z');
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.systemEventLog.findMany.mockResolvedValue([
+        {
+          id: BigInt(2),
+          eventId: 'evt-2',
+          eventType: 'SETTLEMENT_COMPLETED',
+          aggregateType: 'SETTLEMENT',
+          aggregateId: 'settle-1',
+          payloadJson: { investorId: 'inv-1' },
+          metadataJson: {},
+          occurredAt: now,
+          txHash: '0xabc',
+          blockNumber: BigInt(200),
+        },
+        {
+          id: BigInt(1),
+          eventId: 'evt-1',
+          eventType: 'DOCUMENT_UPLOADED',
+          aggregateType: 'DOCUMENT',
+          aggregateId: 'doc-1',
+          payloadJson: { filename: 'lpa.pdf' },
+          metadataJson: {},
+          occurredAt: earlier,
+          txHash: null,
+          blockNumber: null,
+        },
+      ]);
+
+      const result = await service.getActivityFeed(fundId, {
+        limit: 50,
+        offset: 0,
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result[0].eventType).toBe('SETTLEMENT_COMPLETED');
+      expect(result[0].blockNumber).toBe(200);
+      expect(result[1].eventType).toBe('DOCUMENT_UPLOADED');
+      expect(result[1].blockNumber).toBeNull();
+      expect(prisma.systemEventLog.findMany).toHaveBeenCalledWith({
+        where: { fundId },
+        orderBy: { occurredAt: 'desc' },
+        take: 50,
+        skip: 0,
+      });
+    });
+
+    it('throws NotFoundError for missing fund', async () => {
+      prisma.fund.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.getActivityFeed('nonexistent', { limit: 50, offset: 0 }),
+      ).rejects.toThrow(NotFoundError);
     });
   });
 });

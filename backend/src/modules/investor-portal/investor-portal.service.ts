@@ -514,6 +514,202 @@ export class InvestorPortalService {
   }
 
   /**
+   * List documents related to this investor in a fund.
+   */
+  async getMyDocuments(investorId: string, fundId: string) {
+    // Get subscriptions for this investor to find governing documents
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: { fundId, investorId, deletedAt: null },
+      select: { governingDocumentId: true },
+    });
+
+    const governingDocIds = subscriptions
+      .map((s) => s.governingDocumentId)
+      .filter((id): id is string => id !== null);
+
+    // Get documents linked to this investor (wire confirmations, etc.)
+    const linkedDocs = await this.prisma.document.findMany({
+      where: {
+        fundId,
+        linkedEntityType: 'INVESTOR',
+        linkedEntityId: investorId,
+        deletedAt: null,
+      },
+    });
+
+    // Get governing documents
+    const governingDocs =
+      governingDocIds.length > 0
+        ? await this.prisma.document.findMany({
+            where: { id: { in: governingDocIds }, deletedAt: null },
+          })
+        : [];
+
+    const allDocs = [...governingDocs, ...linkedDocs];
+
+    // Deduplicate by id
+    const seen = new Set<string>();
+    const uniqueDocs = allDocs.filter((d) => {
+      if (seen.has(d.id)) return false;
+      seen.add(d.id);
+      return true;
+    });
+
+    return uniqueDocs.map((d) => ({
+      id: d.id,
+      name: d.originalFilename,
+      type: d.documentType,
+      createdAt: d.createdAt.toISOString(),
+      status: d.parseStatus,
+      downloadable: d.parseStatus === 'COMPLETED',
+    }));
+  }
+
+  /**
+   * Activity feed for this investor in a fund.
+   */
+  async getMyActivityFeed(investorId: string, fundId: string, limit: number) {
+    // Get this investor's subscription and transfer IDs for filtering
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: { fundId, investorId, deletedAt: null },
+      select: { id: true },
+    });
+    const subIds = subscriptions.map((s) => s.id);
+
+    const wallets = await this.prisma.wallet.findMany({
+      where: { investorId, deletedAt: null },
+      select: { id: true },
+    });
+    const walletIds = wallets.map((w) => w.id);
+
+    const transfers =
+      walletIds.length > 0
+        ? await this.prisma.transferRequest.findMany({
+            where: {
+              fundId,
+              deletedAt: null,
+              OR: [
+                { fromWalletId: { in: walletIds } },
+                { toWalletId: { in: walletIds } },
+              ],
+            },
+            select: { id: true },
+          })
+        : [];
+    const transferIds = transfers.map((t) => t.id);
+
+    const aggregateIds = [...subIds, ...transferIds, investorId];
+
+    const events = await this.prisma.systemEventLog.findMany({
+      where: {
+        fundId,
+        aggregateId: { in: aggregateIds },
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: limit,
+    });
+
+    return events.map((e) => ({
+      id: Number(e.id),
+      eventId: e.eventId,
+      eventType: e.eventType,
+      aggregateType: e.aggregateType,
+      aggregateId: e.aggregateId,
+      payload: e.payloadJson,
+      occurredAt: e.occurredAt.toISOString(),
+      txHash: e.txHash,
+    }));
+  }
+
+  /**
+   * Tax report for this investor in a fund for a given year.
+   */
+  async getTaxReport(investorId: string, fundId: string, taxYear: number) {
+    const report = await this.prisma.taxReport.findFirst({
+      where: { investorId, fundId, taxYear },
+    });
+
+    if (!report) return null;
+
+    return {
+      taxYear: report.taxYear,
+      taxEntityName: report.taxEntityName,
+      ordinaryIncome: report.ordinaryIncome.toString(),
+      returnOfCapital: report.returnOfCapital.toString(),
+      ltcg: report.ltcg.toString(),
+      stcg: report.stcg.toString(),
+      totalDistributions: report.totalDistributions.toString(),
+      generatedAt: report.generatedAt.toISOString(),
+    };
+  }
+
+  /**
+   * Waterfall breakdown for this investor in a fund.
+   */
+  async getWaterfallBreakdown(investorId: string, fundId: string) {
+    // Get active waterfall config
+    const waterfallConfig = await this.prisma.waterfallConfig.findFirst({
+      where: { fundId, isActive: true },
+    });
+
+    // Get latest completed distribution run
+    const distributionRun = await this.prisma.distributionRun.findFirst({
+      where: { fundId, runStatus: 'COMPLETED' },
+      orderBy: { completedAt: 'desc' },
+    });
+
+    let lineItem = null;
+    if (distributionRun) {
+      const item = await this.prisma.distributionLineItem.findFirst({
+        where: { distributionRunId: distributionRun.id, investorId },
+      });
+      if (item) {
+        lineItem = {
+          id: item.id,
+          grossAmount: item.grossAmount.toString(),
+          netAmount: item.netAmount.toString(),
+          currency: item.currency,
+          ownershipPctUsed: item.ownershipPctUsed
+            ? Number(item.ownershipPctUsed)
+            : null,
+          prefAmount: item.prefAmount.toString(),
+          returnOfCapitalAmount: item.returnOfCapitalAmount.toString(),
+          promoteAmount: item.promoteAmount.toString(),
+          tierBreakdown: item.tierBreakdown,
+        };
+      }
+    }
+
+    return {
+      waterfallConfig: waterfallConfig
+        ? {
+            id: waterfallConfig.id,
+            version: waterfallConfig.version,
+            calculationBasis: waterfallConfig.calculationBasis,
+            distributionFrequency: waterfallConfig.distributionFrequency,
+            catchUpEnabled: waterfallConfig.catchUpEnabled,
+            gpPromotePct: waterfallConfig.gpPromotePct
+              ? Number(waterfallConfig.gpPromotePct)
+              : null,
+            prefReturnPct: waterfallConfig.prefReturnPct
+              ? Number(waterfallConfig.prefReturnPct)
+              : null,
+            rulesJson: waterfallConfig.rulesJson,
+          }
+        : null,
+      distributionRun: distributionRun
+        ? {
+            id: distributionRun.id,
+            runStatus: distributionRun.runStatus,
+            asOfTimestamp: distributionRun.asOfTimestamp.toISOString(),
+            completedAt: distributionRun.completedAt?.toISOString() ?? null,
+          }
+        : null,
+      lineItem,
+    };
+  }
+
+  /**
    * List transfer requests involving this investor's wallets.
    */
   async getMyTransfers(investorId: string, fundId: string) {

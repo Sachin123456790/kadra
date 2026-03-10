@@ -156,6 +156,132 @@ export class InvestorPortalController {
     };
   }
 
+  @Get('me/documents')
+  async getMyDocuments(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('fundId') fundIdOrCode?: string,
+  ) {
+    const investor = await this.portalService.resolveInvestor(user.email);
+    const fundId = await resolveFundId(
+      this.prisma,
+      fundIdOrCode || DEFAULT_FUND_CODE,
+    );
+    const data = await this.portalService.getMyDocuments(investor.id, fundId);
+    return {
+      data,
+      meta: {
+        requestId: randomUUID(),
+        timestamp: new Date().toISOString(),
+        count: data.length,
+      },
+    };
+  }
+
+  @Get('me/activity-feed')
+  async getMyActivityFeed(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('fundId') fundIdOrCode?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const investor = await this.portalService.resolveInvestor(user.email);
+    const fundId = await resolveFundId(
+      this.prisma,
+      fundIdOrCode || DEFAULT_FUND_CODE,
+    );
+    const data = await this.portalService.getMyActivityFeed(
+      investor.id,
+      fundId,
+      limit ? parseInt(limit, 10) : 50,
+    );
+    return {
+      data,
+      meta: {
+        requestId: randomUUID(),
+        timestamp: new Date().toISOString(),
+        count: data.length,
+      },
+    };
+  }
+
+  @Get('me/tax-report')
+  async getTaxReport(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('fundId') fundIdOrCode?: string,
+    @Query('taxYear') taxYear?: string,
+  ) {
+    const investor = await this.portalService.resolveInvestor(user.email);
+    const fundId = await resolveFundId(
+      this.prisma,
+      fundIdOrCode || DEFAULT_FUND_CODE,
+    );
+    const year = taxYear ? parseInt(taxYear, 10) : new Date().getFullYear();
+    const data = await this.portalService.getTaxReport(
+      investor.id,
+      fundId,
+      year,
+    );
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Get('me/waterfall-breakdown')
+  async getWaterfallBreakdown(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('fundId') fundIdOrCode?: string,
+  ) {
+    const investor = await this.portalService.resolveInvestor(user.email);
+    const fundId = await resolveFundId(
+      this.prisma,
+      fundIdOrCode || DEFAULT_FUND_CODE,
+    );
+    const data = await this.portalService.getWaterfallBreakdown(
+      investor.id,
+      fundId,
+    );
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Get('me/capital-account')
+  async getMyCapitalAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('fundId') fundIdOrCode?: string,
+  ) {
+    const investor = await this.portalService.resolveInvestor(user.email);
+    const fundId = await resolveFundId(
+      this.prisma,
+      fundIdOrCode || DEFAULT_FUND_CODE,
+    );
+    const capitalAccount = await this.prisma.capitalAccount.findFirst({
+      where: {
+        investorId: investor.id,
+        fundId,
+        isCurrent: true,
+        deletedAt: null,
+      },
+    });
+    const data = capitalAccount
+      ? {
+          id: capitalAccount.id,
+          openingBalance: capitalAccount.openingBalance.toString(),
+          initialContribution: capitalAccount.initialContribution.toString(),
+          capitalReturned: capitalAccount.capitalReturned.toString(),
+          accruedPreferredReturn: capitalAccount.accruedPref.toString(),
+          residualAllocation: capitalAccount.residualAllocation.toString(),
+          endingBalance: capitalAccount.endingCapitalBalance.toString(),
+          asOfDate: capitalAccount.asOfDate.toISOString(),
+        }
+      : null;
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
   @Get('funds/:fundId/cap-table')
   async getCapTable(@Param('fundId') fundIdOrCode: string) {
     const fundId = await resolveFundId(this.prisma, fundIdOrCode);

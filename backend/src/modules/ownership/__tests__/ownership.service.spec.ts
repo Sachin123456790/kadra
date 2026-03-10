@@ -27,6 +27,9 @@ const mockPrisma = () => ({
   wallet: {
     findFirst: jest.fn(),
   },
+  capitalAccount: {
+    findMany: jest.fn(),
+  },
 });
 
 describe('OwnershipService', () => {
@@ -101,7 +104,9 @@ describe('OwnershipService', () => {
         },
       ]);
 
-      const result = await service.getCapTable(fundId, { includePending: true });
+      const result = await service.getCapTable(fundId, {
+        includePending: true,
+      });
 
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].pendingAllocationPct).toBe(20);
@@ -134,7 +139,9 @@ describe('OwnershipService', () => {
         },
       ]);
 
-      const result = await service.getCapTable(fundId, { includePending: true });
+      const result = await service.getCapTable(fundId, {
+        includePending: true,
+      });
 
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].pendingAllocationPct).toBe(20);
@@ -144,7 +151,9 @@ describe('OwnershipService', () => {
     it('throws NotFoundError for missing fund', async () => {
       prisma.fund.findUnique.mockResolvedValue(null);
 
-      await expect(service.getCapTable('nonexistent')).rejects.toThrow(NotFoundError);
+      await expect(service.getCapTable('nonexistent')).rejects.toThrow(
+        NotFoundError,
+      );
     });
 
     it('returns empty rows when no contract and no pending subs', async () => {
@@ -161,7 +170,9 @@ describe('OwnershipService', () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
       prisma.tokenContract.findFirst.mockResolvedValue(null);
 
-      const result = await service.getCapTable(fundId, { includePending: false });
+      const result = await service.getCapTable(fundId, {
+        includePending: false,
+      });
 
       expect(result.rows).toHaveLength(0);
       expect(prisma.subscription.findMany).not.toHaveBeenCalled();
@@ -207,17 +218,22 @@ describe('OwnershipService', () => {
         to: '2026-12-31T23:59:59.999Z',
       });
 
-      const whereArg = prisma.tokenPositionEvent.findMany.mock.calls[0][0].where;
-      expect(whereArg.blockTimestamp.gte).toEqual(new Date('2026-01-01T00:00:00.000Z'));
-      expect(whereArg.blockTimestamp.lte).toEqual(new Date('2026-12-31T23:59:59.999Z'));
+      const whereArg =
+        prisma.tokenPositionEvent.findMany.mock.calls[0][0].where;
+      expect(whereArg.blockTimestamp.gte).toEqual(
+        new Date('2026-01-01T00:00:00.000Z'),
+      );
+      expect(whereArg.blockTimestamp.lte).toEqual(
+        new Date('2026-12-31T23:59:59.999Z'),
+      );
     });
 
     it('throws NotFoundError for missing fund', async () => {
       prisma.fund.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getOwnershipHistory('nonexistent'),
-      ).rejects.toThrow(NotFoundError);
+      await expect(service.getOwnershipHistory('nonexistent')).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 
@@ -285,6 +301,41 @@ describe('OwnershipService', () => {
             snapshotType: 'RUN_START',
           }),
         }),
+      );
+    });
+  });
+
+  describe('getCapitalAccounts', () => {
+    it('returns capital accounts with investor info', async () => {
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.capitalAccount.findMany.mockResolvedValue([
+        {
+          id: 'ca-1',
+          investorId: 'inv-1',
+          investor: { legalName: 'Investor A' },
+          openingBalance: { toString: () => '0.00' },
+          initialContribution: { toString: () => '1000000.00' },
+          capitalReturned: { toString: () => '0.00' },
+          accruedPref: { toString: () => '80000.00' },
+          residualAllocation: { toString: () => '0.00' },
+          endingCapitalBalance: { toString: () => '1080000.00' },
+          asOfDate: new Date('2026-01-01'),
+        },
+      ]);
+
+      const result = await service.getCapitalAccounts(fundId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].investorName).toBe('Investor A');
+      expect(result[0].initialContribution).toBe('1000000.00');
+      expect(result[0].endingBalance).toBe('1080000.00');
+    });
+
+    it('throws NotFoundError for missing fund', async () => {
+      prisma.fund.findUnique.mockResolvedValue(null);
+
+      await expect(service.getCapitalAccounts('nonexistent')).rejects.toThrow(
+        NotFoundError,
       );
     });
   });

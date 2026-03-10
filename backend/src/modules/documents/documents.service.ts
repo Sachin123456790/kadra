@@ -377,6 +377,35 @@ export class DocumentsService {
     };
   }
 
+  async verifyDocument(documentId: string) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+    });
+    if (!doc) throw new NotFoundError('Document', documentId);
+
+    const primaryHash = await this.prisma.documentHash.findFirst({
+      where: { documentId, isPrimary: true },
+    });
+
+    if (!primaryHash) {
+      return { verified: false, reason: 'NO_HASH_FOUND', documentId };
+    }
+
+    const verified = primaryHash.anchoredOnchain === true;
+
+    return {
+      verified,
+      documentId,
+      hashAlgorithm: primaryHash.hashAlgorithm,
+      storedHash: primaryHash.hashHex,
+      anchorTxHash: primaryHash.anchorTxHash,
+      anchorBlockNumber: primaryHash.anchorBlockNumber
+        ? Number(primaryHash.anchorBlockNumber)
+        : null,
+      anchoredAt: primaryHash.anchorConfirmedAt?.toISOString() ?? null,
+    };
+  }
+
   async getParseStatus(documentId: string) {
     const doc = await this.prisma.document.findUnique({
       where: { id: documentId },

@@ -6,6 +6,29 @@ import { NotFoundError } from '../../common/errors';
 export class OwnershipService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getCapitalAccounts(fundId: string) {
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    const accounts = await this.prisma.capitalAccount.findMany({
+      where: { fundId, isCurrent: true, deletedAt: null },
+      include: { investor: true },
+    });
+
+    return accounts.map((a) => ({
+      id: a.id,
+      investorId: a.investorId,
+      investorName: a.investor.legalName,
+      openingBalance: a.openingBalance.toString(),
+      initialContribution: a.initialContribution.toString(),
+      capitalReturned: a.capitalReturned.toString(),
+      accruedPreferredReturn: a.accruedPref.toString(),
+      residualAllocation: a.residualAllocation.toString(),
+      endingBalance: a.endingCapitalBalance.toString(),
+      asOfDate: a.asOfDate.toISOString(),
+    }));
+  }
+
   async getCapTable(
     fundId: string,
     options?: { asOfTimestamp?: string; includePending?: boolean },
