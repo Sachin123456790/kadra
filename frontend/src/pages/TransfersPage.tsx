@@ -1,136 +1,287 @@
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
-  AreaChart, Area,
-} from 'recharts';
-import { QUERY_KEYS, DEFAULT_FUND_CODE } from '@/config/constants';
-import { getFailedTransfers, getSuccessfulTransfers, getOwnershipHistory } from '@/services';
-import type { FailedTransfer, SuccessfulTransfer } from '@/services/tokenization.service';
-import type { OwnershipEvent } from '@/services/ownership.service';
+  getFailedTransfers,
+  getSuccessfulTransfers,
+  getFundOverview,
+} from "@/services";
+import type { FailedTransfer, SuccessfulTransfer } from "@/services/tokenization.service";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
-import { DataTable, Column } from "@/components/kadra/DataTable";
-import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { Copy, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const fmt = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+// ── Constants ────────────────────────────────────────────
 
-const successCols: Column<SuccessfulTransfer>[] = [
-  { key: "fromWalletAddress", header: "From", render: (r) => <ExplorerLink value={r.fromWalletAddress} type="address" /> },
-  { key: "toWalletAddress", header: "To", render: (r) => <ExplorerLink value={r.toWalletAddress} type="address" /> },
-  { key: "tokenAmount", header: "Amount", render: (r) => fmt(parseFloat(r.tokenAmount)) },
-  { key: "transferRequestId", header: "Status", render: () => <StatusBadge status="Success" /> },
-  { key: "txHash", header: "Tx Hash", render: (r) => <ExplorerLink value={r.txHash || "—"} type="tx" /> },
-  { key: "timestamp", header: "Date", render: (r) => new Date(r.timestamp).toLocaleDateString() },
-];
+const IDENTITY_REGISTRY_ADDRESS = "0x55822888507cac67bE5C11516e00C4597E7c78fb";
 
-const failedCols: Column<FailedTransfer>[] = [
-  { key: "fromWalletAddress", header: "From", render: (r) => <ExplorerLink value={r.fromWalletAddress} type="address" /> },
-  { key: "toWalletAddress", header: "To", render: (r) => <ExplorerLink value={r.toWalletAddress} type="address" /> },
-  { key: "tokenAmount", header: "Amount", render: (r) => fmt(parseFloat(r.tokenAmount)) },
-  { key: "transferRequestId", header: "Status", render: () => <StatusBadge status="Failed" /> },
-  { key: "failureCode", header: "Failure Reason", render: (r) => r.failureCode ? r.failureCode.replace(/_/g, ' ') : "—" },
-  { key: "timestamp", header: "Date", render: (r) => new Date(r.timestamp).toLocaleDateString() },
-];
+const fmt = (n: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
 
-const ownershipCols: Column<OwnershipEvent>[] = [
-  { key: "eventType", header: "Event Type", render: (r) => (
-    <StatusBadge status={r.eventType} />
-  )},
-  { key: "toWalletAddress", header: "Wallet Address", render: (r) => <ExplorerLink value={r.toWalletAddress} type="address" /> },
-  { key: "tokenDelta", header: "Amount", render: (r) => fmt(parseFloat(r.tokenDelta)) },
-  { key: "txHash", header: "Tx Hash", render: (r) => <ExplorerLink value={r.txHash || "—"} type="tx" /> },
-  { key: "blockNumber", header: "Block Number", render: (r) => r.blockNumber ?? "---" },
-  { key: "eventTimestamp", header: "Timestamp", render: (r) => new Date(r.eventTimestamp).toLocaleString() },
-];
+function truncateHex(hex: string): string {
+  if (!hex || hex.length <= 12) return hex || "--";
+  return `${hex.slice(0, 6)}...${hex.slice(-4)}`;
+}
 
-function TransferSummaryChart({
-  successCount,
-  failedCount,
-}: {
-  successCount: number;
-  failedCount: number;
-}) {
-  const data = [
-    { name: 'Successful', count: successCount },
-    { name: 'Failed', count: failedCount },
-  ];
-  const colors = ['#16a34a', '#ef4444'];
+function CopyButton({ value }: { readonly value: string }) {
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value).catch(() => {
+      /* silently fail in unsupported contexts */
+    });
+  };
 
   return (
-    <SectionCard title="Transfer Summary" className="mb-6">
-      <ResponsiveContainer width="100%" height={250}>
-        <BarChart data={data} margin={{ top: 8, right: 24, left: 16, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
-          <Tooltip contentStyle={{ borderRadius: 6, borderColor: '#e5e7eb', fontSize: 13 }} />
-          <Bar dataKey="count" name="Transfers" radius={[4, 4, 0, 0]}>
-            {data.map((_entry, index) => (
-              <Cell key={`cell-${index}`} fill={colors[index]} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+    <button
+      onClick={handleCopy}
+      className="inline-flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+      title="Copy to clipboard"
+    >
+      <Copy className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+// ── Unified Transfer Row ─────────────────────────────────
+
+interface UnifiedTransfer {
+  id: string;
+  date: string;
+  fromWallet: string;
+  fromLpName: string;
+  toWallet: string;
+  toLpName: string;
+  amount: number;
+  preCheckResult: "Eligible" | "Not Eligible";
+  onChainResult: "Executed" | "Reverted";
+  txHash: string;
+  timestamp: string;
+  failureReason: string | null;
+  isFailed: boolean;
+}
+
+function mergeTransfers(
+  successful: SuccessfulTransfer[],
+  failed: FailedTransfer[],
+): UnifiedTransfer[] {
+  const successRows: UnifiedTransfer[] = successful.map((t) => ({
+    id: t.transferRequestId,
+    date: t.timestamp,
+    fromWallet: t.fromWalletAddress,
+    fromLpName: "",
+    toWallet: t.toWalletAddress,
+    toLpName: "",
+    amount: parseFloat(t.tokenAmount),
+    preCheckResult: "Eligible",
+    onChainResult: "Executed",
+    txHash: t.txHash,
+    timestamp: t.timestamp,
+    failureReason: null,
+    isFailed: false,
+  }));
+
+  const failedRows: UnifiedTransfer[] = failed.map((t) => ({
+    id: t.transferRequestId,
+    date: t.timestamp,
+    fromWallet: t.fromWalletAddress,
+    fromLpName: "",
+    toWallet: t.toWalletAddress,
+    toLpName: "",
+    amount: parseFloat(t.tokenAmount),
+    preCheckResult: "Not Eligible",
+    onChainResult: "Reverted",
+    txHash: "",
+    timestamp: t.timestamp,
+    failureReason: t.failureCode ? t.failureCode.replace(/_/g, " ") : null,
+    isFailed: true,
+  }));
+
+  const all = [...successRows, ...failedRows];
+  all.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
+  return all;
+}
+
+// ── Transfer Rules Card ──────────────────────────────────
+
+function TransferRulesCard({
+  identityRegistryAddress,
+  lpaHash,
+}: {
+  readonly identityRegistryAddress: string;
+  readonly lpaHash: string;
+}) {
+  return (
+    <SectionCard title="Transfer Rules" className="mb-6">
+      <div className="rounded-lg bg-gray-50 p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
+              Transfer Restriction Type
+            </p>
+            <p className="text-sm font-medium text-gray-900">LP Only</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
+              Identity Registry Address
+            </p>
+            <ExplorerLink
+              value={identityRegistryAddress}
+              type="address"
+            />
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
+              Eligibility Marker Required
+            </p>
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+              Yes
+            </span>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
+              Rules Derived From
+            </p>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-xs text-gray-700">
+                {truncateHex(lpaHash)}
+              </span>
+              {lpaHash && <CopyButton value={lpaHash} />}
+            </div>
+          </div>
+        </div>
+      </div>
     </SectionCard>
   );
 }
 
-function OwnershipTimelineChart({ events }: { events: OwnershipEvent[] }) {
-  const chartData = useMemo(() => {
-    const sorted = [...events].sort(
-      (a, b) => new Date(a.eventTimestamp).getTime() - new Date(b.eventTimestamp).getTime(),
-    );
-    let cumulative = 0;
-    return sorted.map((e) => {
-      cumulative += parseFloat(e.tokenDelta);
-      return {
-        date: new Date(e.eventTimestamp).toLocaleDateString(),
-        cumulativeTokens: cumulative,
-        eventType: e.eventType,
-      };
-    });
-  }, [events]);
+// ── Transfer History Table ───────────────────────────────
 
-  if (chartData.length === 0) return null;
+function TransferHistoryTable({
+  transfers,
+}: {
+  readonly transfers: UnifiedTransfer[];
+}) {
+  if (transfers.length === 0) {
+    return (
+      <EmptyState
+        title="No transfers"
+        message="No transfer activity has been recorded yet."
+      />
+    );
+  }
 
   return (
-    <div className="mb-6">
-      <h4 className="text-sm font-medium text-gray-700 mb-3">Token Movement Timeline</h4>
-      <ResponsiveContainer width="100%" height={250}>
-        <AreaChart data={chartData} margin={{ top: 8, right: 24, left: 16, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} />
-          <YAxis
-            tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
-            tick={{ fontSize: 12, fill: '#6b7280' }}
-          />
-          <Tooltip
-            formatter={(value: number) => fmt(value)}
-            contentStyle={{ borderRadius: 6, borderColor: '#e5e7eb', fontSize: 13 }}
-          />
-          <Area
-            type="monotone"
-            dataKey="cumulativeTokens"
-            name="Cumulative Tokens"
-            stroke="#4f46e5"
-            fill="#c7d2fe"
-            strokeWidth={2}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-200">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              Date
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              From Wallet
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              To Wallet
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              Amount
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              Pre-Check
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              On-Chain Result
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              Tx Hash
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              Timestamp
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {transfers.map((t) => (
+            <tr
+              key={t.id}
+              className={cn(
+                "border-b border-gray-100",
+                t.isFailed && "bg-red-50",
+              )}
+            >
+              <td className="px-4 py-3 text-gray-900">
+                {new Date(t.date).toLocaleDateString()}
+              </td>
+              <td className="px-4 py-3">
+                <ExplorerLink value={t.fromWallet} type="address" />
+              </td>
+              <td className="px-4 py-3">
+                <ExplorerLink value={t.toWallet} type="address" />
+              </td>
+              <td className="px-4 py-3 text-gray-900">{fmt(t.amount)}</td>
+              <td className="px-4 py-3">
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                    t.preCheckResult === "Eligible"
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800",
+                  )}
+                >
+                  {t.preCheckResult}
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                    t.onChainResult === "Executed"
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800",
+                  )}
+                >
+                  {t.onChainResult}
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                {t.txHash ? (
+                  <ExplorerLink value={t.txHash} type="tx" />
+                ) : (
+                  <span className="text-gray-400">--</span>
+                )}
+              </td>
+              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                <div>
+                  {new Date(t.timestamp).toLocaleString()}
+                </div>
+                {t.failureReason && (
+                  <p className="text-xs text-red-600 mt-0.5">
+                    {t.failureReason}
+                  </p>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-type Tab = 'transfers' | 'ownership';
+// ── Main Page ────────────────────────────────────────────
 
 export default function TransfersPage() {
   const fundId = DEFAULT_FUND_CODE;
-  const [activeTab, setActiveTab] = useState<Tab>('transfers');
 
   const {
     data: failedData,
@@ -138,7 +289,7 @@ export default function TransfersPage() {
     error: failedError,
   } = useQuery({
     queryKey: QUERY_KEYS.failedTransfers(fundId),
-    queryFn: () => getFailedTransfers(fundId).then(r => r.data),
+    queryFn: () => getFailedTransfers(fundId).then((r) => r.data),
   });
 
   const {
@@ -147,94 +298,75 @@ export default function TransfersPage() {
     error: successError,
   } = useQuery({
     queryKey: QUERY_KEYS.successfulTransfers(fundId),
-    queryFn: () => getSuccessfulTransfers(fundId).then(r => r.data),
+    queryFn: () => getSuccessfulTransfers(fundId).then((r) => r.data),
   });
 
   const {
-    data: ownershipData,
-    isLoading: ownershipLoading,
-    error: ownershipError,
+    data: fundOverview,
+    isLoading: fundLoading,
   } = useQuery({
-    queryKey: QUERY_KEYS.ownershipHistory(fundId),
-    queryFn: () => getOwnershipHistory(fundId).then(r => r.data),
-    enabled: activeTab === 'ownership',
+    queryKey: QUERY_KEYS.fundOverview(fundId),
+    queryFn: () => getFundOverview(fundId).then((r) => r.data),
   });
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'transfers', label: 'Transfers' },
-    { key: 'ownership', label: 'Ownership History' },
-  ];
+  const isLoading = failedLoading || successLoading || fundLoading;
 
-  const renderTransfersTab = () => {
-    if (failedLoading || successLoading) return <div className="p-6 text-gray-600">Loading...</div>;
-    if (failedError) return <ErrorAlert title="Failed Transfers Error" message={(failedError as Error).message} />;
-    if (successError) return <ErrorAlert title="Successful Transfers Error" message={(successError as Error).message} />;
-
-    const failed = failedData ?? [];
+  const transfers = useMemo(() => {
     const successful = successData ?? [];
+    const failed = failedData ?? [];
+    return mergeTransfers(successful, failed);
+  }, [successData, failedData]);
 
+  // Derive LPA hash from fund overview if available
+  const lpaHash = fundOverview?.tokenContract?.contractAddress ?? "";
+
+  if (isLoading) {
     return (
-      <div className="space-y-6">
-        <TransferSummaryChart successCount={successful.length} failedCount={failed.length} />
-        <SectionCard title={`Failed Transfers (${failed.length})`}>
-          {failed.length === 0 ? (
-            <EmptyState title="No failed transfers" message="All transfer attempts have succeeded." />
-          ) : (
-            <DataTable columns={failedCols} data={failed} getRowId={(r) => r.transferRequestId} />
-          )}
-        </SectionCard>
-        <SectionCard title={`Successful Transfers (${successful.length})`}>
-          {successful.length === 0 ? (
-            <EmptyState title="No successful transfers" message="No transfers have been completed yet." />
-          ) : (
-            <DataTable columns={successCols} data={successful} getRowId={(r) => r.transferRequestId} />
-          )}
-        </SectionCard>
+      <div>
+        <PageHeader
+          title="Transfers"
+          subtitle="Transfer rules enforcement and activity monitoring"
+        />
+        <div className="flex items-center gap-2 p-6 text-gray-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading transfer data...
+        </div>
       </div>
     );
-  };
+  }
 
-  const renderOwnershipTab = () => {
-    if (ownershipLoading) return <div className="p-6 text-gray-600">Loading ownership history...</div>;
-    if (ownershipError) return <ErrorAlert title="Ownership History Error" message={(ownershipError as Error).message} />;
-
-    const events = ownershipData ?? [];
-
+  if (failedError || successError) {
     return (
-      <div className="space-y-6">
-        {events.length > 0 && <OwnershipTimelineChart events={events} />}
-        <SectionCard title={`Ownership Events (${events.length})`}>
-          {events.length === 0 ? (
-            <EmptyState title="No ownership events" message="No token minting or transfer events recorded yet." />
-          ) : (
-            <DataTable columns={ownershipCols} data={events} getRowId={(r) => r.eventId} />
-          )}
-        </SectionCard>
+      <div>
+        <PageHeader
+          title="Transfers"
+          subtitle="Transfer rules enforcement and activity monitoring"
+        />
+        <ErrorAlert
+          title="Failed to load transfers"
+          message={
+            ((failedError || successError) as Error).message
+          }
+        />
       </div>
     );
-  };
+  }
 
   return (
     <div>
-      <PageHeader title="Transfers" subtitle="Monitor token transfer activity and ownership history" />
-      <div className="mb-6 border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium transition-colors ${
-                activeTab === tab.key
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-      {activeTab === 'transfers' ? renderTransfersTab() : renderOwnershipTab()}
+      <PageHeader
+        title="Transfers"
+        subtitle="Transfer rules enforcement and activity monitoring"
+      />
+
+      <TransferRulesCard
+        identityRegistryAddress={IDENTITY_REGISTRY_ADDRESS}
+        lpaHash={lpaHash}
+      />
+
+      <SectionCard title={`Transfer History (${transfers.length})`}>
+        <TransferHistoryTable transfers={transfers} />
+      </SectionCard>
     </div>
   );
 }
