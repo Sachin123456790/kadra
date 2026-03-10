@@ -1,175 +1,230 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, Tooltip as PieTooltip,
-} from "recharts";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { MetricCard } from "@/components/kadra/MetricCard";
 import { SectionCard } from "@/components/kadra/SectionCard";
-import { DataTable, Column } from "@/components/kadra/DataTable";
+import { ActivityFeed } from "@/components/kadra/ActivityFeed";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
-import { getMyDashboard } from "@/services";
-import { ExplorerLink } from "@/components/kadra/ExplorerLink";
-import type { InvestorDashboard as DashboardData } from "@/services/investor-portal.service";
-
-const CAPITAL_COLORS: Record<string, string> = {
-  "Initial Contribution": "#312e81",   // indigo-700 equivalent
-  "Capital Returned": "#16a34a",       // green-600
-  "Accrued Pref Return": "#60a5fa",    // blue-400
-  "Ending Balance": "#6366f1",         // indigo-500
-};
-
-const OWNERSHIP_BLUES = ["#4338ca", "#6366f1", "#818cf8", "#a5b4fc", "#c7d2fe"];
+import {
+  getMyDashboard,
+  getInvestorActivityFeed,
+  getInvestorCapitalAccount,
+  getMyDistributions,
+} from "@/services/investor-portal.service";
 
 const fmt = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
-
-type SubRow = DashboardData["subscriptions"][number];
-type PosRow = DashboardData["tokenPositions"][number];
-
-const subCols: Column<SubRow>[] = [
-  { key: "subscriptionRef", header: "Reference" },
-  { key: "allocationPct", header: "Allocation %", render: (r) => `${r.allocationPct}%` },
-  { key: "committedAmount", header: "Committed", render: (r) => fmt(Number(r.committedAmount)) },
-  { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
-];
-
-const posCols: Column<PosRow>[] = [
-  { key: "walletAddress", header: "Wallet", render: (r) => <ExplorerLink value={r.walletAddress ?? ""} type="address" /> },
-  { key: "settledTokenBalance", header: "Settled Balance", render: (r) => fmt(Number(r.settledTokenBalance)) },
-  { key: "ownershipPct", header: "Ownership %", render: (r) => `${r.ownershipPct.toFixed(1)}%` },
-];
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
 
 export default function InvestorDashboardPage() {
   const fundId = DEFAULT_FUND_CODE;
 
-  const { data, isLoading, error } = useQuery({
+  const {
+    data: dashboard,
+    isLoading: dashLoading,
+    error: dashError,
+  } = useQuery({
     queryKey: QUERY_KEYS.investorDashboard(fundId),
     queryFn: () => getMyDashboard(fundId).then((r) => r.data),
   });
 
-  const summary = data?.summary;
-  const subscriptions = data?.subscriptions ?? [];
-  const tokenPositions = data?.tokenPositions ?? [];
-  const capitalAccount = data?.capitalAccount;
+  const { data: capitalAccount, isLoading: caLoading } = useQuery({
+    queryKey: QUERY_KEYS.investorCapitalAccount(fundId),
+    queryFn: () => getInvestorCapitalAccount(fundId).then((r) => r.data),
+  });
 
-  const capitalBarData = useMemo(() => {
-    if (!capitalAccount) return [];
-    return [
-      { name: "Initial Contribution", value: Number(capitalAccount.initialContribution) },
-      { name: "Capital Returned", value: Number(capitalAccount.capitalReturned) },
-      { name: "Accrued Pref Return", value: Number(capitalAccount.accruedPref) },
-      { name: "Ending Balance", value: Number(capitalAccount.endingCapitalBalance) },
-    ];
-  }, [capitalAccount]);
+  const { data: distributions, isLoading: distLoading } = useQuery({
+    queryKey: QUERY_KEYS.investorDistributions(fundId),
+    queryFn: () => getMyDistributions(fundId).then((r) => r.data),
+  });
 
-  const ownershipPieData = useMemo(() => {
-    if (!tokenPositions || tokenPositions.length === 0) return [];
-    return tokenPositions.map((pos) => ({
-      name: pos.walletAddress
-        ? `${pos.walletAddress.slice(0, 6)}...${pos.walletAddress.slice(-4)}`
-        : "Unknown",
-      value: Number(pos.settledTokenBalance),
-      fullAddress: pos.walletAddress,
-    }));
-  }, [tokenPositions]);
+  const { data: activityEvents, isLoading: actLoading } = useQuery({
+    queryKey: QUERY_KEYS.investorActivityFeed(fundId),
+    queryFn: () => getInvestorActivityFeed(fundId).then((r) => r.data),
+  });
 
-  if (isLoading) return <div className="p-6">Loading...</div>;
-  if (error) return <ErrorAlert title="Failed to load portfolio" message={(error as Error).message} />;
-  if (!data || !summary) return <EmptyState title="No portfolio data" message="Your portfolio overview is not available yet." />;
+  if (dashLoading) return <div className="p-6 text-gray-500">Loading...</div>;
+  if (dashError)
+    return (
+      <ErrorAlert
+        title="Failed to load portfolio"
+        message={(dashError as Error).message}
+      />
+    );
+  if (!dashboard || !dashboard.summary)
+    return (
+      <EmptyState
+        title="No portfolio data"
+        message="Your portfolio overview is not available yet."
+      />
+    );
+
+  const { summary, investor, subscriptions } = dashboard;
+  const ownershipPct = summary.ownershipPct;
+  const totalCommitted = Number(summary.totalCommitted);
+  const totalSettled = Number(summary.totalSettled);
+
+  const accruedPref = capitalAccount
+    ? Number(capitalAccount.accruedPreferredReturn)
+    : 0;
+  const endingBalance = capitalAccount
+    ? Number(capitalAccount.endingBalance)
+    : 0;
+  const totalDistributions = (distributions ?? []).reduce(
+    (sum, d) => sum + Number(d.netAmount),
+    0,
+  );
+
+  const settledCount = subscriptions.filter(
+    (s) => s.status === "Settled",
+  ).length;
+  const settlementStatus =
+    settledCount === subscriptions.length && subscriptions.length > 0
+      ? "Settled"
+      : settledCount > 0
+        ? "Partial"
+        : "Pending";
+
+  const capitalContributed = capitalAccount
+    ? Number(capitalAccount.initialContribution)
+    : 0;
 
   return (
     <div>
-      <PageHeader title="Portfolio Overview" subtitle="Your investment summary" />
+      <PageHeader
+        title="Portfolio Overview"
+        subtitle="Your investment summary"
+      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricCard label="Total Committed" value={fmt(Number(summary.totalCommitted))} />
-        <MetricCard label="Total Settled" value={fmt(Number(summary.totalSettled))} />
-        <MetricCard label="Token Balance" value={fmt(Number(summary.tokenBalance))} />
-        <MetricCard label="Ownership" value={`${summary.ownershipPct.toFixed(1)}%`} />
+      {/* Top Metric Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <MetricCard
+          label="Ownership"
+          value={`${ownershipPct.toFixed(1)}%`}
+          subtitle="Current fund ownership"
+        />
+        <MetricCard
+          label="Total Committed"
+          value={fmt(totalCommitted)}
+          subtitle="Capital commitment"
+        />
+        <MetricCard
+          label="Total Settled"
+          value={fmt(totalSettled)}
+          subtitle="Capital settled"
+        />
       </div>
 
-      {(capitalBarData.length > 0 || ownershipPieData.length > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {capitalBarData.length > 0 && (
-            <SectionCard title="Capital Account Breakdown">
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={capitalBarData} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
-                  <XAxis type="number" tickFormatter={(v: number) => fmt(v)} tick={{ fontSize: 12 }} />
-                  <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 12 }} />
-                  <RechartsTooltip formatter={(value: number) => fmt(value)} />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                    {capitalBarData.map((entry) => (
-                      <Cell key={entry.name} fill={CAPITAL_COLORS[entry.name] ?? "#4338ca"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </SectionCard>
-          )}
-          {ownershipPieData.length > 0 && (
-            <SectionCard title="Token Ownership">
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={ownershipPieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={70}
-                  >
-                    {ownershipPieData.map((_, i) => (
-                      <Cell key={i} fill={OWNERSHIP_BLUES[i % OWNERSHIP_BLUES.length]} />
-                    ))}
-                  </Pie>
-                  <PieTooltip formatter={(value: number) => fmt(value)} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </SectionCard>
-          )}
-        </div>
-      )}
+      {/* Bottom Metric Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <MetricCard
+          label="Accrued Preferred Return"
+          value={fmt(accruedPref)}
+          subtitle={caLoading ? "Loading..." : undefined}
+        />
+        <MetricCard
+          label="Total Distributions"
+          value={fmt(totalDistributions)}
+          subtitle={distLoading ? "Loading..." : undefined}
+        />
+        <MetricCard
+          label="Capital Account Balance"
+          value={fmt(endingBalance)}
+          subtitle={caLoading ? "Loading..." : undefined}
+        />
+      </div>
 
-      <SectionCard title="Subscriptions" className="mb-6">
-        {subscriptions.length === 0 ? (
-          <EmptyState title="No subscriptions" message="You have no active subscriptions." />
-        ) : (
-          <DataTable columns={subCols} data={subscriptions} getRowId={(r) => r.id} />
-        )}
-      </SectionCard>
-
-      <SectionCard title="Token Positions" className="mb-6">
-        {tokenPositions.length === 0 ? (
-          <EmptyState title="No positions" message="You have no settled positions yet." />
-        ) : (
-          <DataTable columns={posCols} data={tokenPositions} getRowId={(r) => r.id} />
-        )}
-      </SectionCard>
-
-      {capitalAccount && (
-        <SectionCard title="Capital Account">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Panel 1: Portfolio Summary */}
+        <SectionCard title="Portfolio Summary">
           <dl className="space-y-3">
-            {([
-              ["Opening Balance", fmt(Number(capitalAccount.openingBalance))],
-              ["Initial Contribution", fmt(Number(capitalAccount.initialContribution))],
-              ["Capital Returned", fmt(Number(capitalAccount.capitalReturned))],
-              ["Accrued Preferred Return", fmt(Number(capitalAccount.accruedPref))],
-              ["Ending Balance", fmt(Number(capitalAccount.endingCapitalBalance))],
-            ] as const).map(([k, v]) => (
-              <div key={k} className="flex justify-between border-b border-border pb-2 last:border-0">
-                <dt className="text-sm text-muted-foreground">{k}</dt>
-                <dd className="text-sm font-medium text-card-foreground">{v}</dd>
-              </div>
-            ))}
+            <SummaryRow label="Fund Name" value="Kadra Demo Fund I" />
+            <SummaryRow
+              label="Legal Entity Name"
+              value={investor.legalName}
+            />
+            <SummaryRow
+              label="Eligibility Marker"
+              value={
+                <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                  Active: Kadra Demo Fund I
+                </span>
+              }
+            />
+            <SummaryRow
+              label="Ownership"
+              value={
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden max-w-[120px]">
+                    <div
+                      className="h-full rounded-full bg-indigo-600"
+                      style={{ width: `${Math.min(ownershipPct, 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">
+                    {ownershipPct.toFixed(1)}%
+                  </span>
+                </div>
+              }
+            />
+            <SummaryRow
+              label="Settlement Status"
+              value={<StatusBadge status={settlementStatus} />}
+            />
+            <SummaryRow
+              label="Capital Contributed"
+              value={fmt(capitalContributed)}
+            />
+            <SummaryRow
+              label="Accrued Preferred Return"
+              value={fmt(accruedPref)}
+            />
+            <SummaryRow
+              label="Distributions Received"
+              value={fmt(totalDistributions)}
+            />
+            <SummaryRow
+              label="Capital Account Balance"
+              value={fmt(endingBalance)}
+            />
           </dl>
         </SectionCard>
-      )}
+
+        {/* Panel 2: Activity Feed */}
+        <SectionCard title="Activity Feed">
+          <ActivityFeed
+            events={activityEvents ?? []}
+            isLoading={actLoading}
+            maxItems={10}
+            showViewAll
+            viewAllLink="/investor/documents"
+          />
+        </SectionCard>
+      </div>
+    </div>
+  );
+}
+
+/* ── Helper Component ── */
+
+function SummaryRow({
+  label,
+  value,
+}: {
+  readonly label: string;
+  readonly value: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-0">
+      <dt className="text-sm text-gray-500">{label}</dt>
+      <dd className="text-sm font-medium text-gray-900">
+        {typeof value === "string" || typeof value === "number" ? value : value}
+      </dd>
     </div>
   );
 }
