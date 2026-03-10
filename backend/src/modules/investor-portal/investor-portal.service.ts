@@ -658,7 +658,7 @@ export class InvestorPortalService {
       orderBy: { completedAt: 'desc' },
     });
 
-    let lineItem = null;
+    let lineItem: Record<string, unknown> | null = null;
     if (distributionRun) {
       const item = await this.prisma.distributionLineItem.findFirst({
         where: { distributionRunId: distributionRun.id, investorId },
