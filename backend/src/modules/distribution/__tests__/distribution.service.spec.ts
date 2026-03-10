@@ -17,6 +17,9 @@ const mockPrisma = () => ({
   tokenPosition: {
     findMany: jest.fn(),
   },
+  subscription: {
+    findMany: jest.fn(),
+  },
   ownershipSnapshot: {
     create: jest.fn(),
   },
@@ -303,6 +306,7 @@ describe('DistributionService', () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
       prisma.waterfallConfig.findUnique.mockResolvedValue(mockConfig);
       prisma.tokenContract.findFirst.mockResolvedValue(null);
+      prisma.subscription.findMany.mockResolvedValue([]); // no settled subscriptions either
 
       await expect(
         service.previewDistribution(fundId, previewInput),

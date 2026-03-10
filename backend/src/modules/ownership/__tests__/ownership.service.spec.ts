@@ -94,15 +94,18 @@ describe('OwnershipService', () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
       prisma.tokenContract.findFirst.mockResolvedValue(null); // no contract deployed
       prisma.tokenPosition.findMany.mockResolvedValue([]); // won't be called, but safe
-      prisma.subscription.findMany.mockResolvedValue([
-        {
-          id: 'sub-1',
-          investorId: 'inv-1',
-          allocationPct: 20,
-          investor: { id: 'inv-1', legalName: 'Investor A' },
-          wallet: { address: '0xABC' },
-        },
-      ]);
+      // First call: SETTLED subs (none), second call: PENDING subs
+      prisma.subscription.findMany
+        .mockResolvedValueOnce([]) // SETTLED query returns empty
+        .mockResolvedValueOnce([
+          {
+            id: 'sub-1',
+            investorId: 'inv-1',
+            allocationPct: 20,
+            investor: { id: 'inv-1', legalName: 'Investor A' },
+            wallet: { address: '0xABC' },
+          },
+        ]);
 
       const result = await service.getCapTable(fundId, {
         includePending: true,
@@ -169,13 +172,16 @@ describe('OwnershipService', () => {
     it('excludes pending when includePending is false', async () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
       prisma.tokenContract.findFirst.mockResolvedValue(null);
+      // SETTLED subs query still runs (fallback path), returns empty
+      prisma.subscription.findMany.mockResolvedValue([]);
 
       const result = await service.getCapTable(fundId, {
         includePending: false,
       });
 
       expect(result.rows).toHaveLength(0);
-      expect(prisma.subscription.findMany).not.toHaveBeenCalled();
+      // The SETTLED subs query is always called as fallback; only PENDING query is skipped
+      expect(prisma.subscription.findMany).toHaveBeenCalledTimes(1);
     });
   });
 

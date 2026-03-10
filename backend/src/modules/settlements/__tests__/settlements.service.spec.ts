@@ -1,6 +1,7 @@
 import { SettlementsService } from '../settlements.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EventLogService } from '../../../common/event-log.service';
+import { TokenizationService } from '../../tokenization/tokenization.service';
 import { NotFoundError, ConflictError } from '../../../common/errors';
 
 const mockPrisma = () => ({
@@ -55,9 +56,15 @@ describe('SettlementsService', () => {
     const mockEventLog = {
       log: jest.fn().mockResolvedValue({}),
     } as unknown as EventLogService;
+    const mockTokenizationService = {
+      mintForSubscription: jest
+        .fn()
+        .mockResolvedValue({ txHash: '0xmock', tokenAmount: '2000' }),
+    } as unknown as TokenizationService;
     service = new SettlementsService(
       prisma as unknown as PrismaService,
       mockEventLog,
+      mockTokenizationService,
     );
   });
 
