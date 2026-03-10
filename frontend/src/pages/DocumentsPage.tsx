@@ -11,6 +11,7 @@ import {
   updateExtractedFields,
   getInvestors,
 } from "@/services";
+import { getNotices } from "@/services/notices.service";
 import type {
   UploadResult,
   ParseStatus,
@@ -21,6 +22,7 @@ import type {
   SubscriptionItem,
 } from "@/services/documents.service";
 import type { Investor } from "@/services/investors.service";
+import type { Notice } from "@/services/notices.service";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { DataTable, Column } from "@/components/kadra/DataTable";
@@ -29,6 +31,7 @@ import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import { MetricCard } from "@/components/kadra/MetricCard";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +54,8 @@ import {
   Plus,
   X,
   Search,
+  Copy,
+  Bell,
 } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -89,6 +94,15 @@ const fmt = (n: number) =>
     maximumFractionDigits: 0,
   }).format(n);
 
+function truncateHash(hash: string, len = 10): string {
+  if (!hash || hash.length <= len * 2) return hash;
+  return `${hash.slice(0, len)}...${hash.slice(-6)}`;
+}
+
+function copyToClipboard(text: string) {
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
 // ── Table columns ────────────────────────────────────────────
 
 /** Get display value from an extracted field (text takes priority, then numeric) */
@@ -98,10 +112,20 @@ function fieldDisplayValue(f: ExtractedField): string {
   return "";
 }
 
-const documentColumns: Column<FundDocument>[] = [
+const DOCUMENT_TYPE_OPTIONS = [
+  "Master LPA",
+  "Amendment",
+  "Side Letter",
+  "Wire Confirmation",
+  "Other",
+] as const;
+
+// ── Governing Documents table columns ────────────────────────
+
+const governingDocColumns: Column<FundDocument>[] = [
   {
     key: "originalFilename",
-    header: "Document",
+    header: "Document Name",
     render: (row) => (
       <div className="flex items-center gap-2">
         <FileText className="h-4 w-4 text-gray-500" />
@@ -117,25 +141,67 @@ const documentColumns: Column<FundDocument>[] = [
     ),
   },
   {
-    key: "parseStatus",
-    header: "Parse Status",
-    render: (row) => <StatusBadge status={mapParseStatus(row.parseStatus)} />,
-  },
-  {
-    key: "hash",
-    header: "Hash Status",
-    render: (row) => <StatusBadge status={row.hash?.anchoredOnchain ? "Completed" : "Pending"} />,
-  },
-  {
     key: "createdAt",
-    header: "Uploaded",
+    header: "Upload Date",
     render: (row) => (
       <span className="text-gray-600">
-        {new Date(row.createdAt).toLocaleString()}
+        {new Date(row.createdAt).toLocaleDateString()}
       </span>
     ),
   },
+  {
+    key: "hash",
+    header: "SHA-256 Hash",
+    render: (row) => {
+      const hashHex = row.hash?.hashHex ?? "";
+      if (!hashHex) return <span className="text-gray-400">--</span>;
+      return (
+        <span className="inline-flex items-center gap-1">
+          <span className="font-mono text-xs text-gray-900">{truncateHash(hashHex)}</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); copyToClipboard(hashHex); }}
+            className="text-gray-400 hover:text-gray-600 p-0.5"
+            title="Copy hash"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        </span>
+      );
+    },
+  },
+  {
+    key: "anchorRef",
+    header: "On-Chain Anchor",
+    render: (_row) => {
+      // Anchor tx hash is available in the detail view via hashesData
+      const anchored = _row.hash?.anchoredOnchain;
+      if (!anchored) return <span className="text-gray-400 text-xs">Not anchored</span>;
+      return <StatusBadge status="Completed" />;
+    },
+  },
+  {
+    key: "parseStatus",
+    header: "Status",
+    render: (row) => <StatusBadge status={mapParseStatus(row.parseStatus)} />,
+  },
 ];
+
+// ── Notice status badge colors ──────────────────────────────
+
+function noticeStatusBadge(status: string) {
+  const colorMap: Record<string, string> = {
+    GENERATED: "bg-gray-100 text-gray-600",
+    ANCHORED: "bg-blue-50 text-blue-700",
+    SENT: "bg-blue-50 text-blue-700",
+    VIEWED: "bg-green-50 text-green-700",
+  };
+  const classes = colorMap[status.toUpperCase()] ?? "bg-gray-100 text-gray-500";
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${classes}`}>
+      {status}
+    </span>
+  );
+}
 
 // ── Subscription draft row for the modal ─────────────────────
 
@@ -164,6 +230,7 @@ export default function DocumentsPage() {
   const [approveSuccess, setApproveSuccess] = useState<number | null>(null);
   const [fieldEdits, setFieldEdits] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
+  const [uploadDocType, setUploadDocType] = useState<string>("Master LPA");
 
   // ── Queries ────────────────────────────────────────────────
 
@@ -174,6 +241,11 @@ export default function DocumentsPage() {
   } = useQuery({
     queryKey: QUERY_KEYS.documents(fundId),
     queryFn: () => getDocuments(fundId).then((r) => r.data),
+  });
+
+  const { data: notices, isLoading: noticesLoading } = useQuery({
+    queryKey: QUERY_KEYS.notices(fundId),
+    queryFn: () => getNotices(fundId).then((r) => r.data),
   });
 
   const { data: parseStatusData } = useQuery({
@@ -432,6 +504,72 @@ export default function DocumentsPage() {
         inv.fundEligibility?.status === "ELIGIBLE",
     ) ?? [];
 
+  // ── Notice table columns ───────────────────────────────────
+
+  interface NoticeRow {
+    id: string;
+    type: string;
+    recipientName: string;
+    generatedAt: string;
+    documentHash: string;
+    anchorTxHash: string;
+    sentAt: string;
+    openedAt: string;
+    downloadedAt: string;
+    status: string;
+  }
+
+  const noticeRows: NoticeRow[] = (notices ?? []).map((n: Notice) => {
+    const delivery = n.deliveries?.[0];
+    const effectiveStatus = delivery?.status ?? "GENERATED";
+    return {
+      id: n.id,
+      type: n.type,
+      recipientName: n.investor?.legalName ?? n.recipientInvestorId,
+      generatedAt: n.generatedAt,
+      documentHash: n.documentHash ?? "",
+      anchorTxHash: n.anchorTxHash ?? "",
+      sentAt: delivery?.sentAt ?? "",
+      openedAt: delivery?.openedAt ?? "",
+      downloadedAt: delivery?.downloadedAt ?? "",
+      status: effectiveStatus,
+    };
+  });
+
+  const noticeColumns: Column<NoticeRow>[] = [
+    { key: "type", header: "Notice Type", render: (r) => <span className="font-medium text-gray-900">{r.type}</span> },
+    { key: "recipientName", header: "Recipient LP" },
+    { key: "generatedAt", header: "Date Generated", render: (r) => r.generatedAt ? new Date(r.generatedAt).toLocaleDateString() : "--" },
+    {
+      key: "documentHash",
+      header: "Document Hash",
+      render: (r) => {
+        if (!r.documentHash) return <span className="text-gray-400">--</span>;
+        return (
+          <span className="inline-flex items-center gap-1">
+            <span className="font-mono text-xs text-gray-900">{truncateHash(r.documentHash)}</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); copyToClipboard(r.documentHash); }}
+              className="text-gray-400 hover:text-gray-600 p-0.5"
+              title="Copy hash"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          </span>
+        );
+      },
+    },
+    {
+      key: "anchorTxHash",
+      header: "Anchor Transaction",
+      render: (r) => r.anchorTxHash ? <ExplorerLink value={r.anchorTxHash} type="tx" /> : <span className="text-gray-400">--</span>,
+    },
+    { key: "sentAt", header: "Sent", render: (r) => r.sentAt ? new Date(r.sentAt).toLocaleString() : "--" },
+    { key: "openedAt", header: "Opened", render: (r) => r.openedAt ? new Date(r.openedAt).toLocaleString() : "--" },
+    { key: "downloadedAt", header: "Downloaded", render: (r) => r.downloadedAt ? new Date(r.downloadedAt).toLocaleString() : "--" },
+    { key: "status", header: "Status", render: (r) => noticeStatusBadge(r.status) },
+  ];
+
   // ── Render ─────────────────────────────────────────────────
 
   return (
@@ -458,468 +596,535 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      {/* Section 1: Upload Zone */}
-      <SectionCard title="Upload Master LPA" className="mb-6">
-        <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onClick={() => fileInputRef.current?.click()}
-          className={`
-            flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-10 cursor-pointer transition-colors
-            ${
-              isDragOver
-                ? "border-indigo-500 bg-indigo-50/50"
-                : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
-            }
-          `}
-        >
-          <Upload className="h-10 w-10 text-gray-400 mb-3" />
-          <p className="text-sm font-medium text-gray-900 mb-1">
-            {uploadMutation.isPending
-              ? "Uploading..."
-              : "Drop a PDF here, or click to browse"}
-          </p>
-          <p className="text-xs text-gray-500">
-            Accepted format: PDF. The document will be hashed (SHA-256) and
-            parsed. On-chain anchoring occurs after admin approval.
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,application/pdf"
-            onChange={handleInputChange}
-            className="hidden"
-          />
-        </div>
+      {/* Tabbed sections */}
+      <Tabs defaultValue="governing" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="governing" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Governing Documents
+          </TabsTrigger>
+          <TabsTrigger value="notices" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Generated Notices
+          </TabsTrigger>
+          <TabsTrigger value="upload" className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Document Upload
+          </TabsTrigger>
+        </TabsList>
 
-        {uploadMutation.isPending && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-            Uploading and processing document...
-          </div>
-        )}
-
-        {uploadMutation.isError && (
-          <div className="mt-4">
-            <ErrorAlert
-              title="Upload Failed"
-              message={(uploadMutation.error as Error).message}
-            />
-          </div>
-        )}
-
-        {uploadMutation.isSuccess && !uploadMutation.isPending && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-green-700">
-            <CheckCircle2 className="h-4 w-4" />
-            Document uploaded successfully. Processing has begun.
-          </div>
-        )}
-      </SectionCard>
-
-      {/* Section 2: Documents List */}
-      <SectionCard title="Uploaded Documents" className="mb-6">
-        {docsLoading && (
-          <div className="flex items-center gap-2 py-8 justify-center text-sm text-gray-500">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-            Loading documents...
-          </div>
-        )}
-        {docsError && (
-          <ErrorAlert
-            title="Failed to load documents"
-            message={(docsError as Error).message}
-          />
-        )}
-        {!docsLoading && !docsError && (!documents || documents.length === 0) && (
-          <EmptyState
-            title="No documents uploaded"
-            message="Upload a Master LPA to get started. The document will be parsed and its hash anchored on-chain."
-          />
-        )}
-        {documents && documents.length > 0 && (
-          <div className="max-h-80 overflow-y-auto">
-            <DataTable
-              columns={documentColumns}
-              data={documents}
-              getRowId={(row) => row.documentId}
-              onRowClick={(row) => setSelectedDocId(row.documentId)}
-              selectedId={selectedDocId ?? undefined}
-            />
-          </div>
-        )}
-      </SectionCard>
-
-      {/* Section 3: Document Detail */}
-      {selectedDoc && (
-        <>
-          {/* Info + Hashes */}
-          <SectionCard title="Document Details" className="mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left: Basic Info */}
-              <div className="space-y-4">
-                <DetailRow label="Document Name" value={selectedDoc.originalFilename} />
-                <DetailRow
-                  label="Document ID"
-                  value={selectedDoc.documentId}
-                  mono
-                />
-                <DetailRow
-                  label="Uploaded"
-                  value={new Date(selectedDoc.createdAt).toLocaleString()}
-                />
-                <DetailRow
-                  label="Document Type"
-                  value={selectedDoc.documentType ?? "Master LPA"}
-                />
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Parse Status</span>
-                  <StatusBadge
-                    status={mapParseStatus(
-                      parseStatusData?.parseStatus ?? selectedDoc.parseStatus,
-                    )}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Hash Status</span>
-                  <StatusBadge
-                    status={mapHashStatus(
-                      parseStatusData?.hashStatus ?? (selectedDoc.hash?.anchoredOnchain ? "ANCHORED" : "PENDING"),
-                    )}
-                  />
-                </div>
-                {parseStatusData?.extractionSummary && (
-                  <>
-                    <DetailRow
-                      label="Fields Extracted"
-                      value={String(
-                        parseStatusData.extractionSummary.fieldsExtracted,
-                      )}
-                    />
-                    <DetailRow
-                      label="Low Confidence Fields"
-                      value={String(
-                        parseStatusData.extractionSummary.lowConfidenceFields,
-                      )}
-                    />
-                  </>
-                )}
+        {/* Tab 1: Governing Documents */}
+        <TabsContent value="governing">
+          <SectionCard title="Uploaded Documents" className="mb-6">
+            {docsLoading && (
+              <div className="flex items-center gap-2 py-8 justify-center text-sm text-gray-500">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                Loading documents...
               </div>
-
-              {/* Right: Hashes */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Hash className="h-4 w-4 text-gray-500" />
-                  Cryptographic Hashes
-                </h4>
-                {hashesData && hashesData.length > 0 ? (
-                  <div className="space-y-3">
-                    {hashesData.map((h: DocumentHash) => (
-                      <div
-                        key={h.hashId}
-                        className="rounded-md border border-gray-200 p-3"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-gray-600 uppercase">
-                            {h.algorithm}
-                          </span>
-                          <StatusBadge
-                            status={
-                              h.anchoredOnchain ? "Completed" : "Pending"
-                            }
-                          />
-                        </div>
-                        <p className="text-xs font-mono text-gray-900 break-all">
-                          {h.hashHex}
-                        </p>
-                        {h.anchor && (
-                          <div className="mt-2 text-xs text-gray-500 space-y-0.5">
-                            <p>Chain ID: {h.anchor.chainId}</p>
-                            <p className="break-all flex items-center gap-1">
-                              Tx:{" "}
-                              <ExplorerLink
-                                value={h.anchor.txHash}
-                                type="tx"
-                              />
-                            </p>
-                            {h.anchor.blockNumber && (
-                              <p>Block: {h.anchor.blockNumber}</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
-                    <Clock className="h-4 w-4" />
-                    Hash computation in progress...
-                  </div>
-                )}
+            )}
+            {docsError && (
+              <ErrorAlert
+                title="Failed to load documents"
+                message={(docsError as Error).message}
+              />
+            )}
+            {!docsLoading && !docsError && (!documents || documents.length === 0) && (
+              <EmptyState
+                title="No documents uploaded"
+                message="Upload a Master LPA to get started. The document will be parsed and its hash anchored on-chain."
+              />
+            )}
+            {documents && documents.length > 0 && (
+              <div className="max-h-80 overflow-y-auto">
+                <DataTable
+                  columns={governingDocColumns}
+                  data={documents}
+                  getRowId={(row) => row.documentId}
+                  onRowClick={(row) => setSelectedDocId(row.documentId)}
+                  selectedId={selectedDocId ?? undefined}
+                />
               </div>
-            </div>
+            )}
           </SectionCard>
 
-          {/* Wire confirmation info */}
-          {selectedDoc.documentType === "WIRE_CONFIRMATION" && (
-            <SectionCard title="Wire Confirmation" className="mb-6">
-              <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-                <FileText className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-medium">Payment Evidence Document</p>
-                  <p className="text-blue-600 mt-1">
-                    Wire confirmations are used during settlement validation to verify payment.
-                    Their SHA-256 hash is anchored on-chain for tamper-proof provenance.
-                  </p>
-                </div>
-              </div>
-            </SectionCard>
-          )}
-
-          {/* Extracted Fields — only for MASTER_LPA, editable before approval, read-only after */}
-          {isParsed && isMasterLpa && (
-            <SectionCard
-              title={isApproved ? "Extracted Fields (Approved)" : "Extracted Fields (Review & Edit)"}
-              className="mb-6"
-            >
-              {extractedFields.length === 0 ? (
-                <div className="flex items-center gap-2 py-6 justify-center text-sm text-gray-500">
-                  <Clock className="h-4 w-4" />
-                  No extracted fields available.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                          Field Name
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                          Value
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                          Confidence
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {extractedFields.map((field) => (
-                        <tr
-                          key={field.fieldId}
-                          className="border-b border-gray-100"
-                        >
-                          <td className="px-4 py-3 text-gray-900 font-medium">
-                            {field.fieldName}
-                          </td>
-                          <td className="px-4 py-3">
-                            {isApproved ? (
-                              <span className="text-gray-900">
-                                {fieldDisplayValue(field)}
-                              </span>
-                            ) : (
-                              <input
-                                type="text"
-                                value={
-                                  fieldEdits[field.fieldId] !== undefined
-                                    ? fieldEdits[field.fieldId]
-                                    : fieldDisplayValue(field)
-                                }
-                                onChange={(e) =>
-                                  setFieldEdits((prev) => ({
-                                    ...prev,
-                                    [field.fieldId]: e.target.value,
-                                  }))
-                                }
-                                className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                              />
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${confidenceColor(field.confidence)}`}
-                            >
-                              {(field.confidence * 100).toFixed(0)}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Low-confidence warning */}
-              {extractedFields.some((f) => f.confidence < 0.7) && (
-                <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <span>
-                    Some fields have low confidence scores. Review carefully
-                    before creating subscriptions.
-                  </span>
-                </div>
-              )}
-
-              {/* Save edits button (only before approval) */}
-              {!isApproved && Object.keys(fieldEdits).length > 0 && (
-                <div className="mt-4 flex justify-end">
-                  <Button
-                    onClick={handleSaveFields}
-                    disabled={saveFieldsMutation.isPending}
-                    variant="outline"
-                    className="text-gray-700"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {saveFieldsMutation.isPending ? "Saving..." : "Save Field Changes"}
-                  </Button>
-                </div>
-              )}
-            </SectionCard>
-          )}
-
-          {/* Admin Notes (before approval, MASTER_LPA only) */}
-          {isParsed && isMasterLpa && !isApproved && (
-            <SectionCard title="Admin Notes" className="mb-6">
-              <div className="flex items-start gap-2 mb-2">
-                <StickyNote className="h-4 w-4 text-gray-500 mt-1" />
-                <span className="text-sm text-gray-600">
-                  Add notes or comments for this document review. These will be
-                  saved when you approve the document.
-                </span>
-              </div>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Enter additional notes, observations, or instructions..."
-                rows={3}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-            </SectionCard>
-          )}
-
-          {/* Show saved notes on approved docs (MASTER_LPA only) */}
-          {isParsed && isMasterLpa && isApproved && (selectedDoc?.metadata as Record<string, unknown>)?.notes && (
-            <SectionCard title="Admin Notes" className="mb-6">
-              <p className="text-sm text-gray-900">
-                {String((selectedDoc?.metadata as Record<string, unknown>)?.notes)}
-              </p>
-            </SectionCard>
-          )}
-
-          {/* Eligible Investors (MASTER_LPA only) */}
-          {isParsed && isMasterLpa && (
-            <SectionCard title="Eligible Investors" className="mb-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                <MetricCard
-                  label="Total Eligible"
-                  value={eligibleInvestors.length}
-                />
-                <MetricCard
-                  label="With Wallets"
-                  value={
-                    eligibleInvestors.filter((i) => i.wallets.length > 0).length
-                  }
-                />
-                <MetricCard
-                  label="Fields Extracted"
-                  value={extractedFields.length}
-                />
-                <MetricCard
-                  label="Low Confidence"
-                  value={extractedFields.filter((f) => f.confidence < 0.7).length}
-                  subtitle={
-                    extractedFields.filter((f) => f.confidence < 0.7).length > 0
-                      ? "Review recommended"
-                      : undefined
-                  }
-                />
-              </div>
-
-              {eligibleInvestors.length === 0 ? (
-                <EmptyState
-                  title="No eligible investors"
-                  message="No investors are currently eligible for this fund. Approve investor eligibility before creating subscriptions."
-                />
-              ) : (
-                <>
-                  <div className="overflow-x-auto mb-4">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                            Investor
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                            Email
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                            Wallet
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                            Verification
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                            Eligibility
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {eligibleInvestors.map((inv) => {
-                          const wallet =
-                            inv.wallets.find((w) => w.isPrimary) ??
-                            inv.wallets[0];
-                          return (
-                            <tr
-                              key={inv.investorId}
-                              className="border-b border-gray-100"
-                            >
-                              <td className="px-4 py-3 font-medium text-gray-900">
-                                {inv.legalName}
-                              </td>
-                              <td className="px-4 py-3 text-gray-600">
-                                {inv.email}
-                              </td>
-                              <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                                {wallet
-                                  ? `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`
-                                  : "None"}
-                              </td>
-                              <td className="px-4 py-3">
-                                <StatusBadge
-                                  status={inv.verificationStatus}
-                                />
-                              </td>
-                              <td className="px-4 py-3">
-                                <StatusBadge
-                                  status={
-                                    inv.fundEligibility?.status ?? "Unknown"
-                                  }
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+          {/* Document Detail (only shown when a doc is selected) */}
+          {selectedDoc && (
+            <>
+              {/* Info + Hashes */}
+              <SectionCard title="Document Details" className="mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left: Basic Info */}
+                  <div className="space-y-4">
+                    <DetailRow label="Document Name" value={selectedDoc.originalFilename} />
+                    <DetailRow
+                      label="Document ID"
+                      value={selectedDoc.documentId}
+                      mono
+                    />
+                    <DetailRow
+                      label="Uploaded"
+                      value={new Date(selectedDoc.createdAt).toLocaleString()}
+                    />
+                    <DetailRow
+                      label="Document Type"
+                      value={selectedDoc.documentType ?? "Master LPA"}
+                    />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500">Parse Status</span>
+                      <StatusBadge
+                        status={mapParseStatus(
+                          parseStatusData?.parseStatus ?? selectedDoc.parseStatus,
+                        )}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500">Hash Status</span>
+                      <StatusBadge
+                        status={mapHashStatus(
+                          parseStatusData?.hashStatus ?? (selectedDoc.hash?.anchoredOnchain ? "ANCHORED" : "PENDING"),
+                        )}
+                      />
+                    </div>
+                    {parseStatusData?.extractionSummary && (
+                      <>
+                        <DetailRow
+                          label="Fields Extracted"
+                          value={String(
+                            parseStatusData.extractionSummary.fieldsExtracted,
+                          )}
+                        />
+                        <DetailRow
+                          label="Low Confidence Fields"
+                          value={String(
+                            parseStatusData.extractionSummary.lowConfidenceFields,
+                          )}
+                        />
+                      </>
+                    )}
                   </div>
 
-                  {!isApproved && (
-                    <div className="flex justify-end">
+                  {/* Right: Hashes */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <Hash className="h-4 w-4 text-gray-500" />
+                      Cryptographic Hashes
+                    </h4>
+                    {hashesData && hashesData.length > 0 ? (
+                      <div className="space-y-3">
+                        {hashesData.map((h: DocumentHash) => (
+                          <div
+                            key={h.hashId}
+                            className="rounded-md border border-gray-200 p-3"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium text-gray-600 uppercase">
+                                {h.algorithm}
+                              </span>
+                              <StatusBadge
+                                status={
+                                  h.anchoredOnchain ? "Completed" : "Pending"
+                                }
+                              />
+                            </div>
+                            <p className="text-xs font-mono text-gray-900 break-all">
+                              {h.hashHex}
+                            </p>
+                            {h.anchor && (
+                              <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+                                <p>Chain ID: {h.anchor.chainId}</p>
+                                <p className="break-all flex items-center gap-1">
+                                  Tx:{" "}
+                                  <ExplorerLink
+                                    value={h.anchor.txHash}
+                                    type="tx"
+                                  />
+                                </p>
+                                {h.anchor.blockNumber && (
+                                  <p>Block: {h.anchor.blockNumber}</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                        <Clock className="h-4 w-4" />
+                        Hash computation in progress...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </SectionCard>
+
+              {/* Wire confirmation info */}
+              {selectedDoc.documentType === "WIRE_CONFIRMATION" && (
+                <SectionCard title="Wire Confirmation" className="mb-6">
+                  <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                    <FileText className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium">Payment Evidence Document</p>
+                      <p className="text-blue-600 mt-1">
+                        Wire confirmations are used during settlement validation to verify payment.
+                        Their SHA-256 hash is anchored on-chain for tamper-proof provenance.
+                      </p>
+                    </div>
+                  </div>
+                </SectionCard>
+              )}
+
+              {/* Extracted Fields */}
+              {isParsed && isMasterLpa && (
+                <SectionCard
+                  title={isApproved ? "Extracted Fields (Approved)" : "Extracted Fields (Review & Edit)"}
+                  className="mb-6"
+                >
+                  {extractedFields.length === 0 ? (
+                    <div className="flex items-center gap-2 py-6 justify-center text-sm text-gray-500">
+                      <Clock className="h-4 w-4" />
+                      No extracted fields available.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Field Name
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Value
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              Confidence
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {extractedFields.map((field) => (
+                            <tr
+                              key={field.fieldId}
+                              className="border-b border-gray-100"
+                            >
+                              <td className="px-4 py-3 text-gray-900 font-medium">
+                                {field.fieldName}
+                              </td>
+                              <td className="px-4 py-3">
+                                {isApproved ? (
+                                  <span className="text-gray-900">
+                                    {fieldDisplayValue(field)}
+                                  </span>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={
+                                      fieldEdits[field.fieldId] !== undefined
+                                        ? fieldEdits[field.fieldId]
+                                        : fieldDisplayValue(field)
+                                    }
+                                    onChange={(e) =>
+                                      setFieldEdits((prev) => ({
+                                        ...prev,
+                                        [field.fieldId]: e.target.value,
+                                      }))
+                                    }
+                                    className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${confidenceColor(field.confidence)}`}
+                                >
+                                  {(field.confidence * 100).toFixed(0)}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Low-confidence warning */}
+                  {extractedFields.some((f) => f.confidence < 0.7) && (
+                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Some fields have low confidence scores. Review carefully
+                        before creating subscriptions.
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Save edits button (only before approval) */}
+                  {!isApproved && Object.keys(fieldEdits).length > 0 && (
+                    <div className="mt-4 flex justify-end">
                       <Button
-                        onClick={openApproveModal}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        onClick={handleSaveFields}
+                        disabled={saveFieldsMutation.isPending}
+                        variant="outline"
+                        className="text-gray-700"
                       >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Review & Create Subscriptions
+                        <Save className="h-4 w-4 mr-2" />
+                        {saveFieldsMutation.isPending ? "Saving..." : "Save Field Changes"}
                       </Button>
                     </div>
                   )}
-                </>
+                </SectionCard>
               )}
-            </SectionCard>
+
+              {/* Admin Notes (before approval, MASTER_LPA only) */}
+              {isParsed && isMasterLpa && !isApproved && (
+                <SectionCard title="Admin Notes" className="mb-6">
+                  <div className="flex items-start gap-2 mb-2">
+                    <StickyNote className="h-4 w-4 text-gray-500 mt-1" />
+                    <span className="text-sm text-gray-600">
+                      Add notes or comments for this document review. These will be
+                      saved when you approve the document.
+                    </span>
+                  </div>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Enter additional notes, observations, or instructions..."
+                    rows={3}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </SectionCard>
+              )}
+
+              {/* Show saved notes on approved docs */}
+              {isParsed && isMasterLpa && isApproved && (selectedDoc?.metadata as Record<string, unknown>)?.notes && (
+                <SectionCard title="Admin Notes" className="mb-6">
+                  <p className="text-sm text-gray-900">
+                    {String((selectedDoc?.metadata as Record<string, unknown>)?.notes)}
+                  </p>
+                </SectionCard>
+              )}
+
+              {/* Eligible Investors (MASTER_LPA only) */}
+              {isParsed && isMasterLpa && (
+                <SectionCard title="Eligible Investors" className="mb-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                    <MetricCard
+                      label="Total Eligible"
+                      value={eligibleInvestors.length}
+                    />
+                    <MetricCard
+                      label="With Wallets"
+                      value={
+                        eligibleInvestors.filter((i) => i.wallets.length > 0).length
+                      }
+                    />
+                    <MetricCard
+                      label="Fields Extracted"
+                      value={extractedFields.length}
+                    />
+                    <MetricCard
+                      label="Low Confidence"
+                      value={extractedFields.filter((f) => f.confidence < 0.7).length}
+                      subtitle={
+                        extractedFields.filter((f) => f.confidence < 0.7).length > 0
+                          ? "Review recommended"
+                          : undefined
+                      }
+                    />
+                  </div>
+
+                  {eligibleInvestors.length === 0 ? (
+                    <EmptyState
+                      title="No eligible investors"
+                      message="No investors are currently eligible for this fund. Approve investor eligibility before creating subscriptions."
+                    />
+                  ) : (
+                    <>
+                      <div className="overflow-x-auto mb-4">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200">
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                Investor
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                Email
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                Wallet
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                Verification
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                Eligibility
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {eligibleInvestors.map((inv) => {
+                              const wallet =
+                                inv.wallets.find((w) => w.isPrimary) ??
+                                inv.wallets[0];
+                              return (
+                                <tr
+                                  key={inv.investorId}
+                                  className="border-b border-gray-100"
+                                >
+                                  <td className="px-4 py-3 font-medium text-gray-900">
+                                    {inv.legalName}
+                                  </td>
+                                  <td className="px-4 py-3 text-gray-600">
+                                    {inv.email}
+                                  </td>
+                                  <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                                    {wallet
+                                      ? `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`
+                                      : "None"}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <StatusBadge
+                                      status={inv.verificationStatus}
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <StatusBadge
+                                      status={
+                                        inv.fundEligibility?.status ?? "Unknown"
+                                      }
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {!isApproved && (
+                        <div className="flex justify-end">
+                          <Button
+                            onClick={openApproveModal}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Review & Create Subscriptions
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </SectionCard>
+              )}
+            </>
           )}
-        </>
-      )}
+        </TabsContent>
+
+        {/* Tab 2: Generated Notices */}
+        <TabsContent value="notices">
+          <SectionCard title="Generated Notices">
+            {noticesLoading && (
+              <div className="flex items-center gap-2 py-8 justify-center text-sm text-gray-500">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                Loading notices...
+              </div>
+            )}
+            {!noticesLoading && noticeRows.length === 0 && (
+              <EmptyState
+                title="No notices generated"
+                message="Generated notices will appear here once capital calls or other notice-triggering events occur."
+              />
+            )}
+            {!noticesLoading && noticeRows.length > 0 && (
+              <div className="overflow-x-auto">
+                <DataTable
+                  columns={noticeColumns}
+                  data={noticeRows}
+                  getRowId={(r) => r.id}
+                />
+              </div>
+            )}
+          </SectionCard>
+        </TabsContent>
+
+        {/* Tab 3: Document Upload */}
+        <TabsContent value="upload">
+          <SectionCard title="Upload Document" className="mb-6">
+            {/* Document type selector */}
+            <div className="mb-4">
+              <label htmlFor="doc-type-select" className="block text-sm font-medium text-gray-700 mb-1">
+                Document Type
+              </label>
+              <select
+                id="doc-type-select"
+                value={uploadDocType}
+                onChange={(e) => setUploadDocType(e.target.value)}
+                className="w-full sm:w-64 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                {DOCUMENT_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Drag/drop upload zone */}
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onClick={() => fileInputRef.current?.click()}
+              className={`
+                flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-10 cursor-pointer transition-colors
+                ${
+                  isDragOver
+                    ? "border-indigo-500 bg-indigo-50/50"
+                    : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+                }
+              `}
+            >
+              <Upload className="h-10 w-10 text-gray-400 mb-3" />
+              <p className="text-sm font-medium text-gray-900 mb-1">
+                {uploadMutation.isPending
+                  ? "Uploading..."
+                  : "Drop a PDF here, or click to browse"}
+              </p>
+              <p className="text-xs text-gray-500">
+                Accepted format: PDF. The document will be hashed (SHA-256) and
+                parsed. On-chain anchoring occurs after admin approval.
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handleInputChange}
+                className="hidden"
+              />
+            </div>
+
+            {uploadMutation.isPending && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                Uploading and processing document...
+              </div>
+            )}
+
+            {uploadMutation.isError && (
+              <div className="mt-4">
+                <ErrorAlert
+                  title="Upload Failed"
+                  message={(uploadMutation.error as Error).message}
+                />
+              </div>
+            )}
+
+            {uploadMutation.isSuccess && !uploadMutation.isPending && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-green-700">
+                <CheckCircle2 className="h-4 w-4" />
+                Document uploaded successfully. Processing has begun.
+              </div>
+            )}
+          </SectionCard>
+        </TabsContent>
+      </Tabs>
 
       {/* Approve Modal */}
       <Dialog open={showApproveModal} onOpenChange={(open) => {

@@ -20,6 +20,12 @@ export interface InvestorRow {
   verificationStatus: string;
   fundEligibility: string;
   ownership: number;
+  kycStatus: string;
+  accreditationStatus: string;
+  eligibilityOnChain: string;
+  tokenBalance: string;
+  settlementStatus: string;
+  lastActivity: string;
 }
 
 /** Row shape used by SubscriptionsPage table after mapping API Subscription */
