@@ -276,10 +276,10 @@ export class SettlementsService {
         'Settlement record does not belong to this subscription',
       );
     }
-    if (record.status !== 'PASSED') {
+    if (record.status !== 'PASSED' && record.status !== 'OVERRIDDEN') {
       throw new ConflictError(
         'SETTLEMENT_NOT_PASSED',
-        'Settlement must be PASSED before confirmation',
+        'Settlement must be PASSED or OVERRIDDEN before confirmation',
       );
     }
 
