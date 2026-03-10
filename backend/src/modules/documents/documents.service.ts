@@ -70,8 +70,15 @@ export class DocumentsService {
         },
       });
 
-      await tx.documentHash.create({
-        data: {
+      await tx.documentHash.upsert({
+        where: {
+          hashAlgorithm_hashHex: {
+            hashAlgorithm: 'SHA256',
+            hashHex,
+          },
+        },
+        update: { documentId: doc.id },
+        create: {
           documentId: doc.id,
           hashAlgorithm: 'SHA256',
           hashHex,
