@@ -1,450 +1,363 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
-  Tooltip, Legend, ResponsiveContainer,
-} from "recharts";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { MetricCard } from "@/components/kadra/MetricCard";
 import { SectionCard } from "@/components/kadra/SectionCard";
-import { KadraTabs } from "@/components/kadra/KadraTabs";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
-import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
-import { getFundOverview } from "@/services";
-import { getInvestors } from "@/services/investors.service";
-import { getCapTable } from "@/services/ownership.service";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { ActivityFeed } from "@/components/kadra/ActivityFeed";
+import { QUERY_KEYS, DEFAULT_FUND_CODE, ROUTES } from "@/config/constants";
+import { getFundOverview, getActivityFeed } from "@/services";
+import { getCapitalCalls } from "@/services/capital-calls.service";
+import { getCapitalAccounts } from "@/services/ownership.service";
 
-const CAPITAL_COLORS = ["#4338ca", "#a5b4fc", "#d1d5db"] as const;
-const BAR_COLOR = "#4f46e5";
+/* ── Formatters ── */
 
-const fmt = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
-const fmtCompact = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(n);
-const pct = (n: number) => `${n.toFixed(1)}%`;
+const fmt = (n: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
 
-/* ── Capital Breakdown Donut ── */
+/* ── Progress Bar ── */
 
-interface CapitalDonutProps {
-  readonly settledCapital: number;
-  readonly pendingCapital: number;
-  readonly committedCapital: number;
+interface ProgressBarProps {
+  readonly label: string;
+  readonly value: number;
+  readonly max: number;
+  readonly color: string;
 }
 
-function CapitalDonutChart({ settledCapital, pendingCapital, committedCapital }: CapitalDonutProps) {
-  const chartData = useMemo(() => [
-    { name: "Settled", value: settledCapital },
-    { name: "Pending", value: pendingCapital },
-    ...(committedCapital - settledCapital - pendingCapital > 0
-      ? [{ name: "Remaining", value: committedCapital - settledCapital - pendingCapital }]
-      : []),
-  ], [settledCapital, pendingCapital, committedCapital]);
-
+function ProgressBar({ label, value, max, color }: ProgressBarProps) {
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
   return (
-    <div className="relative">
-      <ResponsiveContainer width="100%" height={250}>
-        <PieChart>
-          <Pie
-            data={chartData}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={80}
-            paddingAngle={2}
-          >
-            {chartData.map((entry, idx) => (
-              <Cell key={entry.name} fill={CAPITAL_COLORS[idx] ?? CAPITAL_COLORS[2]} />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value: number) => fmt(value)}
-            contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13 }}
-          />
-          <Legend
-            verticalAlign="bottom"
-            iconType="circle"
-            iconSize={8}
-            formatter={(value: string) => <span className="text-sm text-gray-600">{value}</span>}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      {/* Center label */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginBottom: 28 }}>
-        <div className="text-center">
-          <p className="text-xs text-gray-500">Total</p>
-          <p className="text-sm font-semibold text-gray-900">{fmtCompact(committedCapital)}</p>
-        </div>
+    <div>
+      <div className="flex justify-between text-sm mb-1">
+        <span className="text-gray-600">{label}</span>
+        <span className="font-medium text-gray-900">{fmt(value)}</span>
+      </div>
+      <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${color}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
 }
 
-/* ── Ownership Bar Chart ── */
+/* ── Copy button for addresses ── */
 
-interface OwnershipBarProps {
-  readonly rows: ReadonlyArray<{ investorName: string | null; ownershipPct: number; investorId: string | null }>;
-}
+function CopyableAddress({ address }: { readonly address: string }) {
+  const truncated = address.length > 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
 
-function OwnershipBarChart({ rows }: OwnershipBarProps) {
-  const sortedData = useMemo(
-    () =>
-      [...rows]
-        .sort((a, b) => b.ownershipPct - a.ownershipPct)
-        .map((r) => ({ name: r.investorName ?? "Unknown", ownership: Number(r.ownershipPct.toFixed(1)) })),
-    [rows],
-  );
+  const handleCopy = () => {
+    void navigator.clipboard.writeText(address);
+  };
 
   return (
-    <ResponsiveContainer width="100%" height={250}>
-      <BarChart data={sortedData} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
-        <XAxis type="number" domain={[0, "dataMax"]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 12, fill: "#6b7280" }} />
-        <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12, fill: "#374151" }} />
-        <Tooltip
-          formatter={(value: number) => [`${value}%`, "Ownership"]}
-          contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 13 }}
-        />
-        <Bar dataKey="ownership" fill={BAR_COLOR} radius={[0, 4, 4, 0]} barSize={20} />
-      </BarChart>
-    </ResponsiveContainer>
+    <span className="inline-flex items-center gap-1.5">
+      <span className="font-mono text-xs text-gray-900">{truncated}</span>
+      <button
+        onClick={handleCopy}
+        className="text-gray-400 hover:text-gray-600 transition-colors"
+        title="Copy address"
+        type="button"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+        </svg>
+      </button>
+    </span>
   );
 }
 
+/* ── Info Row helper ── */
+
+function InfoRow({
+  label,
+  children,
+}: {
+  readonly label: string;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <div className="flex justify-between border-b border-gray-100 pb-2 last:border-0">
+      <dt className="text-sm text-gray-500">{label}</dt>
+      <dd className="text-sm font-medium text-gray-900">{children}</dd>
+    </div>
+  );
+}
+
+/* ── Main Page ── */
+
 export default function FundOverviewPage() {
-  const [tab, setTab] = useState("Overview");
   const fundId = DEFAULT_FUND_CODE;
 
-  const { data, isLoading, error } = useQuery({
+  /* ── Queries ── */
+
+  const {
+    data: fundData,
+    isLoading: fundLoading,
+    error: fundError,
+  } = useQuery({
     queryKey: QUERY_KEYS.fundOverview(fundId),
-    queryFn: () => getFundOverview(fundId).then(r => r.data),
+    queryFn: () => getFundOverview(fundId).then((r) => r.data),
   });
 
-  const { data: investors } = useQuery({
-    queryKey: QUERY_KEYS.investors(fundId),
-    queryFn: () => getInvestors(fundId).then(r => r.data),
-    enabled: tab === "Investors",
+  const { data: activityEvents, isLoading: activityLoading } = useQuery({
+    queryKey: QUERY_KEYS.activityFeed(fundId),
+    queryFn: () => getActivityFeed(fundId, 20).then((r) => r.data),
   });
 
-  const { data: capTable } = useQuery({
-    queryKey: QUERY_KEYS.capTable(fundId),
-    queryFn: () => getCapTable(fundId).then(r => r.data),
-    enabled: tab === "Performance" || tab === "Investors",
+  const { data: capitalCalls } = useQuery({
+    queryKey: QUERY_KEYS.capitalCalls(fundId),
+    queryFn: () => getCapitalCalls(fundId).then((r) => r.data),
   });
 
-  if (isLoading) return <div className="p-6">Loading...</div>;
-  if (error) return <ErrorAlert title="Failed to load fund overview" message={(error as Error).message} />;
-  if (!data) return <EmptyState title="No fund data" message="Fund overview is not available yet." />;
+  const { data: capitalAccounts } = useQuery({
+    queryKey: QUERY_KEYS.capitalAccounts(fundId),
+    queryFn: () => getCapitalAccounts(fundId).then((r) => r.data),
+  });
 
-  const committedCapital = Number(data.totalCommittedAmount) || 0;
-  const settledCapital = Number(data.totalSettledAmount) || 0;
-  const settlementRate = committedCapital > 0 ? (settledCapital / committedCapital) * 100 : 0;
-  const pendingCapital = committedCapital - settledCapital;
+  /* ── Derived values ── */
+
+  const metrics = useMemo(() => {
+    if (!fundData) return null;
+
+    const committedCapital = Number(fundData.totalCommittedAmount) || 0;
+    const settledCapital = Number(fundData.totalSettledAmount) || 0;
+
+    const calledCapital =
+      capitalCalls?.reduce((sum, cc) => sum + (Number(cc.amountDue) || 0), 0) ?? 0;
+
+    const totalDistributed = 0; // No on-chain distributions in demo
+    const totalReturns = totalDistributed;
+
+    const totalAccruedPrefReturn =
+      capitalAccounts?.reduce(
+        (sum, ca) => sum + (Number(ca.accruedPreferredReturn) || 0),
+        0,
+      ) ?? 0;
+
+    const unfundedCommitments = committedCapital - settledCapital;
+
+    const nextCapitalCallDueDate = capitalCalls
+      ?.filter((cc) => cc.status !== "COMPLETED" && cc.status !== "CANCELLED")
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0]
+      ?.dueDate ?? null;
+
+    return {
+      committedCapital,
+      settledCapital,
+      calledCapital,
+      totalDistributed,
+      totalReturns,
+      totalAccruedPrefReturn,
+      unfundedCommitments,
+      nextCapitalCallDueDate,
+    };
+  }, [fundData, capitalCalls, capitalAccounts]);
+
+  /* ── Loading / Error / Empty ── */
+
+  if (fundLoading) return <div className="p-6 text-gray-500">Loading...</div>;
+  if (fundError)
+    return (
+      <ErrorAlert
+        title="Failed to load fund overview"
+        message={(fundError as Error).message}
+      />
+    );
+  if (!fundData || !metrics)
+    return (
+      <EmptyState title="No fund data" message="Fund overview is not available yet." />
+    );
+
+  const isDeployed = fundData.tokenContract?.deploymentStatus === "DEPLOYED";
+  const fundSize = metrics.committedCapital;
+  const isFullyCommitted = metrics.settledCapital >= fundSize && fundSize > 0;
+
+  /* ── Last on-chain event ── */
+  const lastOnChainEvent = activityEvents
+    ?.filter((e) => e.txHash)
+    .sort(
+      (a, b) =>
+        new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+    )[0] ?? null;
 
   return (
     <div>
-      <PageHeader title={data.fundName} subtitle="Fund Overview" />
-      <KadraTabs tabs={["Overview", "Performance", "Investors", "Sustainability"]} active={tab} onChange={setTab} />
+      <PageHeader title={fundData.fundName} subtitle="Fund Dashboard" />
 
-      {/* ── Overview Tab ── */}
-      {tab === "Overview" && (
-        <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <MetricCard label="Committed Capital" value={fmt(committedCapital)} />
-            <MetricCard label="Settled Capital" value={fmt(settledCapital)} />
-            <MetricCard label="Active LPs" value={data.lpCount} />
-            <MetricCard label="Pending Subscriptions" value={data.pendingSubscriptions} />
-          </div>
+      {/* ── Top Metric Bar (4 cards) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <MetricCard
+          label="Status"
+          value={fundData.status}
+          subtitle={
+            <StatusBadge status={fundData.status === "ACTIVE" ? "Passed" : fundData.status} />
+          }
+        />
+        <MetricCard
+          label="Total AUM / Fund Size"
+          value={`${fmt(metrics.settledCapital)} / ${fmt(fundSize)}`}
+          subtitle={isFullyCommitted ? "Fully Committed" : "Partially Committed"}
+        />
+        <MetricCard label="Active LPs" value={fundData.lpCount} />
+        <MetricCard label="Pending Settlements" value={fundData.pendingSubscriptions} />
+      </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-            {[
-              { label: "Status", value: data.status },
-              { label: "Eligible Wallets", value: String(data.eligibleWalletCount) },
-              { label: "Settled Subscriptions", value: String(data.settledSubscriptions) },
-              { label: "Token Symbol", value: data.tokenContract?.deploymentStatus === "DEPLOYED" ? "KDRA" : "Not deployed" },
-            ].map((item) => (
-              <div key={item.label} className="rounded-lg border border-border bg-card p-4">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{item.label}</p>
-                <p className="mt-1 text-sm font-semibold text-card-foreground">{item.value}</p>
-              </div>
-            ))}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contract</p>
-              <div className="mt-1 text-sm font-semibold text-card-foreground">
-                {data.tokenContract?.contractAddress
-                  ? <ExplorerLink value={data.tokenContract.contractAddress} type="address" />
-                  : "N/A"}
-              </div>
+      {/* ── Bottom Metric Bar (5 cards) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <MetricCard label="Committed Capital" value={fmt(metrics.committedCapital)} />
+        <MetricCard label="Called Capital" value={fmt(metrics.calledCapital)} />
+        <MetricCard label="Settled Capital" value={fmt(metrics.settledCapital)} />
+        <MetricCard label="Total Distributed" value={fmt(metrics.totalDistributed)} />
+        <MetricCard label="Total Returns" value={fmt(metrics.totalReturns)} />
+      </div>
+
+      {/* ── 2x2 Panel Grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Panel 1: Fund Status */}
+        <SectionCard title="Fund Status">
+          <dl className="space-y-3">
+            <InfoRow label="Fund Name">{fundData.fundName}</InfoRow>
+            <InfoRow label="Legal Form">Limited Partnership</InfoRow>
+            <InfoRow label="Status">
+              <StatusBadge status={fundData.status === "ACTIVE" ? "Passed" : fundData.status} />
+            </InfoRow>
+            <InfoRow label="Contract Address">
+              {fundData.tokenContract?.contractAddress ? (
+                <ExplorerLink
+                  value={fundData.tokenContract.contractAddress}
+                  type="address"
+                />
+              ) : (
+                <span className="text-gray-400">Not deployed</span>
+              )}
+            </InfoRow>
+            <InfoRow label="Chain ID">
+              {fundData.tokenContract?.chainId
+                ? String(fundData.tokenContract.chainId)
+                : "11155111"}
+            </InfoRow>
+            <InfoRow label="Transfer Restrictions Active">
+              <span className="inline-flex items-center gap-1.5 text-green-700 text-xs font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                Yes
+              </span>
+            </InfoRow>
+            <InfoRow label="Waterfall Version">1.0</InfoRow>
+          </dl>
+        </SectionCard>
+
+        {/* Panel 2: Activity Feed */}
+        <SectionCard
+          title="Activity Feed"
+          action={
+            <a
+              href={ROUTES.AUDIT}
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              View All
+            </a>
+          }
+        >
+          <ActivityFeed
+            events={activityEvents ?? []}
+            isLoading={activityLoading}
+            maxItems={20}
+            showViewAll={false}
+            viewAllLink={ROUTES.AUDIT}
+          />
+        </SectionCard>
+
+        {/* Panel 3: Capital Summary */}
+        <SectionCard title="Capital Summary">
+          <div className="space-y-4">
+            <ProgressBar
+              label="Committed"
+              value={metrics.committedCapital}
+              max={metrics.committedCapital}
+              color="bg-indigo-600"
+            />
+            <ProgressBar
+              label="Called"
+              value={metrics.calledCapital}
+              max={metrics.committedCapital}
+              color="bg-blue-500"
+            />
+            <ProgressBar
+              label="Settled"
+              value={metrics.settledCapital}
+              max={metrics.committedCapital}
+              color="bg-green-500"
+            />
+
+            <div className="border-t border-gray-100 pt-4">
+              <dl className="space-y-3">
+                <InfoRow label="GP Promote Accrued">{fmt(0)}</InfoRow>
+                <InfoRow label="Total Preferred Return Accrued">
+                  {fmt(metrics.totalAccruedPrefReturn)}
+                </InfoRow>
+                <InfoRow label="Next Capital Call Due Date">
+                  {metrics.nextCapitalCallDueDate
+                    ? new Date(metrics.nextCapitalCallDueDate).toLocaleDateString()
+                    : "None scheduled"}
+                </InfoRow>
+                <InfoRow label="Unfunded Commitments">
+                  {fmt(metrics.unfundedCommitments)}
+                </InfoRow>
+              </dl>
             </div>
           </div>
+        </SectionCard>
 
-          {/* Key Dates */}
-          {(data.createdAt || data.tokenContract?.deployedAt) && (
-            <SectionCard title="Key Dates">
-              <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {data.createdAt && (
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">Fund Created</dt>
-                    <dd className="mt-1 text-sm font-medium text-gray-900">
-                      {new Date(data.createdAt).toLocaleDateString()} {new Date(data.createdAt).toLocaleTimeString()}
-                    </dd>
-                  </div>
-                )}
-                {data.tokenContract?.deployedAt && (
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">Token Deployed</dt>
-                    <dd className="mt-1 text-sm font-medium text-gray-900">
-                      {new Date(data.tokenContract.deployedAt).toLocaleDateString()} {new Date(data.tokenContract.deployedAt).toLocaleTimeString()}
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </SectionCard>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SectionCard title="Fund Metrics">
-              <dl className="space-y-3">
-                {[
-                  ["Total LPs", String(data.lpCount)],
-                  ["Eligible Wallets", String(data.eligibleWalletCount)],
-                  ["Pending Subscriptions", String(data.pendingSubscriptions)],
-                  ["Settled Subscriptions", String(data.settledSubscriptions)],
-                  ["Committed Capital", fmt(committedCapital)],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between border-b border-border pb-2 last:border-0">
-                    <dt className="text-sm text-muted-foreground">{k}</dt>
-                    <dd className="text-sm font-medium text-card-foreground">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-            </SectionCard>
-
-            <SectionCard title="Token Contract">
-              <dl className="space-y-3">
-                {[
-                  ["Deployment Status", data.tokenContract?.deploymentStatus ?? "Not deployed"],
-                  ["Chain ID", data.tokenContract?.chainId ? String(data.tokenContract.chainId) : "N/A"],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between border-b border-border pb-2 last:border-0">
-                    <dt className="text-sm text-muted-foreground">{k}</dt>
-                    <dd className="text-sm font-medium text-card-foreground font-mono text-xs">{v}</dd>
-                  </div>
-                ))}
-                <div className="flex justify-between border-b border-border pb-2 last:border-0">
-                  <dt className="text-sm text-muted-foreground">Contract Address</dt>
-                  <dd className="text-sm font-medium text-card-foreground">
-                    {data.tokenContract?.contractAddress
-                      ? <ExplorerLink value={data.tokenContract.contractAddress} type="address" truncate={false} />
-                      : "N/A"}
-                  </dd>
-                </div>
-              </dl>
-            </SectionCard>
-          </div>
-        </>
-      )}
-
-      {/* ── Performance Tab ── */}
-      {tab === "Performance" && (
-        <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <MetricCard label="Committed Capital" value={fmt(committedCapital)} />
-            <MetricCard label="Settled Capital" value={fmt(settledCapital)} />
-            <MetricCard label="Pending Capital" value={fmt(pendingCapital)} />
-            <MetricCard label="Settlement Rate" value={pct(settlementRate)} />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <SectionCard title="Capital Breakdown">
-              <div className="space-y-4">
-                {/* Donut chart */}
-                <CapitalDonutChart
-                  settledCapital={settledCapital}
-                  pendingCapital={pendingCapital}
-                  committedCapital={committedCapital}
+        {/* Panel 4: Contract Info */}
+        <SectionCard title="Contract Info">
+          <dl className="space-y-3">
+            <InfoRow label="Deployment Status">
+              <StatusBadge status={isDeployed ? "Completed" : "Pending"} />
+            </InfoRow>
+            <InfoRow label="Contract Address">
+              {fundData.tokenContract?.contractAddress ? (
+                <ExplorerLink
+                  value={fundData.tokenContract.contractAddress}
+                  type="address"
                 />
-
-                <div className="border-t border-border pt-4">
-                  <dl className="space-y-3">
-                    {[
-                      ["Total Committed", fmt(committedCapital)],
-                      ["Total Settled", fmt(settledCapital)],
-                      ["Pending Settlement", fmt(pendingCapital)],
-                      ["Settlement Rate", pct(settlementRate)],
-                    ].map(([k, v]) => (
-                      <div key={k} className="flex justify-between">
-                        <dt className="text-sm text-muted-foreground">{k}</dt>
-                        <dd className="text-sm font-medium">{v}</dd>
-                      </div>
-                    ))}
-                  </dl>
+              ) : (
+                <span className="text-gray-400">N/A</span>
+              )}
+            </InfoRow>
+            <InfoRow label="Total Tokens Minted">
+              {isDeployed ? "10,000 KDRA" : "N/A"}
+            </InfoRow>
+            <InfoRow label="Tokens Outstanding">
+              {isDeployed ? "10,000 KDRA" : "N/A"}
+            </InfoRow>
+            <InfoRow label="Last On-Chain Event">
+              {lastOnChainEvent ? (
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className="text-xs text-gray-600">
+                    {new Date(lastOnChainEvent.occurredAt).toLocaleDateString()}{" "}
+                    {new Date(lastOnChainEvent.occurredAt).toLocaleTimeString()}
+                  </span>
+                  {lastOnChainEvent.txHash && (
+                    <ExplorerLink value={lastOnChainEvent.txHash} type="tx" />
+                  )}
                 </div>
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Subscription Metrics">
-              <div className="space-y-4">
-                {/* Subscription progress */}
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Subscription Completion</span>
-                    <span className="font-medium">
-                      {data.settledSubscriptions}/{data.settledSubscriptions + data.pendingSubscriptions}
-                    </span>
-                  </div>
-                  <div className="h-3 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-green-500 rounded-full transition-all duration-500"
-                      style={{
-                        width: `${(data.settledSubscriptions + data.pendingSubscriptions) > 0
-                          ? (data.settledSubscriptions / (data.settledSubscriptions + data.pendingSubscriptions)) * 100
-                          : 0}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="border-t border-border pt-4">
-                  <dl className="space-y-3">
-                    {[
-                      ["Total Subscriptions", String(data.settledSubscriptions + data.pendingSubscriptions)],
-                      ["Settled", String(data.settledSubscriptions)],
-                      ["Pending", String(data.pendingSubscriptions)],
-                      ["Active LPs", String(data.lpCount)],
-                      ["Eligible Wallets", String(data.eligibleWalletCount)],
-                    ].map(([k, v]) => (
-                      <div key={k} className="flex justify-between">
-                        <dt className="text-sm text-muted-foreground">{k}</dt>
-                        <dd className="text-sm font-medium">{v}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-              </div>
-            </SectionCard>
-          </div>
-
-          {/* Ownership Distribution from cap table */}
-          {capTable && capTable.rows.length > 0 && (
-            <SectionCard title="Ownership Distribution">
-              <OwnershipBarChart rows={capTable.rows} />
-            </SectionCard>
-          )}
-        </>
-      )}
-
-      {/* ── Investors Tab ── */}
-      {tab === "Investors" && (
-        <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <MetricCard label="Total Investors" value={data.lpCount} />
-            <MetricCard label="Eligible Wallets" value={data.eligibleWalletCount} />
-            <MetricCard label="Settled" value={data.settledSubscriptions} />
-            <MetricCard label="Pending" value={data.pendingSubscriptions} />
-          </div>
-
-          <SectionCard title="Investor Registry">
-            {!investors || investors.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No investors registered yet.</p>
-            ) : (
-              <div className="overflow-x-auto -mx-6">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left font-medium text-muted-foreground px-6 py-3 uppercase text-xs tracking-wider">Name</th>
-                      <th className="text-left font-medium text-muted-foreground px-6 py-3 uppercase text-xs tracking-wider">Email</th>
-                      <th className="text-left font-medium text-muted-foreground px-6 py-3 uppercase text-xs tracking-wider">Wallet</th>
-                      <th className="text-left font-medium text-muted-foreground px-6 py-3 uppercase text-xs tracking-wider">Status</th>
-                      <th className="text-left font-medium text-muted-foreground px-6 py-3 uppercase text-xs tracking-wider">Eligibility</th>
-                      {capTable && <th className="text-right font-medium text-muted-foreground px-6 py-3 uppercase text-xs tracking-wider">Ownership</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {investors.map((inv) => {
-                      const ownership = capTable?.rows.find(r => r.investorId === inv.investorId);
-                      return (
-                        <tr key={inv.investorId} className="hover:bg-muted/50 transition-colors">
-                          <td className="px-6 py-3 font-medium">{inv.legalName}</td>
-                          <td className="px-6 py-3 text-muted-foreground">{inv.email}</td>
-                          <td className="px-6 py-3 text-muted-foreground">
-                            {inv.wallets?.[0]?.address
-                              ? <ExplorerLink value={inv.wallets[0].address} type="address" />
-                              : "No wallet"}
-                          </td>
-                          <td className="px-6 py-3"><StatusBadge status={inv.verificationStatus} /></td>
-                          <td className="px-6 py-3">
-                            <StatusBadge status={inv.fundEligibility?.status ?? "N/A"} />
-                          </td>
-                          {capTable && (
-                            <td className="px-6 py-3 text-right font-medium">
-                              {ownership ? pct(ownership.ownershipPct) : "0.0%"}
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </SectionCard>
-        </>
-      )}
-
-      {/* ── Sustainability Tab ── */}
-      {tab === "Sustainability" && (
-        <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <MetricCard label="On-Chain Records" value={data.settledSubscriptions + data.eligibleWalletCount} />
-            <MetricCard label="Verified Identities" value={data.lpCount} />
-            <MetricCard label="Eligible Wallets" value={data.eligibleWalletCount} />
-            <MetricCard
-              label="Compliance Standard"
-              value="ERC-3643"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SectionCard title="Compliance & Governance">
-              <dl className="space-y-3">
-                {[
-                  ["Token Standard", "ERC-3643 Security Token"],
-                  ["Transfer Restrictions", "Identity Registry + LP Eligibility"],
-                  ["Settlement Validation", "3-Way Match (Amount, Identity, Reference)"],
-                  ["Document Anchoring", "SHA-256 Hash + On-Chain Timestamp"],
-                  ["Identity Verification", `${data.lpCount} verified investors`],
-                  ["Wallet Eligibility", `${data.eligibleWalletCount} eligible wallets`],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between border-b border-border pb-2 last:border-0">
-                    <dt className="text-sm text-muted-foreground">{k}</dt>
-                    <dd className="text-sm font-medium text-card-foreground">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-            </SectionCard>
-
-            <SectionCard title="Transparency Metrics">
-              <dl className="space-y-3">
-                {[
-                  ["Immutable Ledger", "All ownership changes recorded on-chain"],
-                  ["Audit Trail", "Full document provenance with hash verification"],
-                  ["Real-Time Cap Table", "Reads directly from blockchain state"],
-                  ["No Manual Reconciliation", "Automated settlement + ownership tracking"],
-                  ["Non-Custodial", "Investors control their own wallet keys"],
-                  ["Deterministic Enforcement", "Rules enforced before violations, not after"],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex flex-col border-b border-border pb-2 last:border-0">
-                    <dt className="text-sm font-medium text-card-foreground">{k}</dt>
-                    <dd className="text-xs text-muted-foreground mt-0.5">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-            </SectionCard>
-          </div>
-        </>
-      )}
+              ) : (
+                <span className="text-gray-400">None</span>
+              )}
+            </InfoRow>
+          </dl>
+        </SectionCard>
+      </div>
     </div>
   );
 }

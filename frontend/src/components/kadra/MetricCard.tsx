@@ -1,9 +1,10 @@
 import { cn } from "@/lib/utils";
+import { ReactNode } from "react";
 
 interface MetricCardProps {
   label: string;
   value: string | number;
-  subtitle?: string;
+  subtitle?: ReactNode;
   className?: string;
 }
 
