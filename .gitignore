@@ -12,6 +12,7 @@ docs/plans/
 docs/audit/
 docs/SSOT/
 test-data
+hackathon/
 # Backend
 backend/dist
 backend/node_modules
