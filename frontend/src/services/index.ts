@@ -16,3 +16,7 @@ export * from './auth.service';
 export * from './investor-portal.service';
 
 export * from './wallet-profile.service';
+
+export * from './capital-calls.service';
+export * from './notices.service';
+export * from './tax.service';

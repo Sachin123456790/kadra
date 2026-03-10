@@ -61,4 +61,32 @@ export type { WaterfallConfig } from '@/services/fund.service';
 
 // ── Audit ────────────────────────────────────────────────
 
-export type { AuditExportSummary, AuditExportDetail } from '@/services/audit.service';
+export type { AuditExportSummary, AuditExportDetail, EventLogEntry, DocumentProvenance } from '@/services/audit.service';
+
+// ── Capital Calls ────────────────────────────────────────
+
+export type { CapitalCall, CapitalCallResponse } from '@/services/capital-calls.service';
+
+// ── Notices ──────────────────────────────────────────────
+
+export type { Notice, NoticeDelivery } from '@/services/notices.service';
+
+// ── Tax ──────────────────────────────────────────────────
+
+export type { TaxReport } from '@/services/tax.service';
+
+// ── Activity Feed ────────────────────────────────────────
+
+export type { ActivityEvent } from '@/services/fund.service';
+
+// ── Documents ────────────────────────────────────────────
+
+export type { DocumentVerification } from '@/services/documents.service';
+
+// ── Ownership ────────────────────────────────────────────
+
+export type { CapitalAccountSummary } from '@/services/ownership.service';
+
+// ── Investor Portal ──────────────────────────────────────
+
+export type { CapitalAccountStatement, InvestorDocument, WaterfallBreakdown } from '@/services/investor-portal.service';

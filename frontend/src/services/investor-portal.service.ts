@@ -92,3 +92,47 @@ export function getMyTransfers(fundId = DEFAULT_FUND) {
 export function getInvestorCapTable(fundId = DEFAULT_FUND) {
   return get<InvestorCapTable>(`/investor/funds/${fundId}/cap-table`);
 }
+
+// ── Capital Account, Documents, Activity, Waterfall ────────
+
+export interface CapitalAccountStatement {
+  id: string;
+  openingBalance: string;
+  initialContribution: string;
+  capitalReturned: string;
+  accruedPreferredReturn: string;
+  residualAllocation: string;
+  endingBalance: string;
+  asOfDate: string;
+}
+
+export interface InvestorDocument {
+  id: string;
+  name: string;
+  type: string;
+  createdAt: string;
+  status: string;
+  downloadable: boolean;
+}
+
+export interface WaterfallBreakdown {
+  waterfallConfig: unknown;
+  distributionLineItem: unknown;
+  distributionRun: unknown;
+}
+
+export function getInvestorCapitalAccount(fundId: string) {
+  return get<CapitalAccountStatement | null>(`/investor/me/capital-account?fundId=${fundId}`);
+}
+
+export function getInvestorDocuments(fundId: string) {
+  return get<InvestorDocument[]>(`/investor/me/documents?fundId=${fundId}`);
+}
+
+export function getInvestorActivityFeed(fundId: string, limit = 50) {
+  return get<import('./fund.service').ActivityEvent[]>(`/investor/me/activity-feed?fundId=${fundId}&limit=${limit}`);
+}
+
+export function getInvestorWaterfallBreakdown(fundId: string) {
+  return get<WaterfallBreakdown | null>(`/investor/me/waterfall-breakdown?fundId=${fundId}`);
+}

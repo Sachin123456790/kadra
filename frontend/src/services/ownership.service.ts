@@ -33,3 +33,21 @@ export function getCapTable(fundId: string) {
 export function getOwnershipHistory(fundId: string) {
   return get<OwnershipEvent[]>(`/admin/funds/${fundId}/ownership-history`);
 }
+
+// ── Capital Accounts ───────────────────────────────────────
+
+export interface CapitalAccountSummary {
+  id: string;
+  investorId: string;
+  openingBalance: string;
+  initialContribution: string;
+  capitalReturned: string;
+  accruedPreferredReturn: string;
+  endingBalance: string;
+  asOfDate: string;
+  investor?: { legalName: string; email: string };
+}
+
+export function getCapitalAccounts(fundId: string) {
+  return get<CapitalAccountSummary[]>(`/admin/funds/${fundId}/capital-accounts`);
+}

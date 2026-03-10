@@ -41,6 +41,18 @@ export const QUERY_KEYS = {
   investorTransfers: (fundId: string) => ['investor', fundId, 'transfers'] as const,
   investorProfile: () => ['investor', 'profile'] as const,
   investorWallets: () => ['investor', 'wallets'] as const,
+  capitalCalls: (fundId: string) => ['capital-calls', fundId] as const,
+  notices: (fundId: string) => ['notices', fundId] as const,
+  activityFeed: (fundId: string) => ['activity-feed', fundId] as const,
+  eventLog: (fundId: string) => ['event-log', fundId] as const,
+  documentProvenance: (fundId: string) => ['document-provenance', fundId] as const,
+  capitalAccounts: (fundId: string) => ['capital-accounts', fundId] as const,
+  investorDocuments: (fundId: string) => ['investor-documents', fundId] as const,
+  investorActivityFeed: (fundId: string) => ['investor-activity-feed', fundId] as const,
+  investorCapitalAccount: (fundId: string) => ['investor-capital-account', fundId] as const,
+  taxReport: (fundId: string, year: number) => ['tax-report', fundId, year] as const,
+  waterfallBreakdown: (fundId: string) => ['waterfall-breakdown', fundId] as const,
+  investorNotices: () => ['investor-notices'] as const,
 } as const;
 
 export const ADMIN_ROLES = ['admin', 'platform_admin', 'fund_admin', 'operations_analyst'] as const;
@@ -66,4 +78,6 @@ export const ROUTES = {
   INVESTOR_DISTRIBUTIONS: '/investor/distributions',
   INVESTOR_TRANSFERS: '/investor/transfers',
   INVESTOR_PROFILE: '/investor/profile',
+  INVESTOR_CAPITAL_ACCOUNT: '/investor/capital-account',
+  INVESTOR_DOCUMENTS: '/investor/documents',
 } as const;

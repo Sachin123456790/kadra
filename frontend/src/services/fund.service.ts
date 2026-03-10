@@ -62,3 +62,21 @@ export function createFund(body: {
 export function getFund(fundId: string) {
   return get<FundOverview>(`/admin/funds/${fundId}`);
 }
+
+// ── Activity Feed ──────────────────────────────────────────
+
+export interface ActivityEvent {
+  id: string;
+  eventType: string;
+  aggregateType: string;
+  aggregateId: string;
+  payload: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  occurredAt: string;
+  txHash: string | null;
+  blockNumber: number | null;
+}
+
+export function getActivityFeed(fundId: string, limit = 50, offset = 0) {
+  return get<ActivityEvent[]>(`/admin/funds/${fundId}/activity-feed?limit=${limit}&offset=${offset}`);
+}

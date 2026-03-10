@@ -2,8 +2,8 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, Users, FileText, FileUp, Landmark, ArrowLeftRight,
-  PieChart, Coins, Shield, Search, Menu, X,
+  LayoutDashboard, Users, FileText, ClipboardList, CheckCircle, ArrowLeftRight,
+  PieChart, Table, Shield, Search, Menu, X,
   Sun, Moon, Bell, LogOut, User, HelpCircle, ChevronDown, Wallet,
 } from "lucide-react";
 import {
@@ -20,24 +20,24 @@ import { useNotifications, formatRelativeTime } from "@/hooks/useNotifications";
 import { ADMIN_ROLES } from "@/config/constants";
 
 const adminNavItems = [
-  { label: "Overview", path: "/dashboard", icon: LayoutDashboard },
-  { label: "Documents", path: "/documents", icon: FileUp },
+  { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+  { label: "Cap Table", path: "/cap-table", icon: Table },
+  { label: "Distribution", path: "/distribution", icon: PieChart },
   { label: "Investors", path: "/investors", icon: Users },
-  { label: "Subscriptions", path: "/subscriptions", icon: FileText },
-  { label: "Settlement", path: "/settlement", icon: Landmark },
+  { label: "Documents", path: "/documents", icon: FileText },
+  { label: "Subscriptions", path: "/subscriptions", icon: ClipboardList },
+  { label: "Settlement", path: "/settlement", icon: CheckCircle },
   { label: "Transfers", path: "/transfers", icon: ArrowLeftRight },
-  { label: "Cap Table", path: "/cap-table", icon: PieChart },
-  { label: "Distribution", path: "/distribution", icon: Coins },
   { label: "Audit & Exports", path: "/audit", icon: Shield },
 ];
 
 const investorNavItems = [
   { label: "Dashboard", path: "/investor", icon: LayoutDashboard },
-  { label: "My Subscriptions", path: "/investor/subscriptions", icon: FileText },
-  { label: "Cap Table", path: "/investor/cap-table", icon: PieChart },
-  { label: "Distributions", path: "/investor/distributions", icon: Coins },
-  { label: "My Transfers", path: "/investor/transfers", icon: ArrowLeftRight },
-  { label: "Profile & Wallets", path: "/investor/profile", icon: Wallet },
+  { label: "Capital Account", path: "/investor/capital-account", icon: Wallet },
+  { label: "Documents", path: "/investor/documents", icon: FileText },
+  { label: "Distributions", path: "/investor/distributions", icon: PieChart },
+  { label: "Transfers", path: "/investor/transfers", icon: ArrowLeftRight },
+  { label: "Profile", path: "/investor/profile", icon: User },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {

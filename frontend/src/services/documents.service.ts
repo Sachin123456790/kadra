@@ -1,5 +1,22 @@
 import { get, post, put, upload } from './api-client';
 
+// ── Document Verification ──────────────────────────────────
+
+export interface DocumentVerification {
+  verified: boolean;
+  documentId: string;
+  hashAlgorithm?: string;
+  storedHash?: string;
+  anchorTxHash?: string;
+  anchorBlockNumber?: number;
+  anchoredAt?: string;
+  reason?: string;
+}
+
+export function verifyDocument(documentId: string) {
+  return post<DocumentVerification>(`/admin/documents/${documentId}/verify`, {});
+}
+
 export interface UploadResult {
   documentId: string;
   parseStatus: string;

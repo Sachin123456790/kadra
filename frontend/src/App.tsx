@@ -23,6 +23,8 @@ import InvestorCapTable from "./pages/InvestorCapTable";
 import InvestorDistributions from "./pages/InvestorDistributions";
 import InvestorTransfers from "./pages/InvestorTransfers";
 import InvestorProfile from "./pages/InvestorProfile";
+import InvestorCapitalAccount from "./pages/InvestorCapitalAccount";
+import InvestorDocuments from "./pages/InvestorDocuments";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import NotificationsPage from "./pages/NotificationsPage";
@@ -73,6 +75,8 @@ const App = () => (
                       <Route path="/help" element={<HelpSupportPage />} />
                       {/* Investor routes */}
                       <Route path="/investor" element={<RoleGuard allow="investor"><InvestorDashboard /></RoleGuard>} />
+                      <Route path="/investor/capital-account" element={<RoleGuard allow="investor"><InvestorCapitalAccount /></RoleGuard>} />
+                      <Route path="/investor/documents" element={<RoleGuard allow="investor"><InvestorDocuments /></RoleGuard>} />
                       <Route path="/investor/subscriptions" element={<RoleGuard allow="investor"><InvestorSubscriptions /></RoleGuard>} />
                       <Route path="/investor/cap-table" element={<RoleGuard allow="investor"><InvestorCapTable /></RoleGuard>} />
                       <Route path="/investor/distributions" element={<RoleGuard allow="investor"><InvestorDistributions /></RoleGuard>} />
