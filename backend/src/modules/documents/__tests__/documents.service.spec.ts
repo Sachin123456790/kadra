@@ -28,6 +28,7 @@ describe('DocumentsService', () => {
     },
     documentHash: {
       create: jest.fn(),
+      upsert: jest.fn(),
       findMany: jest.fn(),
       findFirst: jest.fn(),
     },
@@ -142,6 +143,7 @@ describe('DocumentsService', () => {
             },
             documentHash: {
               create: jest.fn().mockResolvedValue({ id: 'hash-1' }),
+              upsert: jest.fn().mockResolvedValue({ id: 'hash-1' }),
             },
             extractedDocumentField: {
               create: jest.fn().mockResolvedValue({}),

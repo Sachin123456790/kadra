@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
@@ -86,16 +87,17 @@ function ThreeWayMatchIcons({
     { label: "Reference", key: "checkReferenceMatch" as const },
   ];
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
       {items.map((item) => {
         const passed = validation.checks[item.key];
         return (
-          <div key={item.key} className="flex items-center gap-0.5" title={item.label}>
+          <div key={item.key} className="flex items-center gap-1">
             {passed ? (
               <CheckCircle className="h-4 w-4 text-green-600" />
             ) : (
               <XCircle className="h-4 w-4 text-red-600" />
             )}
+            <span className="text-xs text-gray-600">{item.label}</span>
           </div>
         );
       })}
@@ -144,11 +146,18 @@ function CapitalCallsSection({ fundId }: { readonly fundId: string }) {
         wireInstructions: formData.wireInstructions || undefined,
       }).then((r) => r.data),
     onSuccess: () => {
+      toast.success("Capital call created successfully");
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.capitalCalls(fundId),
       });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.subscriptions(fundId),
+      });
       setDialogOpen(false);
       setFormData({ amountDue: "", dueDate: "", wireInstructions: "" });
+    },
+    onError: (error: Error) => {
+      toast.error("Failed to create capital call: " + error.message);
     },
   });
 
@@ -478,6 +487,9 @@ function SettlementValidationSection({
                     Committed Amount
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Payment Received
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Allocation
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -490,7 +502,7 @@ function SettlementValidationSection({
                     Settlement Timestamp
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Tx Hash
+                    Settlement Tx Hash
                   </th>
                 </tr>
               </thead>
@@ -507,13 +519,25 @@ function SettlementValidationSection({
                       ${Number(sub.committedAmount).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-gray-900">
+                      {fmt(Number(sub.committedAmount) || 0)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-900">
                       {Number(sub.allocationPct)}%
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-xs text-gray-600">Amount</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-xs text-gray-600">Identity</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-xs text-gray-600">Reference</span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -525,9 +549,9 @@ function SettlementValidationSection({
                         : "--"}
                     </td>
                     <td className="px-4 py-3">
-                      {sub.governingHashHex ? (
+                      {sub.settlementTxHash ? (
                         <ExplorerLink
-                          value={sub.governingHashHex}
+                          value={sub.settlementTxHash}
                           type="tx"
                         />
                       ) : (

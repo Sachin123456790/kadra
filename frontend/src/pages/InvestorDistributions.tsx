@@ -81,7 +81,7 @@ function WaterfallBreakdownSection({
 
   return (
     <SectionCard title="Waterfall Breakdown">
-      {distributions.length > 1 && (
+      {distributions.length > 0 && (
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Select Distribution Event
@@ -254,6 +254,13 @@ function DistributionHistoryTable({
     {
       key: "currency",
       header: "Currency",
+    },
+    {
+      key: "waterfallVersion",
+      header: "Waterfall Version",
+      render: () => (
+        <span className="text-sm text-gray-600">1.0</span>
+      ),
     },
     {
       key: "id",

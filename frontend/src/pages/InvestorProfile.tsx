@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
-import { getMyProfile, getMyWallets, createWalletChallenge, verifyWalletLink } from "@/services";
+import { getMyProfile, getMyWallets, createWalletChallenge, verifyWalletLink, getMyDashboard } from "@/services";
 import { getInvestorTaxReport } from "@/services/tax.service";
 import type { LinkedWallet } from "@/services/wallet-profile.service";
 import { useWallet } from "@/hooks/useWallet";
@@ -141,7 +142,7 @@ function IdentitySection({
 
 // ── Section 2: Tax Information ──────────────────────────────
 
-function TaxInformationSection({ profile }: { profile: { legalName: string } }) {
+function TaxInformationSection({ profile, fundName }: { profile: { legalName: string }; fundName: string }) {
   const fundId = DEFAULT_FUND_CODE;
   const currentYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(currentYear - 1);
@@ -160,7 +161,7 @@ function TaxInformationSection({ profile }: { profile: { legalName: string } }) 
   }, [currentYear]);
 
   const handleExport = () => {
-    alert("Export coming soon");
+    toast.info("Tax export feature coming soon");
   };
 
   return (
@@ -180,6 +181,11 @@ function TaxInformationSection({ profile }: { profile: { legalName: string } }) 
               ))}
             </select>
           </div>
+          {taxReport && (
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 self-end mb-0.5">
+              K-1 Ready
+            </span>
+          )}
         </div>
 
         {taxLoading ? (
@@ -200,7 +206,7 @@ function TaxInformationSection({ profile }: { profile: { legalName: string } }) 
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Fund Name</p>
-                <p className="text-sm font-medium text-gray-900">Kadra Demo Fund I</p>
+                <p className="text-sm font-medium text-gray-900">{fundName}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Tax Year</p>
@@ -353,6 +359,7 @@ function WalletSection({
 // ── Main Page Component ──────────────────────────────────────
 
 export default function InvestorProfile() {
+  const fundId = DEFAULT_FUND_CODE;
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [step, setStep] = useState<ModalStep>("choose");
@@ -371,6 +378,16 @@ export default function InvestorProfile() {
     queryKey: QUERY_KEYS.investorWallets(),
     queryFn: () => getMyWallets().then((r) => r.data),
   });
+
+  const { data: dashboard } = useQuery({
+    queryKey: QUERY_KEYS.investorDashboard(fundId),
+    queryFn: () => getMyDashboard(fundId).then((r) => r.data),
+  });
+
+  const fundName = useMemo(() => {
+    const sub = dashboard?.subscriptions?.[0];
+    return (sub as Record<string, unknown> | undefined)?.fundName as string | undefined ?? "Kadra Demo Fund I";
+  }, [dashboard]);
 
   const openModal = () => {
     setStep("choose");
@@ -446,7 +463,7 @@ export default function InvestorProfile() {
         )}
 
         {/* Section 2: Tax Information */}
-        <TaxInformationSection profile={{ legalName: profile?.legalName ?? "Investor" }} />
+        <TaxInformationSection profile={{ legalName: profile?.legalName ?? "Investor" }} fundName={fundName} />
 
         {/* Wallet Section (preserved) */}
         <WalletSection

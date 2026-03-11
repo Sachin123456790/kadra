@@ -13,6 +13,7 @@ export interface Subscription {
   createdAt: string | null;
   governingHashHex: string | null;
   latestSettlementStatus: string | null;
+  settlementTxHash: string | null;
 }
 
 export interface CreateSubscriptionItem {

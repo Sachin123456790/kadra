@@ -1,5 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, FileText, ClipboardList, CheckCircle, ArrowLeftRight,
@@ -17,7 +18,8 @@ import {
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications, formatRelativeTime } from "@/hooks/useNotifications";
-import { ADMIN_ROLES } from "@/config/constants";
+import { ADMIN_ROLES, DEFAULT_FUND_CODE, QUERY_KEYS } from "@/config/constants";
+import { getFundOverview } from "@/services";
 
 const adminNavItems = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
@@ -48,6 +50,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const { notifications, unreadCount, markAsRead } = useNotifications();
   const isAdmin = user?.role && (ADMIN_ROLES as readonly string[]).includes(user.role);
+
+  const { data: fundData } = useQuery({
+    queryKey: QUERY_KEYS.fundOverview(DEFAULT_FUND_CODE),
+    queryFn: () => getFundOverview(DEFAULT_FUND_CODE).then((r) => r.data),
+    enabled: isAdmin === true,
+    staleTime: 60_000,
+  });
+
   const navItems = isAdmin ? adminNavItems : investorNavItems;
   const homeRoute = isAdmin ? "/dashboard" : "/investor";
   const profileRoute = isAdmin ? "/profile" : "/investor/profile";
@@ -67,6 +77,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <Link to={homeRoute} className="text-lg font-bold text-topbar-foreground tracking-tight">Kadra</Link>
+          {isAdmin && fundData && (
+            <div className="hidden sm:flex items-center gap-2 ml-2 pl-2 border-l border-topbar-foreground/20">
+              <span className="text-sm font-medium text-topbar-foreground/80">{fundData.fundName}</span>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-green-500/20 text-green-300">
+                {fundData.status === "ACTIVE" ? "Active" : fundData.status}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="hidden sm:flex items-center bg-topbar-foreground/10 rounded-md px-3 py-1.5 w-72">

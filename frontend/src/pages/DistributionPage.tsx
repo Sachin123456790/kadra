@@ -8,6 +8,7 @@ import { QUERY_KEYS, DEFAULT_FUND_CODE } from '@/config/constants';
 import { getWaterfallConfig } from '@/services/fund.service';
 import { previewDistribution } from '@/services/distribution.service';
 import { getCapitalAccounts } from '@/services/ownership.service';
+import { getDocuments } from '@/services/documents.service';
 import type { DistributionLineItem } from '@/services/distribution.service';
 import type { CapitalAccountSummary } from '@/services/ownership.service';
 import type { WaterfallConfig } from '@/services/fund.service';
@@ -86,7 +87,7 @@ function buildTierDisplay(config: WaterfallConfig): TierInfo[] {
   ];
 }
 
-function WaterfallConfigSection({ config }: { readonly config: WaterfallConfig }) {
+function WaterfallConfigSection({ config, lpaHash }: { readonly config: WaterfallConfig; readonly lpaHash: string | null }) {
   const tiers = buildTierDisplay(config);
 
   return (
@@ -111,7 +112,7 @@ function WaterfallConfigSection({ config }: { readonly config: WaterfallConfig }
         </div>
 
         {/* Metadata row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-100">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-gray-100">
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Calculation Basis</p>
             <p className="mt-1 text-sm text-gray-900">{config.calculationBasis ?? "IRR"}</p>
@@ -131,6 +132,12 @@ function WaterfallConfigSection({ config }: { readonly config: WaterfallConfig }
                 <Lock className="h-3 w-3" />
                 Locked
               </span>
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Derived From (LPA Hash)</p>
+            <p className="mt-1">
+              <TruncatedHash hash={lpaHash} />
             </p>
           </div>
         </div>
@@ -178,6 +185,15 @@ function DistributionBarChart({ lineItems }: { readonly lineItems: ReadonlyArray
 
 /* ── Per-LP Breakdown Columns ── */
 
+function getTierValue(item: DistributionLineItem, ...keys: string[]): number {
+  const tb = item.tierBreakdown as Record<string, string | number> | null;
+  if (!tb) return 0;
+  for (const key of keys) {
+    if (tb[key] !== undefined) return parseFloat(String(tb[key]));
+  }
+  return 0;
+}
+
 const breakdownColumns: Column<DistributionLineItem>[] = [
   {
     key: "investorName",
@@ -193,6 +209,21 @@ const breakdownColumns: Column<DistributionLineItem>[] = [
     key: "grossAmount",
     header: "Gross Allocation",
     render: (r) => <span className="text-gray-900">{fmt(parseFloat(r.grossAmount))}</span>,
+  },
+  {
+    key: "capitalReturned",
+    header: "Capital Returned",
+    render: (r) => <span className="text-gray-900">{fmt(getTierValue(r, 'returnOfCapital', 'Return of Capital'))}</span>,
+  },
+  {
+    key: "preferredReturn",
+    header: "Preferred Return",
+    render: (r) => <span className="text-gray-900">{fmt(getTierValue(r, 'preferredReturn', 'Preferred Return'))}</span>,
+  },
+  {
+    key: "residualShare",
+    header: "Residual Share",
+    render: (r) => <span className="text-gray-900">{fmt(getTierValue(r, 'residualLp', 'Residual LP'))}</span>,
   },
   {
     key: "netAmount",
@@ -236,6 +267,25 @@ function SimulationSection({
 
   const totalGross = previewData?.lineItems.reduce((s, i) => s + parseFloat(i.grossAmount), 0) ?? 0;
   const totalNet = previewData?.lineItems.reduce((s, i) => s + parseFloat(i.netAmount), 0) ?? 0;
+
+  const tierTotals = useMemo(() => {
+    if (!previewData?.lineItems) return null;
+    let returnOfCapital = 0;
+    let preferredReturn = 0;
+    let residualLp = 0;
+    let gpPromote = 0;
+
+    for (const item of previewData.lineItems) {
+      const tb = item.tierBreakdown as Record<string, string | number> | null;
+      if (!tb) continue;
+      returnOfCapital += parseFloat(String(tb.returnOfCapital ?? tb['Return of Capital'] ?? 0));
+      preferredReturn += parseFloat(String(tb.preferredReturn ?? tb['Preferred Return'] ?? 0));
+      residualLp += parseFloat(String(tb.residualLp ?? tb['Residual LP'] ?? 0));
+      gpPromote += parseFloat(String(tb.gpPromote ?? tb['GP Promote'] ?? tb['Carried Interest'] ?? 0));
+    }
+
+    return { returnOfCapital, preferredReturn, residualLp, gpPromote };
+  }, [previewData]);
 
   return (
     <SectionCard title="Simulate Distribution" className="mb-6">
@@ -313,6 +363,16 @@ function SimulationSection({
             <MetricCard label="Investors" value={previewData.lineItems.length} />
           </div>
 
+          {/* Tier-by-tier breakdown */}
+          {tierTotals && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <MetricCard label="Return of Capital" value={fmt(tierTotals.returnOfCapital)} />
+              <MetricCard label="Preferred Return" value={fmt(tierTotals.preferredReturn)} />
+              <MetricCard label="Residual LP" value={fmt(tierTotals.residualLp)} />
+              <MetricCard label="GP Promote" value={fmt(tierTotals.gpPromote)} />
+            </div>
+          )}
+
           {/* Chart */}
           <DistributionBarChart lineItems={previewData.lineItems} />
 
@@ -366,6 +426,14 @@ const capitalAccountColumns: Column<CapitalAccountSummary>[] = [
     key: "accruedPreferredReturn",
     header: "Pref Return Accrued",
     render: (r) => <span className="text-gray-900">{fmt(parseFloat(r.accruedPreferredReturn))}</span>,
+  },
+  {
+    key: "distributionsReceived",
+    header: "Distributions Received",
+    render: (r) => {
+      const val = (r as CapitalAccountSummary & { distributionsReceived?: string }).distributionsReceived;
+      return <span className="text-gray-900">{fmt(val ? parseFloat(val) : 0)}</span>;
+    },
   },
   {
     key: "endingBalance",
@@ -445,6 +513,7 @@ function CapitalAccountsSection({ fundId }: { readonly fundId: string }) {
   } = useQuery({
     queryKey: QUERY_KEYS.capitalAccounts(fundId),
     queryFn: () => getCapitalAccounts(fundId).then(r => r.data),
+    refetchInterval: 30000,
   });
 
   const handleRowClick = useCallback((row: CapitalAccountSummary) => {
@@ -517,6 +586,17 @@ export default function DistributionPage() {
     queryFn: () => getWaterfallConfig(fundId).then(r => r.data),
   });
 
+  const { data: documents } = useQuery({
+    queryKey: QUERY_KEYS.documents(fundId),
+    queryFn: () => getDocuments(fundId).then(r => r.data),
+  });
+
+  const lpaHash = useMemo(() => {
+    if (!documents) return null;
+    const lpa = documents.find((d) => d.documentType === 'MASTER_LPA');
+    return lpa?.hash?.hashHex ?? null;
+  }, [documents]);
+
   if (waterfallLoading) return <div className="p-6">Loading...</div>;
   if (waterfallError) return <ErrorAlert title="Waterfall Config Error" message={(waterfallError as Error).message} />;
 
@@ -525,7 +605,7 @@ export default function DistributionPage() {
       <PageHeader title="Distribution" subtitle="Waterfall configuration, simulation, and capital accounts" />
 
       {/* Section 1: Waterfall Configuration */}
-      {waterfallData && <WaterfallConfigSection config={waterfallData} />}
+      {waterfallData && <WaterfallConfigSection config={waterfallData} lpaHash={lpaHash} />}
 
       {/* Section 2: Distribution Simulation */}
       {waterfallData?.waterfallConfigId && (

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from "recharts";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
@@ -7,7 +8,7 @@ import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
-import { getSubscriptions, getInvestors, getDocuments } from "@/services";
+import { getSubscriptions, getInvestors, getDocuments, createSubscriptions } from "@/services";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +56,7 @@ function statusBadge(status: string) {
 // ── Main component ──────────────────────────────────────────
 
 export default function SubscriptionsPage() {
+  const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const fundId = DEFAULT_FUND_CODE;
@@ -88,6 +90,33 @@ export default function SubscriptionsPage() {
   }, [documentsData]);
 
   const latestLpaHash = latestLpa?.hash?.hashHex ?? "";
+
+  const createMutation = useMutation({
+    mutationFn: () => {
+      if (!latestLpa) {
+        return Promise.reject(new Error("No LPA document found"));
+      }
+      const selectedInvestor = investorsData?.find(inv => inv.investorId === createLpId);
+      const walletId = selectedInvestor?.wallets?.[0]?.walletId ?? "";
+      return createSubscriptions(fundId, latestLpa.documentId, [
+        {
+          investorId: createLpId,
+          walletId,
+          allocationPct: Number(createAllocation),
+          committedAmount: createAmount,
+          subscriptionRef: `SUB-${createLpId.slice(0, 6).toUpperCase()}`,
+        },
+      ]).then(r => r.data);
+    },
+    onSuccess: () => {
+      toast.success("Subscription created successfully");
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions(fundId) });
+      setShowCreateModal(false);
+    },
+    onError: (error: Error) => {
+      toast.error("Failed to create subscription: " + error.message);
+    },
+  });
 
   const statusChartData = useMemo(() => {
     if (!subscriptions) return [];
@@ -282,14 +311,11 @@ export default function SubscriptionsPage() {
               Cancel
             </Button>
             <Button
-              disabled={!createLpId || !createAmount || !createAllocation}
+              disabled={!createLpId || !createAmount || !createAllocation || !latestLpa || createMutation.isPending}
               className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              onClick={() => {
-                // Form ready - submission would call createSubscriptions service
-                setShowCreateModal(false);
-              }}
+              onClick={() => createMutation.mutate()}
             >
-              Create Subscription
+              {createMutation.isPending ? "Creating..." : "Create Subscription"}
             </Button>
           </DialogFooter>
         </DialogContent>

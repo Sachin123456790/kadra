@@ -143,6 +143,19 @@ const columns: Column<EnrichedCapTableRow>[] = [
     render: (r) => <span className="text-gray-600">{fmtDate(r.settledAt)}</span>,
   },
   {
+    key: "settlementTxHash",
+    header: "Settlement Tx",
+    render: (r) =>
+      r.settlementTxHash ? (
+        <span className="inline-flex items-center">
+          <ExplorerLink value={r.settlementTxHash} type="tx" />
+          <CopyButton text={r.settlementTxHash} />
+        </span>
+      ) : (
+        <span className="text-gray-500">--</span>
+      ),
+  },
+  {
     key: "governingHashHex",
     header: "Governing LPA Hash",
     render: (r) => <TruncatedHash hash={r.governingHashHex} />,
@@ -248,6 +261,7 @@ export default function CapTablePage() {
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.capTable(fundId),
     queryFn: () => getCapTable(fundId).then(r => r.data),
+    refetchInterval: 30000,
   });
 
   const { data: subscriptions } = useQuery({

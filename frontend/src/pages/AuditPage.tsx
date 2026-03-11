@@ -119,12 +119,27 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
     {
       key: "txHash",
       header: "Hash Reference",
-      render: (r) =>
-        r.txHash ? (
-          <ExplorerLink value={r.txHash} type="tx" />
-        ) : (
-          <span className="text-gray-400">--</span>
-        ),
+      render: (r) => {
+        if (r.txHash) {
+          return <ExplorerLink value={r.txHash} type="tx" />;
+        }
+        const docHash =
+          (r.metadata?.documentHash as string) ??
+          (r.payload?.documentHash as string) ??
+          null;
+        if (docHash) {
+          return (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500">Doc:</span>
+              <span className="font-mono text-xs text-gray-700" title={docHash}>
+                {truncateHash(docHash)}
+              </span>
+              <CopyButton value={docHash} />
+            </div>
+          );
+        }
+        return <span className="text-gray-400">--</span>;
+      },
     },
     {
       key: "id",
@@ -409,9 +424,12 @@ function ExportSection({ fundId }: { readonly fundId: string }) {
     (successTransfers ?? []).length > 0 ||
     (failedTransfers ?? []).length > 0;
   const hasNotices = (notices ?? []).length > 0;
-  // Distribution runs would need a separate check; approximate by having settlements
-  const hasDistributions = hasSettlements;
-  const hasOnChainProofs = true; // Always true for Sepolia
+  // Check for actual distribution runs by looking for settled subscriptions with capital accounts
+  const hasDistributions = hasCapitalAccounts && hasSettlements;
+  // Check if any documents have on-chain anchors
+  const hasOnChainProofs = (documents ?? []).some(
+    (d) => d.hash?.anchoredOnchain === true,
+  );
 
   return (
     <SectionCard title="Export Auditor Package">

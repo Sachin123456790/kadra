@@ -5,7 +5,8 @@ import { SectionCard } from "@/components/kadra/SectionCard";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
-import { getMyTransfers, getMyDashboard } from "@/services";
+import { getMyTransfers, getMyDashboard, getInvestorCapTable } from "@/services";
+import { getMyProfile } from "@/services/wallet-profile.service";
 import { validateTransfer, confirmTransfer } from "@/services/tokenization.service";
 import { encodeTransfer } from "@/config/kadra-token-abi";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
@@ -19,32 +20,53 @@ const fmt = (n: number) =>
 // ── Section 1: Transfer Eligibility ─────────────────────────
 
 function TransferEligibilityPanel() {
+  const fundId = DEFAULT_FUND_CODE;
+
+  const { data: profile } = useQuery({
+    queryKey: QUERY_KEYS.investorProfile(),
+    queryFn: () => getMyProfile().then((r) => r.data),
+  });
+
+  const { data: dashboard } = useQuery({
+    queryKey: QUERY_KEYS.investorDashboard(fundId),
+    queryFn: () => getMyDashboard(fundId).then((r) => r.data),
+  });
+
+  const isVerified = profile?.verificationStatus === "VERIFIED";
+  const eligibility = dashboard?.eligibility?.[0];
+  const isEligible = eligibility?.eligibilityStatus === "ELIGIBLE";
+
+  const badgeStyle = (active: boolean) =>
+    active
+      ? "bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"
+      : "bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600";
+
   return (
     <SectionCard title="Transfer Eligibility">
       <div className="bg-gray-50 rounded-lg p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">Eligibility Marker Status</span>
-            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-              Active
+            <span className={`inline-flex items-center rounded-full ${badgeStyle(isEligible)}`}>
+              {isEligible ? "Active" : "Inactive"}
             </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">Fund-Specific LP Marker</span>
-            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-              Kadra Demo Fund I: Verified
+            <span className={`inline-flex items-center rounded-full ${badgeStyle(isEligible)}`}>
+              {isEligible ? "Verified" : "Pending"}
             </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">KYC Status</span>
-            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-              Verified
+            <span className={`inline-flex items-center rounded-full ${badgeStyle(isVerified)}`}>
+              {isVerified ? "Verified" : "Pending"}
             </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">Accreditation Status</span>
-            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-              Accredited
+            <span className={`inline-flex items-center rounded-full ${badgeStyle(isVerified)}`}>
+              {isVerified ? "Accredited" : "Pending"}
             </span>
           </div>
         </div>
@@ -314,9 +336,11 @@ function InitiateTransferSection({
 function TransferHistorySection({
   transfers,
   investorWalletAddress,
+  walletNameMap,
 }: {
   transfers: InvestorTransferRequest[];
   investorWalletAddress: string | null;
+  walletNameMap: Record<string, string>;
 }) {
   const getDirection = (t: InvestorTransferRequest): "Sent" | "Received" => {
     if (!investorWalletAddress) return "Sent";
@@ -328,6 +352,12 @@ function TransferHistorySection({
   const getCounterparty = (t: InvestorTransferRequest): string => {
     const direction = getDirection(t);
     return direction === "Sent" ? (t.toWalletAddress ?? "--") : (t.fromWalletAddress ?? "--");
+  };
+
+  const getCounterpartyName = (t: InvestorTransferRequest): string | null => {
+    const addr = getCounterparty(t);
+    if (addr === "--") return null;
+    return walletNameMap[addr.toLowerCase()] ?? null;
   };
 
   const isBlocked = (t: InvestorTransferRequest): boolean => {
@@ -382,7 +412,12 @@ function TransferHistorySection({
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <ExplorerLink value={getCounterparty(t)} type="address" />
+                      <div>
+                        {getCounterpartyName(t) && (
+                          <span className="block text-sm font-medium text-gray-900">{getCounterpartyName(t)}</span>
+                        )}
+                        <ExplorerLink value={getCounterparty(t)} type="address" />
+                      </div>
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {fmt(Number(t.tokenAmount))}
@@ -431,6 +466,23 @@ export default function InvestorTransfersPage() {
     queryFn: () => getMyDashboard(fundId).then((r) => r.data),
   });
 
+  const { data: capTable } = useQuery({
+    queryKey: QUERY_KEYS.investorCapTable(fundId),
+    queryFn: () => getInvestorCapTable(fundId).then((r) => r.data),
+  });
+
+  const walletNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (capTable?.rows) {
+      for (const row of capTable.rows) {
+        if (row.investorName && row.walletAddress) {
+          map[row.walletAddress.toLowerCase()] = row.investorName;
+        }
+      }
+    }
+    return map;
+  }, [capTable]);
+
   const investorWalletAddress = useMemo(() => {
     if (!dashboard?.wallets?.length) return null;
     const primary = dashboard.wallets.find((w) => w.isPrimary);
@@ -465,6 +517,7 @@ export default function InvestorTransfersPage() {
         <TransferHistorySection
           transfers={transfers ?? []}
           investorWalletAddress={investorWalletAddress}
+          walletNameMap={walletNameMap}
         />
       </div>
     </div>

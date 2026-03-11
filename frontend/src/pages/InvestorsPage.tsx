@@ -171,6 +171,15 @@ export default function InvestorsPage() {
       ),
     },
     {
+      key: "ownership",
+      header: "Ownership %",
+      render: (r) => (
+        <span className="text-sm text-gray-900">
+          {r.ownership > 0 ? `${r.ownership}%` : "--"}
+        </span>
+      ),
+    },
+    {
       key: "tokenBalance",
       header: "Token Balance",
       render: (r) => <span className="font-mono text-xs text-gray-900">{r.tokenBalance}</span>,
@@ -221,7 +230,14 @@ export default function InvestorsPage() {
       : undefined;
 
   const selectedInvestorDocCount: number =
-    documents ? documents.length : 0;
+    selectedInvestor && documents
+      ? documents.filter(
+          (d) =>
+            (d.metadata as Record<string, unknown>)?.investorId === selectedInvestor.investorId ||
+            (d.metadata as Record<string, unknown>)?.investorName === selectedInvestor.legalName ||
+            d.uploadedBy === selectedInvestor.email,
+        ).length
+      : 0;
 
   const selectedInvestorSubs = selectedInvestor && allSubscriptions
     ? allSubscriptions.filter(s => s.investorId === selectedInvestor.investorId)
@@ -336,6 +352,12 @@ export default function InvestorsPage() {
                     </dt>
                     <dd className="text-sm text-gray-900">
                       {selectedInvestor.verificationStatus === "Verified" ? "Yes" : "No"}
+                      {selectedInvestor.verificationStatus === "Verified" &&
+                        selectedInvestor.fundEligibility?.effectiveAt && (
+                          <span className="ml-2 text-xs text-gray-500">
+                            {new Date(selectedInvestor.fundEligibility.effectiveAt).toLocaleDateString()}
+                          </span>
+                        )}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">
@@ -347,6 +369,12 @@ export default function InvestorsPage() {
                     </dt>
                     <dd className="text-sm text-gray-900">
                       {selectedInvestor.verificationStatus === "Verified" ? "Accredited" : "Unaccredited"}
+                      {selectedInvestor.verificationStatus === "Verified" &&
+                        selectedInvestor.fundEligibility?.effectiveAt && (
+                          <span className="ml-2 text-xs text-gray-500">
+                            {new Date(selectedInvestor.fundEligibility.effectiveAt).toLocaleDateString()}
+                          </span>
+                        )}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">

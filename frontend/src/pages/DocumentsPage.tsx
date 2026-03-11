@@ -172,11 +172,15 @@ const governingDocColumns: Column<FundDocument>[] = [
   {
     key: "anchorRef",
     header: "On-Chain Anchor",
-    render: (_row) => {
-      // Anchor tx hash is available in the detail view via hashesData
-      const anchored = _row.hash?.anchoredOnchain;
-      if (!anchored) return <span className="text-gray-400 text-xs">Not anchored</span>;
-      return <StatusBadge status="Completed" />;
+    render: (row) => {
+      if (!row.hash?.anchoredOnchain) {
+        return <span className="text-gray-400 text-xs">Pending</span>;
+      }
+      const txHash = (row.metadata as Record<string, unknown>)?.anchorTxHash as string | undefined;
+      if (txHash) {
+        return <ExplorerLink value={txHash} type="tx" />;
+      }
+      return <span className="text-xs text-green-700 font-medium">Anchored</span>;
     },
   },
   {
@@ -212,6 +216,73 @@ interface SubscriptionDraft {
   walletAddress: string;
   allocationPct: number;
   committedAmount: number;
+}
+
+// ── Notice table with filter ──────────────────────────────────
+
+interface NoticeRow {
+  id: string;
+  type: string;
+  recipientName: string;
+  generatedAt: string;
+  documentHash: string;
+  anchorTxHash: string;
+  sentAt: string;
+  openedAt: string;
+  downloadedAt: string;
+  status: string;
+}
+
+function NoticeTableWithFilter({
+  noticeRows,
+  noticeColumns,
+}: {
+  readonly noticeRows: NoticeRow[];
+  readonly noticeColumns: Column<NoticeRow>[];
+}) {
+  const [showUnopenedOnly, setShowUnopenedOnly] = useState(false);
+
+  const unopenedCount = noticeRows.filter((r) => !r.openedAt).length;
+  const displayRows = showUnopenedOnly
+    ? noticeRows.filter((r) => !r.openedAt)
+    : noticeRows;
+
+  return (
+    <>
+      {unopenedCount > 0 && (
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => setShowUnopenedOnly((prev) => !prev)}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              showUnopenedOnly
+                ? "bg-amber-100 text-amber-800 border border-amber-300"
+                : "bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200"
+            }`}
+          >
+            <Eye className="h-3.5 w-3.5" />
+            {showUnopenedOnly
+              ? `Showing ${unopenedCount} unopened`
+              : `${unopenedCount} unopened`}
+          </button>
+          {showUnopenedOnly && (
+            <button
+              onClick={() => setShowUnopenedOnly(false)}
+              className="text-xs text-gray-500 hover:text-gray-700 underline"
+            >
+              Show all
+            </button>
+          )}
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <DataTable
+          columns={noticeColumns}
+          data={displayRows}
+          getRowId={(r) => r.id}
+        />
+      </div>
+    </>
+  );
 }
 
 // ── Main component ──────────────────────────────────────────
@@ -506,19 +577,6 @@ export default function DocumentsPage() {
 
   // ── Notice table columns ───────────────────────────────────
 
-  interface NoticeRow {
-    id: string;
-    type: string;
-    recipientName: string;
-    generatedAt: string;
-    documentHash: string;
-    anchorTxHash: string;
-    sentAt: string;
-    openedAt: string;
-    downloadedAt: string;
-    status: string;
-  }
-
   const noticeRows: NoticeRow[] = (notices ?? []).map((n: Notice) => {
     const delivery = n.deliveries?.[0];
     const effectiveStatus = delivery?.status ?? "GENERATED";
@@ -634,17 +692,31 @@ export default function DocumentsPage() {
                 message="Upload a Master LPA to get started. The document will be parsed and its hash anchored on-chain."
               />
             )}
-            {documents && documents.length > 0 && (
-              <div className="max-h-80 overflow-y-auto">
-                <DataTable
-                  columns={governingDocColumns}
-                  data={documents}
-                  getRowId={(row) => row.documentId}
-                  onRowClick={(row) => setSelectedDocId(row.documentId)}
-                  selectedId={selectedDocId ?? undefined}
-                />
-              </div>
-            )}
+            {documents && documents.length > 0 && (() => {
+              const GOVERNING_TYPES = new Set(["MASTER_LPA", "AMENDMENT", "SIDE_LETTER"]);
+              const governingDocs = documents.filter(
+                (d) => GOVERNING_TYPES.has(d.documentType) || !d.documentType,
+              );
+              if (governingDocs.length === 0) {
+                return (
+                  <EmptyState
+                    title="No governing documents"
+                    message="Upload a Master LPA, Amendment, or Side Letter to get started."
+                  />
+                );
+              }
+              return (
+                <div className="max-h-80 overflow-y-auto">
+                  <DataTable
+                    columns={governingDocColumns}
+                    data={governingDocs}
+                    getRowId={(row) => row.documentId}
+                    onRowClick={(row) => setSelectedDocId(row.documentId)}
+                    selectedId={selectedDocId ?? undefined}
+                  />
+                </div>
+              );
+            })()}
           </SectionCard>
 
           {/* Document Detail (only shown when a doc is selected) */}
@@ -1035,13 +1107,10 @@ export default function DocumentsPage() {
               />
             )}
             {!noticesLoading && noticeRows.length > 0 && (
-              <div className="overflow-x-auto">
-                <DataTable
-                  columns={noticeColumns}
-                  data={noticeRows}
-                  getRowId={(r) => r.id}
-                />
-              </div>
+              <NoticeTableWithFilter
+                noticeRows={noticeRows}
+                noticeColumns={noticeColumns}
+              />
             )}
           </SectionCard>
         </TabsContent>

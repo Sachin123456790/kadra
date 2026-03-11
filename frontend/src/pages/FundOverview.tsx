@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { MetricCard } from "@/components/kadra/MetricCard";
 import { SectionCard } from "@/components/kadra/SectionCard";
@@ -8,10 +9,21 @@ import { EmptyState } from "@/components/kadra/EmptyState";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import { ActivityFeed } from "@/components/kadra/ActivityFeed";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { QUERY_KEYS, DEFAULT_FUND_CODE, ROUTES } from "@/config/constants";
-import { getFundOverview, getActivityFeed } from "@/services";
+import { getFundOverview, getActivityFeed, getDocuments } from "@/services";
 import { getCapitalCalls } from "@/services/capital-calls.service";
 import { getCapitalAccounts } from "@/services/ownership.service";
+
+const IDENTITY_REGISTRY_ADDRESS = "0x55822888507cac67bE5C11516e00C4597E7c78fb";
+
+// Demo fund target size ($5M). Used as the denominator for the Committed progress bar
+// so it does not trivially show 100% by comparing committed capital against itself.
+const DEMO_FUND_TARGET_SIZE = 5_000_000;
 
 /* ── Formatters ── */
 
@@ -55,7 +67,9 @@ function CopyableAddress({ address }: { readonly address: string }) {
   const truncated = address.length > 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
 
   const handleCopy = () => {
-    void navigator.clipboard.writeText(address);
+    void navigator.clipboard.writeText(address).then(() => {
+      toast.success("Address copied to clipboard");
+    });
   };
 
   return (
@@ -112,6 +126,7 @@ export default function FundOverviewPage() {
   const { data: activityEvents, isLoading: activityLoading } = useQuery({
     queryKey: QUERY_KEYS.activityFeed(fundId),
     queryFn: () => getActivityFeed(fundId, 20).then((r) => r.data),
+    refetchInterval: 30_000,
   });
 
   const { data: capitalCalls } = useQuery({
@@ -122,6 +137,11 @@ export default function FundOverviewPage() {
   const { data: capitalAccounts } = useQuery({
     queryKey: QUERY_KEYS.capitalAccounts(fundId),
     queryFn: () => getCapitalAccounts(fundId).then((r) => r.data),
+  });
+
+  const { data: documents } = useQuery({
+    queryKey: QUERY_KEYS.documents(fundId),
+    queryFn: () => getDocuments(fundId).then((r) => r.data),
   });
 
   /* ── Derived values ── */
@@ -179,8 +199,12 @@ export default function FundOverviewPage() {
     );
 
   const isDeployed = fundData.tokenContract?.deploymentStatus === "DEPLOYED";
-  const fundSize = metrics.committedCapital;
-  const isFullyCommitted = metrics.settledCapital >= fundSize && fundSize > 0;
+  const fundSize = DEMO_FUND_TARGET_SIZE;
+  const isFullyCommitted = metrics.committedCapital >= fundSize && fundSize > 0;
+
+  // Find the governing document (Master LPA) hash for waterfall version link
+  const governingDoc = documents?.find((d) => d.documentType === "MASTER_LPA");
+  const governingDocHash = governingDoc?.hash?.hashHex ?? null;
 
   /* ── Last on-chain event ── */
   const lastOnChainEvent = activityEvents
@@ -241,6 +265,12 @@ export default function FundOverviewPage() {
                 <span className="text-gray-400">Not deployed</span>
               )}
             </InfoRow>
+            <InfoRow label="Identity Registry">
+              <ExplorerLink
+                value={IDENTITY_REGISTRY_ADDRESS}
+                type="address"
+              />
+            </InfoRow>
             <InfoRow label="Chain ID">
               {fundData.tokenContract?.chainId
                 ? String(fundData.tokenContract.chainId)
@@ -252,7 +282,25 @@ export default function FundOverviewPage() {
                 Yes
               </span>
             </InfoRow>
-            <InfoRow label="Waterfall Version">1.0</InfoRow>
+            <InfoRow label="Waterfall Version">
+              {governingDocHash ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help border-b border-dashed border-gray-400 text-indigo-600">
+                      1.0
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="text-xs">
+                      Linked to LPA hash:{" "}
+                      <span className="font-mono">{governingDocHash.slice(0, 12)}...{governingDocHash.slice(-8)}</span>
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                "1.0"
+              )}
+            </InfoRow>
           </dl>
         </SectionCard>
 
@@ -283,24 +331,25 @@ export default function FundOverviewPage() {
             <ProgressBar
               label="Committed"
               value={metrics.committedCapital}
-              max={metrics.committedCapital}
+              max={fundSize}
               color="bg-indigo-600"
             />
             <ProgressBar
               label="Called"
               value={metrics.calledCapital}
-              max={metrics.committedCapital}
+              max={fundSize}
               color="bg-blue-500"
             />
             <ProgressBar
               label="Settled"
               value={metrics.settledCapital}
-              max={metrics.committedCapital}
+              max={fundSize}
               color="bg-green-500"
             />
 
             <div className="border-t border-gray-100 pt-4">
               <dl className="space-y-3">
+                {/* GP Promote is $0 — correct for demo since no distributions have been run yet */}
                 <InfoRow label="GP Promote Accrued">{fmt(0)}</InfoRow>
                 <InfoRow label="Total Preferred Return Accrued">
                   {fmt(metrics.totalAccruedPrefReturn)}
@@ -343,6 +392,9 @@ export default function FundOverviewPage() {
             <InfoRow label="Last On-Chain Event">
               {lastOnChainEvent ? (
                 <div className="flex flex-col items-end gap-0.5">
+                  <span className="text-xs font-medium text-gray-700">
+                    {lastOnChainEvent.eventType.replace(/_/g, " ")}
+                  </span>
                   <span className="text-xs text-gray-600">
                     {new Date(lastOnChainEvent.occurredAt).toLocaleDateString()}{" "}
                     {new Date(lastOnChainEvent.occurredAt).toLocaleTimeString()}

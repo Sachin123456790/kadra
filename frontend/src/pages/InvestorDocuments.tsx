@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileText } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { DataTable, Column } from "@/components/kadra/DataTable";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
@@ -40,6 +41,13 @@ const fmtDate = (d: string) =>
     month: "short",
     day: "numeric",
   });
+
+const fmtCurrency = (n: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(n);
 
 function TypeBadge({ type }: { readonly type: string }) {
   const style = TYPE_BADGE_STYLES[type] ?? "bg-gray-100 text-gray-600";
@@ -82,9 +90,26 @@ const columns: Column<InvestorDocument>[] = [
   {
     key: "name",
     header: "Document Name",
-    render: (row) => (
-      <span className="text-sm font-medium text-gray-900">{row.name}</span>
-    ),
+    render: (row) => {
+      const meta = (row as Record<string, unknown>).metadata as Record<string, unknown> | undefined;
+      return (
+        <div>
+          <span className="text-sm font-medium text-gray-900">{row.name}</span>
+          {row.type === "CAPITAL_CALL_NOTICE" && meta && (
+            <div className="text-xs text-gray-500 mt-0.5">
+              {meta.amountDue != null && <span>Amount Due: {fmtCurrency(Number(meta.amountDue))}</span>}
+              {meta.amountDue != null && meta.dueDate != null && <span className="mx-1">&middot;</span>}
+              {meta.dueDate != null && <span>Due: {fmtDate(String(meta.dueDate))}</span>}
+            </div>
+          )}
+          {row.type === "DISTRIBUTION_NOTICE" && meta && meta.payoutAmount != null && (
+            <div className="text-xs text-gray-500 mt-0.5">
+              Payout: {fmtCurrency(Number(meta.payoutAmount))}
+            </div>
+          )}
+        </div>
+      );
+    },
   },
   {
     key: "type",
@@ -111,7 +136,7 @@ const columns: Column<InvestorDocument>[] = [
         onClick={(e) => {
           e.stopPropagation();
           if (row.downloadable) {
-            alert("Download will be available soon.");
+            toast.info("Download feature coming soon");
           }
         }}
         disabled={!row.downloadable}

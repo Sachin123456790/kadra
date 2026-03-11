@@ -4,7 +4,8 @@ import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import {
   getFailedTransfers,
   getSuccessfulTransfers,
-  getFundOverview,
+  getDocuments,
+  getInvestors,
 } from "@/services";
 import type { FailedTransfer, SuccessfulTransfer } from "@/services/tokenization.service";
 import { PageHeader } from "@/components/kadra/PageHeader";
@@ -67,17 +68,33 @@ interface UnifiedTransfer {
   isFailed: boolean;
 }
 
+function buildWalletToNameMap(
+  investors: Array<{ legalName: string; wallets: Array<{ address: string }> }> | undefined,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!investors) return map;
+  for (const inv of investors) {
+    for (const w of inv.wallets) {
+      map.set(w.address.toLowerCase(), inv.legalName);
+    }
+  }
+  return map;
+}
+
 function mergeTransfers(
   successful: SuccessfulTransfer[],
   failed: FailedTransfer[],
+  walletNameMap: Map<string, string>,
 ): UnifiedTransfer[] {
+  const lookupName = (addr: string) => walletNameMap.get(addr.toLowerCase()) ?? "";
+
   const successRows: UnifiedTransfer[] = successful.map((t) => ({
     id: t.transferRequestId,
     date: t.timestamp,
     fromWallet: t.fromWalletAddress,
-    fromLpName: "",
+    fromLpName: lookupName(t.fromWalletAddress),
     toWallet: t.toWalletAddress,
-    toLpName: "",
+    toLpName: lookupName(t.toWalletAddress),
     amount: parseFloat(t.tokenAmount),
     preCheckResult: "Eligible",
     onChainResult: "Executed",
@@ -91,9 +108,9 @@ function mergeTransfers(
     id: t.transferRequestId,
     date: t.timestamp,
     fromWallet: t.fromWalletAddress,
-    fromLpName: "",
+    fromLpName: lookupName(t.fromWalletAddress),
     toWallet: t.toWalletAddress,
-    toLpName: "",
+    toLpName: lookupName(t.toWalletAddress),
     amount: parseFloat(t.tokenAmount),
     preCheckResult: "Not Eligible",
     onChainResult: "Reverted",
@@ -188,7 +205,13 @@ function TransferHistoryTable({
               Date
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              From LP
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
               From Wallet
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              To LP
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
               To Wallet
@@ -222,8 +245,14 @@ function TransferHistoryTable({
               <td className="px-4 py-3 text-gray-900">
                 {new Date(t.date).toLocaleDateString()}
               </td>
+              <td className="px-4 py-3 text-gray-900">
+                {t.fromLpName || "--"}
+              </td>
               <td className="px-4 py-3">
                 <ExplorerLink value={t.fromWallet} type="address" />
+              </td>
+              <td className="px-4 py-3 text-gray-900">
+                {t.toLpName || "--"}
               </td>
               <td className="px-4 py-3">
                 <ExplorerLink value={t.toWallet} type="address" />
@@ -302,23 +331,36 @@ export default function TransfersPage() {
   });
 
   const {
-    data: fundOverview,
-    isLoading: fundLoading,
+    data: documents,
+    isLoading: docsLoading,
   } = useQuery({
-    queryKey: QUERY_KEYS.fundOverview(fundId),
-    queryFn: () => getFundOverview(fundId).then((r) => r.data),
+    queryKey: QUERY_KEYS.documents(fundId),
+    queryFn: () => getDocuments(fundId).then((r) => r.data),
   });
 
-  const isLoading = failedLoading || successLoading || fundLoading;
+  const {
+    data: investors,
+    isLoading: investorsLoading,
+  } = useQuery({
+    queryKey: QUERY_KEYS.investors(fundId),
+    queryFn: () => getInvestors(fundId).then((r) => r.data),
+  });
+
+  const isLoading = failedLoading || successLoading || docsLoading || investorsLoading;
+
+  const walletNameMap = useMemo(() => buildWalletToNameMap(investors), [investors]);
 
   const transfers = useMemo(() => {
     const successful = successData ?? [];
     const failed = failedData ?? [];
-    return mergeTransfers(successful, failed);
-  }, [successData, failedData]);
+    return mergeTransfers(successful, failed, walletNameMap);
+  }, [successData, failedData, walletNameMap]);
 
-  // Derive LPA hash from fund overview if available
-  const lpaHash = fundOverview?.tokenContract?.contractAddress ?? "";
+  // Derive LPA hash from the first MASTER_LPA governing document
+  const lpaHash = useMemo(() => {
+    const lpaDoc = (documents ?? []).find((d) => d.documentType === "MASTER_LPA");
+    return lpaDoc?.hash?.hashHex ?? "";
+  }, [documents]);
 
   if (isLoading) {
     return (

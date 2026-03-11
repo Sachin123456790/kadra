@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileText } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
@@ -81,7 +82,7 @@ export default function InvestorCapitalAccount() {
   });
 
   const handleExport = () => {
-    alert("Export coming soon");
+    toast.info("Export feature coming soon");
   };
 
   if (isLoading) return <div className="p-6 text-gray-500">Loading...</div>;
@@ -149,15 +150,20 @@ export default function InvestorCapitalAccount() {
               even
             />
             <StatementRow
+              label="Distributions Received"
+              value={fmt(Number((account as Record<string, unknown>).distributionsReceived ?? 0))}
+              even={false}
+            />
+            <StatementRow
               label="Residual Allocation"
               value={fmt(Number(account.residualAllocation))}
-              even={false}
+              even
             />
             <StatementRow
               label="Closing Balance"
               value={fmt(Number(account.endingBalance))}
               isTotal
-              even
+              even={false}
             />
           </div>
         </div>
