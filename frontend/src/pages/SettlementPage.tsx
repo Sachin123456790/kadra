@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
 import {
   CheckCircle,
   XCircle,
@@ -16,6 +17,7 @@ import {
   Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import {
   getSubscriptions,
@@ -373,11 +375,6 @@ function SettlementValidationSection({
       })),
   });
 
-  const { data: settledSubs, isLoading: settledLoading } = useQuery({
-    queryKey: [...QUERY_KEYS.subscriptions(fundId), "SETTLED"],
-    queryFn: () => getSubscriptions(fundId, "SETTLED").then((r) => r.data),
-  });
-
   const selected =
     queue?.find((q) => q.id === selectedId) ?? queue?.[0] ?? null;
 
@@ -434,7 +431,7 @@ function SettlementValidationSection({
     },
   });
 
-  if (isLoading || settledLoading)
+  if (isLoading)
     return (
       <div className="flex items-center gap-2 p-6 text-gray-500">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -470,110 +467,12 @@ function SettlementValidationSection({
 
   return (
     <>
-      {/* Settlement History Table */}
-      {settledSubs && settledSubs.length > 0 && (
-        <SectionCard
-          title={`Settlement History (${settledSubs.length})`}
-          className="mb-6"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    LP Name
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Committed Amount
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Payment Received
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Allocation
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Three-Way Match
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Settlement Timestamp
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Settlement Tx Hash
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {settledSubs.map((sub) => (
-                  <tr
-                    key={sub.subscriptionId}
-                    className="border-b border-gray-100"
-                  >
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {sub.investorName || sub.investorId}
-                    </td>
-                    <td className="px-4 py-3 text-gray-900">
-                      ${Number(sub.committedAmount).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-gray-900">
-                      {fmt(Number(sub.committedAmount) || 0)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-900">
-                      {Number(sub.allocationPct)}%
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          <span className="text-xs text-gray-600">Amount</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          <span className="text-xs text-gray-600">Identity</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          <span className="text-xs text-gray-600">Reference</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status="Settled" />
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {sub.settledAt
-                        ? new Date(sub.settledAt).toLocaleString()
-                        : "--"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.settlementTxHash ? (
-                        <ExplorerLink
-                          value={sub.settlementTxHash}
-                          type="tx"
-                        />
-                      ) : (
-                        <span className="text-gray-400">--</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </SectionCard>
-      )}
-
-      {!hasPending && (!settledSubs || settledSubs.length === 0) && (
+      {!hasPending ? (
         <EmptyState
-          title="No settlements"
-          message="No subscriptions have been created yet."
+          title="No pending settlements"
+          message="All subscriptions have been settled, or no subscriptions exist yet."
         />
-      )}
-
-      {hasPending && (
+      ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <SectionCard title="Payment Evidence Queue">
             <div className="space-y-2">
@@ -817,8 +716,96 @@ export default function SettlementPage() {
         subtitle="Manage capital calls and verify payment evidence against subscription terms"
       />
 
-      <CapitalCallsSection fundId={fundId} />
-      <SettlementValidationSection fundId={fundId} />
+      <Tabs defaultValue="history" className="mt-2">
+        <TabsList className="mb-4">
+          <TabsTrigger value="history">Settlement History & Capital Calls</TabsTrigger>
+          <TabsTrigger value="validation">Payment Evidence & Validation</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="history">
+          <CapitalCallsSection fundId={fundId} />
+          <SettlementHistoryOnly fundId={fundId} />
+        </TabsContent>
+
+        <TabsContent value="validation">
+          <SettlementValidationSection fundId={fundId} />
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+/** Settlement history table extracted for the first tab */
+function SettlementHistoryOnly({ fundId }: { readonly fundId: string }) {
+  const { data: settledSubs, isLoading } = useQuery({
+    queryKey: [...QUERY_KEYS.subscriptions(fundId), "SETTLED"],
+    queryFn: () => getSubscriptions(fundId, "SETTLED").then((r) => r.data),
+  });
+
+  if (isLoading)
+    return (
+      <div className="flex items-center gap-2 p-6 text-gray-500">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading settlement history...
+      </div>
+    );
+
+  if (!settledSubs || settledSubs.length === 0)
+    return (
+      <EmptyState
+        title="No settled subscriptions"
+        message="No subscriptions have been settled yet."
+      />
+    );
+
+  return (
+    <SectionCard title={`Settlement History (${settledSubs.length})`} className="mt-4">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">LP Name</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Committed Amount</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Allocation</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Three-Way Match</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Settlement Date</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Verification</th>
+            </tr>
+          </thead>
+          <tbody>
+            {settledSubs.map((sub) => (
+              <tr key={sub.subscriptionId} className="border-b border-gray-100">
+                <td className="px-4 py-3 font-medium text-gray-900">{sub.investorName || sub.investorId}</td>
+                <td className="px-4 py-3 text-gray-900">${Number(sub.committedAmount).toLocaleString()}</td>
+                <td className="px-4 py-3 text-gray-900">{Number(sub.allocationPct)}%</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    {["Amount", "Identity", "Reference"].map((label) => (
+                      <div key={label} className="flex items-center gap-1">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="text-xs text-gray-600">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-4 py-3"><StatusBadge status="Settled" /></td>
+                <td className="px-4 py-3 text-gray-600">{sub.settledAt ? new Date(sub.settledAt).toLocaleDateString() : "--"}</td>
+                <td className="px-4 py-3">
+                  {sub.settlementTxHash ? (
+                    <span className="inline-flex items-center gap-1 text-green-600">
+                      <CheckCircle className="h-4 w-4" />
+                      <span className="text-xs">Verified</span>
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">--</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
   );
 }

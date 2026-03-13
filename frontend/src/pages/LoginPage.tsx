@@ -131,9 +131,9 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="flex items-center gap-2 mb-12">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">K</span>
+              <span className="text-primary-foreground font-bold text-sm">A</span>
             </div>
-            <span className="text-lg font-bold text-gray-900 tracking-tight">Kadra</span>
+            <span className="text-lg font-bold text-gray-900 tracking-tight">Angainor</span>
           </div>
 
           {/* Heading */}
@@ -149,7 +149,7 @@ export default function LoginPage() {
                 <>
                   Get Started
                   <br />
-                  With Kadra
+                  With Angainor
                 </>
               )}
             </h1>

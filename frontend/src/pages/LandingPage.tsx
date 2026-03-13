@@ -84,7 +84,7 @@ const steps = [
   {
     number: 1,
     title: "Upload LPA",
-    description: "Upload your Master LPA. Kadra hashes and anchors it on-chain.",
+    description: "Upload your Master LPA. Angainor hashes and anchors it on-chain.",
   },
   {
     number: 2,
@@ -175,9 +175,9 @@ export default function LandingPage() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
               <div className="bg-primary rounded-lg h-8 w-8 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">K</span>
+                <span className="text-white font-bold text-sm">A</span>
               </div>
-              <span className="text-gray-900 font-bold text-lg">Kadra</span>
+              <span className="text-gray-900 font-bold text-lg">Angainor</span>
             </div>
             <Link
               to="/login"
@@ -198,7 +198,7 @@ export default function LandingPage() {
                 Fund Infrastructure, Simplified.
               </h1>
               <p className="text-lg text-gray-600 mt-6 max-w-lg">
-                Kadra replaces manual, siloed back-office workflows with blockchain-verified
+                Angainor replaces manual, siloed back-office workflows with blockchain-verified
                 settlement. One system of record. Zero reconciliation.
               </p>
               <div className="mt-10 flex flex-wrap gap-4">
@@ -256,7 +256,7 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl font-bold text-gray-900">How Kadra Works</h2>
+            <h2 className="text-3xl font-bold text-gray-900">How Angainor Works</h2>
             <p className="mt-4 text-lg text-gray-600">
               Four steps from document upload to audit-ready fund administration.
             </p>
@@ -312,15 +312,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Why Kadra */}
-      <section id="why-kadra" className="py-20">
+      {/* Why Angainor */}
+      <section id="why-angainor" className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className="hidden lg:block">
               <SecurityIllustration />
             </div>
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-8">Why Kadra</h2>
+              <h2 className="text-3xl font-bold text-gray-900 mb-8">Why Angainor</h2>
               <div className="space-y-6">
                 {whyKadraPoints.map((point) => (
                   <div key={point.title} className="flex gap-4">
@@ -428,9 +428,9 @@ export default function LandingPage() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <div className="bg-primary rounded-lg h-7 w-7 flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">K</span>
+                  <span className="text-white font-bold text-xs">A</span>
                 </div>
-                <span className="text-white font-bold">Kadra</span>
+                <span className="text-white font-bold">Angainor</span>
               </div>
               <p className="text-sm leading-relaxed mb-6">
                 Programmable infrastructure for private funds.
@@ -522,7 +522,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-12 pt-8 text-center text-sm text-gray-500">
-            &copy; 2024 Kadra. All rights reserved.
+            &copy; 2024 Angainor. All rights reserved.
           </div>
         </div>
       </footer>

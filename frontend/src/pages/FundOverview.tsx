@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/kadra/EmptyState";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import { ActivityFeed } from "@/components/kadra/ActivityFeed";
+import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
 import {
   Tooltip,
   TooltipContent,
@@ -18,6 +19,7 @@ import { QUERY_KEYS, DEFAULT_FUND_CODE, ROUTES } from "@/config/constants";
 import { getFundOverview, getActivityFeed, getDocuments } from "@/services";
 import { getCapitalCalls } from "@/services/capital-calls.service";
 import { getCapitalAccounts } from "@/services/ownership.service";
+import { formatCompact } from "@/lib/format";
 
 const IDENTITY_REGISTRY_ADDRESS = "0x55822888507cac67bE5C11516e00C4597E7c78fb";
 
@@ -229,20 +231,28 @@ export default function FundOverviewPage() {
         />
         <MetricCard
           label="Total AUM / Fund Size"
-          value={`${fmt(metrics.settledCapital)} / ${fmt(fundSize)}`}
+          value={`${formatCompact(metrics.settledCapital)} / ${formatCompact(fundSize)}`}
           subtitle={isFullyCommitted ? "Fully Committed" : "Partially Committed"}
         />
-        <MetricCard label="Active LPs" value={fundData.lpCount} />
-        <MetricCard label="Pending Settlements" value={fundData.pendingSubscriptions} />
+        <MetricCard
+          label="Active LPs"
+          value={fundData.lpCount}
+          subtitle={`of ${(fundData.lpCount ?? 0) + (fundData.pendingSubscriptions ?? 0)} total`}
+        />
+        <MetricCard
+          label="Pending Settlements"
+          value={fundData.pendingSubscriptions}
+          subtitle={`${fundData.pendingSubscriptions ?? 0} awaiting confirmation`}
+        />
       </div>
 
       {/* ── Bottom Metric Bar (5 cards) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <MetricCard label="Committed Capital" value={fmt(metrics.committedCapital)} />
-        <MetricCard label="Called Capital" value={fmt(metrics.calledCapital)} />
-        <MetricCard label="Settled Capital" value={fmt(metrics.settledCapital)} />
-        <MetricCard label="Total Distributed" value={fmt(metrics.totalDistributed)} />
-        <MetricCard label="Total Returns" value={fmt(metrics.totalReturns)} />
+        <MetricCard label="Committed Capital" value={formatCompact(metrics.committedCapital)} />
+        <MetricCard label="Called Capital" value={formatCompact(metrics.calledCapital)} />
+        <MetricCard label="Settled Capital" value={formatCompact(metrics.settledCapital)} />
+        <MetricCard label="Total Distributed" value={formatCompact(metrics.totalDistributed)} />
+        <MetricCard label="Total Returns" value={formatCompact(metrics.totalReturns)} />
       </div>
 
       {/* ── 2x2 Panel Grid ── */}
@@ -254,27 +264,6 @@ export default function FundOverviewPage() {
             <InfoRow label="Legal Form">Limited Partnership</InfoRow>
             <InfoRow label="Status">
               <StatusBadge status={fundData.status === "ACTIVE" ? "Passed" : fundData.status} />
-            </InfoRow>
-            <InfoRow label="Contract Address">
-              {fundData.tokenContract?.contractAddress ? (
-                <ExplorerLink
-                  value={fundData.tokenContract.contractAddress}
-                  type="address"
-                />
-              ) : (
-                <span className="text-gray-400">Not deployed</span>
-              )}
-            </InfoRow>
-            <InfoRow label="Identity Registry">
-              <ExplorerLink
-                value={IDENTITY_REGISTRY_ADDRESS}
-                type="address"
-              />
-            </InfoRow>
-            <InfoRow label="Chain ID">
-              {fundData.tokenContract?.chainId
-                ? String(fundData.tokenContract.chainId)
-                : "11155111"}
             </InfoRow>
             <InfoRow label="Transfer Restrictions Active">
               <span className="inline-flex items-center gap-1.5 text-green-700 text-xs font-medium">
@@ -302,6 +291,26 @@ export default function FundOverviewPage() {
               )}
             </InfoRow>
           </dl>
+          <TechnicalDetails label="Blockchain Details">
+            <dl className="space-y-3">
+              <InfoRow label="Contract Address">
+                {fundData.tokenContract?.contractAddress ? (
+                  <ExplorerLink
+                    value={fundData.tokenContract.contractAddress}
+                    type="address"
+                  />
+                ) : (
+                  <span className="text-gray-400">Not deployed</span>
+                )}
+              </InfoRow>
+              <InfoRow label="Identity Registry">
+                <ExplorerLink
+                  value={IDENTITY_REGISTRY_ADDRESS}
+                  type="address"
+                />
+              </InfoRow>
+            </dl>
+          </TechnicalDetails>
         </SectionCard>
 
         {/* Panel 2: Activity Feed */}
@@ -316,13 +325,23 @@ export default function FundOverviewPage() {
             </a>
           }
         >
-          <ActivityFeed
-            events={activityEvents ?? []}
-            isLoading={activityLoading}
-            maxItems={20}
-            showViewAll={false}
-            viewAllLink={ROUTES.AUDIT}
-          />
+          <div className="max-h-64 overflow-y-auto">
+            <ActivityFeed
+              events={activityEvents ?? []}
+              isLoading={activityLoading}
+              maxItems={20}
+              showViewAll={false}
+              viewAllLink={ROUTES.AUDIT}
+            />
+          </div>
+          <div className="border-t border-gray-100 pt-3 mt-3 text-center">
+            <a
+              href={ROUTES.AUDIT}
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              View All Events
+            </a>
+          </div>
         </SectionCard>
 
         {/* Panel 3: Capital Summary */}
@@ -370,44 +389,62 @@ export default function FundOverviewPage() {
         {/* Panel 4: Contract Info */}
         <SectionCard title="Contract Info">
           <dl className="space-y-3">
+            <InfoRow label="Fund Name">{fundData.fundName}</InfoRow>
+            <InfoRow label="Legal Form">Limited Partnership</InfoRow>
             <InfoRow label="Deployment Status">
               <StatusBadge status={isDeployed ? "Completed" : "Pending"} />
             </InfoRow>
-            <InfoRow label="Contract Address">
-              {fundData.tokenContract?.contractAddress ? (
-                <ExplorerLink
-                  value={fundData.tokenContract.contractAddress}
-                  type="address"
-                />
-              ) : (
-                <span className="text-gray-400">N/A</span>
-              )}
-            </InfoRow>
-            <InfoRow label="Total Tokens Minted">
-              {isDeployed ? "10,000 KDRA" : "N/A"}
-            </InfoRow>
-            <InfoRow label="Tokens Outstanding">
-              {isDeployed ? "10,000 KDRA" : "N/A"}
-            </InfoRow>
-            <InfoRow label="Last On-Chain Event">
-              {lastOnChainEvent ? (
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-xs font-medium text-gray-700">
-                    {lastOnChainEvent.eventType.replace(/_/g, " ")}
-                  </span>
-                  <span className="text-xs text-gray-600">
-                    {new Date(lastOnChainEvent.occurredAt).toLocaleDateString()}{" "}
-                    {new Date(lastOnChainEvent.occurredAt).toLocaleTimeString()}
-                  </span>
-                  {lastOnChainEvent.txHash && (
-                    <ExplorerLink value={lastOnChainEvent.txHash} type="tx" />
-                  )}
-                </div>
-              ) : (
-                <span className="text-gray-400">None</span>
-              )}
+            <InfoRow label="Transfer Restrictions Active">
+              <span className="inline-flex items-center gap-1.5 text-green-700 text-xs font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                Yes
+              </span>
             </InfoRow>
           </dl>
+          <TechnicalDetails label="Blockchain Details">
+            <dl className="space-y-3">
+              <InfoRow label="Contract Address">
+                {fundData.tokenContract?.contractAddress ? (
+                  <ExplorerLink
+                    value={fundData.tokenContract.contractAddress}
+                    type="address"
+                  />
+                ) : (
+                  <span className="text-gray-400">N/A</span>
+                )}
+              </InfoRow>
+              <InfoRow label="Identity Registry">
+                <ExplorerLink
+                  value={IDENTITY_REGISTRY_ADDRESS}
+                  type="address"
+                />
+              </InfoRow>
+              <InfoRow label="Total Tokens Minted">
+                {isDeployed ? "10,000 KDRA" : "N/A"}
+              </InfoRow>
+              <InfoRow label="Tokens Outstanding">
+                {isDeployed ? "10,000 KDRA" : "N/A"}
+              </InfoRow>
+              <InfoRow label="Last On-Chain Event">
+                {lastOnChainEvent ? (
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span className="text-xs font-medium text-gray-700">
+                      {lastOnChainEvent.eventType.replace(/_/g, " ")}
+                    </span>
+                    <span className="text-xs text-gray-600">
+                      {new Date(lastOnChainEvent.occurredAt).toLocaleDateString()}{" "}
+                      {new Date(lastOnChainEvent.occurredAt).toLocaleTimeString()}
+                    </span>
+                    {lastOnChainEvent.txHash && (
+                      <ExplorerLink value={lastOnChainEvent.txHash} type="tx" />
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-gray-400">None</span>
+                )}
+              </InfoRow>
+            </dl>
+          </TechnicalDetails>
         </SectionCard>
       </div>
     </div>

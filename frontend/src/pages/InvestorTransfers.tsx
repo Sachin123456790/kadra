@@ -10,6 +10,7 @@ import { getMyProfile } from "@/services/wallet-profile.service";
 import { validateTransfer, confirmTransfer } from "@/services/tokenization.service";
 import { encodeTransfer } from "@/config/kadra-token-abi";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
 import { useWallet } from "@/hooks/useWallet";
 import type { InvestorTransferRequest } from "@/services/investor-portal.service";
 import { Shield, Search, AlertCircle, CheckCircle } from "lucide-react";
@@ -46,13 +47,13 @@ function TransferEligibilityPanel() {
       <div className="bg-gray-50 rounded-lg p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Eligibility Marker Status</span>
+            <span className="text-sm text-gray-600">Transfer Eligibility</span>
             <span className={`inline-flex items-center rounded-full ${badgeStyle(isEligible)}`}>
               {isEligible ? "Active" : "Inactive"}
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Fund-Specific LP Marker</span>
+            <span className="text-sm text-gray-600">Fund Membership</span>
             <span className={`inline-flex items-center rounded-full ${badgeStyle(isEligible)}`}>
               {isEligible ? "Verified" : "Pending"}
             </span>
@@ -73,7 +74,7 @@ function TransferEligibilityPanel() {
         <div className="flex items-start gap-2 pt-3 border-t border-gray-200">
           <Shield className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
           <p className="text-xs text-gray-500">
-            Transfers are permitted only to wallets holding an active LP eligibility marker for this fund.
+            Transfers are permitted only to verified investors who are eligible members of this fund.
           </p>
         </div>
       </div>
@@ -193,26 +194,23 @@ function InitiateTransferSection({
 
   return (
     <SectionCard title="Initiate Transfer">
-      {/* Wallet connection status */}
+      {/* Wallet connection status (simplified) */}
       {wallet.status !== "connected" ? (
-        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-sm text-amber-800 mb-2">
-            Connect your wallet to sign transfers. Your wallet must be linked to your investor account.
-          </p>
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+          <div className="w-2 h-2 bg-amber-400 rounded-full" />
+          <span className="text-sm text-amber-800">Account not connected</span>
           <button
             onClick={() => wallet.connectWallet()}
-            className="px-3 py-1.5 bg-amber-600 text-white rounded text-sm hover:bg-amber-700"
+            className="ml-auto px-3 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700"
           >
-            Connect Wallet
+            Connect
           </button>
           {wallet.error && <p className="text-xs text-red-600 mt-1">{wallet.error}</p>}
         </div>
       ) : (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full" />
-          <span className="text-sm text-green-800">
-            Connected: <code className="text-xs">{wallet.address}</code>
-          </span>
+          <span className="text-sm text-green-800">Wallet: Connected</span>
         </div>
       )}
 
@@ -223,9 +221,11 @@ function InitiateTransferSection({
             <p className="text-green-800 font-medium">Transfer submitted successfully.</p>
           </div>
           {lastTxHash && (
-            <p className="text-sm text-green-700 mt-1">
-              Tx: <ExplorerLink value={lastTxHash} type="tx" />
-            </p>
+            <TechnicalDetails label="Transaction Details">
+              <p className="text-sm text-green-700">
+                Tx: <ExplorerLink value={lastTxHash} type="tx" />
+              </p>
+            </TechnicalDetails>
           )}
           <button
             onClick={() => { resetForm(); }}
@@ -278,7 +278,7 @@ function InitiateTransferSection({
             <h4 className="text-sm font-medium text-gray-900 mb-3">Amount</h4>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Token Amount</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Transfer Amount</label>
                 <input
                   type="number"
                   value={tokenAmount}
@@ -288,7 +288,7 @@ function InitiateTransferSection({
                   disabled={transferStep !== "idle"}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Current allocation: {tokenBalance} tokens
+                  Current allocation: {tokenBalance} units
                 </p>
               </div>
             </div>
@@ -309,8 +309,8 @@ function InitiateTransferSection({
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800">
             {transferStep === "validating" && "Validating transfer eligibility..."}
-            {transferStep === "signing" && "Please sign the transaction in your wallet..."}
-            {transferStep === "confirming" && "Confirming on-chain transaction..."}
+            {transferStep === "signing" && "Processing transfer..."}
+            {transferStep === "confirming" && "Confirming transfer..."}
           </p>
         </div>
       )}
@@ -413,10 +413,9 @@ function TransferHistorySection({
                     </td>
                     <td className="px-4 py-3">
                       <div>
-                        {getCounterpartyName(t) && (
-                          <span className="block text-sm font-medium text-gray-900">{getCounterpartyName(t)}</span>
-                        )}
-                        <ExplorerLink value={getCounterparty(t)} type="address" />
+                        <span className="block text-sm font-medium text-gray-900">
+                          {getCounterpartyName(t) || "LP Investor"}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
@@ -500,7 +499,7 @@ export default function InvestorTransfersPage() {
     <div>
       <PageHeader
         title="My Transfers"
-        subtitle="Transfer tokens to other eligible investors"
+        subtitle="Transfer ownership to other eligible investors"
       />
 
       <div className="space-y-6">

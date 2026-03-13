@@ -138,28 +138,29 @@ export default function SubscriptionsPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <PageHeader
-          title="Subscriptions"
-          subtitle="Track subscription commitments and settlement status"
-          action={
-            <Button
-              onClick={() => {
-                setCreateLpId("");
-                setCreateAmount("");
-                setCreateAllocation("");
-                setShowCreateModal(true);
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Subscription
-            </Button>
-          }
-        />
-        <SectionCard className="w-full sm:w-72 flex-shrink-0">
+      <PageHeader
+        title="Subscriptions"
+        subtitle="Track subscription commitments and settlement status"
+        action={
+          <Button
+            onClick={() => {
+              setCreateLpId("");
+              setCreateAmount("");
+              setCreateAllocation("");
+              setShowCreateModal(true);
+            }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Subscription
+          </Button>
+        }
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+        <SectionCard className="lg:col-span-1">
           <h3 className="text-sm font-medium text-gray-500 mb-2 text-center">Status Breakdown</h3>
-          <ResponsiveContainer width="100%" height={160}>
+          <ResponsiveContainer width="100%" height={140}>
             <PieChart>
               <Pie
                 data={statusChartData}
@@ -167,8 +168,8 @@ export default function SubscriptionsPage() {
                 nameKey="name"
                 cx="50%"
                 cy="50%"
-                innerRadius={50}
-                outerRadius={70}
+                innerRadius={40}
+                outerRadius={58}
               >
                 {statusChartData.map((entry) => (
                   <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#94a3b8"} />
@@ -188,13 +189,10 @@ export default function SubscriptionsPage() {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 w-8" />
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Record ID</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ref</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Investor</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Allocation %</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Committed</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">LPA Hash</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Created</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Settled</th>
               </tr>
@@ -348,24 +346,10 @@ function SubscriptionTableRow({
             ? <ChevronDown className="h-4 w-4" />
             : <ChevronRight className="h-4 w-4" />}
         </td>
-        <td className="px-4 py-3">
-          <span className="inline-flex items-center gap-1">
-            <span className="font-mono text-xs text-gray-900">{truncateId(sub.subscriptionId)}</span>
-            <button
-              onClick={(e) => { e.stopPropagation(); copyToClipboard(sub.subscriptionId); }}
-              className="text-gray-400 hover:text-gray-600 p-0.5"
-              title="Copy subscription ID"
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </button>
-          </span>
-        </td>
-        <td className="px-4 py-3 text-gray-900">{sub.subscriptionRef}</td>
-        <td className="px-4 py-3 text-gray-900">{sub.investorName || sub.investorId}</td>
+        <td className="px-4 py-3 font-medium text-gray-900">{sub.investorName || sub.investorId}</td>
         <td className="px-4 py-3 text-gray-900">{sub.allocationPct}%</td>
         <td className="px-4 py-3 text-gray-900">{fmt(Number(sub.committedAmount) || 0)}</td>
         <td className="px-4 py-3">{statusBadge(sub.status)}</td>
-        <td className="px-4 py-3 font-mono text-xs text-gray-600">{sub.governingHashHex ? truncateId(sub.governingHashHex) : "--"}</td>
         <td className="px-4 py-3 text-gray-600">{sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : "--"}</td>
         <td className="px-4 py-3 text-gray-600">{sub.settledAt ? new Date(sub.settledAt).toLocaleDateString() : "--"}</td>
       </tr>
@@ -373,37 +357,53 @@ function SubscriptionTableRow({
       {/* Expanded detail row */}
       {isExpanded && (
         <tr className="bg-gray-50/50">
-          <td colSpan={10} className="px-8 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <td colSpan={7} className="px-8 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Subscription Reference */}
+              <div className="flex items-start gap-3">
+                <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">Subscription Reference</p>
+                  <p className="text-sm text-gray-900">{sub.subscriptionRef}</p>
+                </div>
+              </div>
+
+              {/* Record ID */}
+              <div className="flex items-start gap-3">
+                <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">Record ID</p>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="text-sm font-mono text-gray-900">{truncateId(sub.subscriptionId)}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); copyToClipboard(sub.subscriptionId); }}
+                      className="text-gray-400 hover:text-gray-600 p-0.5"
+                      title="Copy subscription ID"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                </div>
+              </div>
+
               {/* Wallet Address */}
               <div className="flex items-start gap-3">
                 <Wallet className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Wallet Address</p>
                   <p className="text-sm font-mono text-gray-900">
-                    {walletAddress || "No wallet linked"}
+                    {walletAddress ? truncateId(walletAddress) : "No wallet linked"}
                   </p>
                 </div>
               </div>
 
-              {/* Governing Document Reference */}
+              {/* LPA Reference */}
               <div className="flex items-start gap-3">
                 <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Governing Document Reference (LPA Hash)</p>
-                  <p className="text-sm font-mono text-gray-900 break-all">
-                    {sub.governingHashHex || "N/A"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Full Subscription Record ID */}
-              <div className="flex items-start gap-3">
-                <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Full Subscription Record ID</p>
-                  <p className="text-sm font-mono text-gray-900 break-all">
-                    {sub.subscriptionId}
+                  <p className="text-xs text-gray-500 mb-0.5">Governing Document Reference</p>
+                  <p className="text-sm font-mono text-gray-900">
+                    {sub.governingHashHex ? truncateId(sub.governingHashHex) : "N/A"}
                   </p>
                 </div>
               </div>

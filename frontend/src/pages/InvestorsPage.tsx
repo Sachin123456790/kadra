@@ -14,6 +14,7 @@ import type { Investor } from "@/services/investors.service";
 import type { CapitalAccountSummary } from "@/services/ownership.service";
 import { X, User, Wallet, Shield, Mail, CheckCircle2, XCircle } from "lucide-react";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
 
 // ── View-model for the table ──────────────────────────────────
 
@@ -27,7 +28,6 @@ interface InvestorTableRow {
   kycStatus: string;
   accreditationStatus: string;
   eligibilityOnChain: string;
-  tokenBalance: string;
   settlementStatus: string;
   lastActivity: string;
 }
@@ -117,7 +117,6 @@ export default function InvestorsPage() {
       kycStatus: isVerified ? "Verified" : "Unverified",
       accreditationStatus: isVerified ? "Accredited" : "Unaccredited",
       eligibilityOnChain: isEligible ? "Yes" : "No",
-      tokenBalance: ownership?.settledTokenBalance ?? "0",
       settlementStatus: deriveSettlementStatus(inv.investorId, allSubscriptions),
       lastActivity: deriveLastActivity(inv, allSubscriptions),
     };
@@ -130,7 +129,17 @@ export default function InvestorsPage() {
 
   const columns: Column<InvestorTableRow>[] = [
     { key: "name", header: "Investor Name" },
-    { key: "wallet", header: "Wallet Address", render: (r) => <ExplorerLink value={r.wallet} type="address" /> },
+    {
+      key: "wallet",
+      header: "Wallet",
+      render: (r) => (
+        r.wallet !== "No wallet linked" ? (
+          <Wallet className="h-4 w-4 text-gray-500" />
+        ) : (
+          <span className="text-xs text-gray-400">--</span>
+        )
+      ),
+    },
     {
       key: "kycStatus",
       header: "KYC Status",
@@ -159,7 +168,7 @@ export default function InvestorsPage() {
     },
     {
       key: "eligibilityOnChain",
-      header: "Eligibility On-Chain",
+      header: "Eligibility",
       render: (r) => (
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
           r.eligibilityOnChain === "Yes"
@@ -178,11 +187,6 @@ export default function InvestorsPage() {
           {r.ownership > 0 ? `${r.ownership}%` : "--"}
         </span>
       ),
-    },
-    {
-      key: "tokenBalance",
-      header: "Token Balance",
-      render: (r) => <span className="font-mono text-xs text-gray-900">{r.tokenBalance}</span>,
     },
     {
       key: "settlementStatus",
@@ -304,28 +308,6 @@ export default function InvestorsPage() {
                 </dl>
               </div>
 
-              {/* Wallets */}
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Wallets</h3>
-                {selectedInvestor.wallets.length === 0 ? (
-                  <p className="text-sm text-gray-500">No wallets linked</p>
-                ) : (
-                  <div className="space-y-2">
-                    {selectedInvestor.wallets.map((w) => (
-                      <div key={w.walletId} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50/50">
-                        <Wallet className="h-4 w-4 text-gray-400 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm"><ExplorerLink value={w.address} type="address" /></div>
-                          <p className="text-xs text-gray-500">
-                            Chain {w.chainId} {w.isPrimary && "-- Primary"} -- {w.status}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               {/* Documents section */}
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Documents</h3>
@@ -378,17 +360,10 @@ export default function InvestorsPage() {
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <dt className="text-sm text-gray-500">Fund Eligibility Marker</dt>
+                    <dt className="text-sm text-gray-500">Eligibility</dt>
                     <dd className="text-sm">
                       {selectedInvestor.fundEligibility ? (
-                        <span className="flex items-center gap-2">
-                          <StatusBadge status={selectedInvestor.fundEligibility.status} />
-                          <span className="text-xs text-gray-500">
-                            {selectedInvestor.fundEligibility.effectiveAt
-                              ? `since ${new Date(selectedInvestor.fundEligibility.effectiveAt).toLocaleDateString()}`
-                              : ""}
-                          </span>
-                        </span>
+                        <StatusBadge status={selectedInvestor.fundEligibility.status} />
                       ) : (
                         <span className="text-gray-500">Inactive</span>
                       )}
@@ -435,29 +410,6 @@ export default function InvestorsPage() {
                 )}
               </div>
 
-              {/* Fund Eligibility */}
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Fund Eligibility</h3>
-                {selectedInvestor.fundEligibility ? (
-                  <dl className="space-y-2">
-                    <div className="flex justify-between">
-                      <dt className="text-sm text-gray-500">Status</dt>
-                      <dd><StatusBadge status={selectedInvestor.fundEligibility.status} /></dd>
-                    </div>
-                    <div className="flex justify-between">
-                      <dt className="text-sm text-gray-500">Effective</dt>
-                      <dd className="text-sm font-medium text-gray-900">
-                        {selectedInvestor.fundEligibility.effectiveAt
-                          ? new Date(selectedInvestor.fundEligibility.effectiveAt).toLocaleDateString()
-                          : "N/A"}
-                      </dd>
-                    </div>
-                  </dl>
-                ) : (
-                  <p className="text-sm text-gray-500">No eligibility record</p>
-                )}
-              </div>
-
               {/* Subscription Details */}
               {selectedInvestorSubs.length > 0 && (
                 <div>
@@ -497,30 +449,80 @@ export default function InvestorsPage() {
                 </div>
               )}
 
-              {/* Ownership from cap table */}
-              {capTable && (() => {
-                const row = capTable.rows.find(r => r.investorId === selectedInvestor.investorId);
-                if (!row) return null;
-                return (
+              {/* Technical / blockchain details (hidden by default) */}
+              <TechnicalDetails label="Technical Details">
+                <div className="space-y-6">
+                  {/* Wallets */}
                   <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Ownership</h3>
-                    <dl className="space-y-2">
-                      <div className="flex justify-between">
-                        <dt className="text-sm text-gray-500">Token Balance</dt>
-                        <dd className="text-sm font-medium font-mono text-gray-900">{row.settledTokenBalance}</dd>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Wallets</h3>
+                    {selectedInvestor.wallets.length === 0 ? (
+                      <p className="text-sm text-gray-500">No wallets linked</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedInvestor.wallets.map((w) => (
+                          <div key={w.walletId} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50/50">
+                            <Wallet className="h-4 w-4 text-gray-400 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm"><ExplorerLink value={w.address} type="address" /></div>
+                              <p className="text-xs text-gray-500">
+                                Chain {w.chainId} {w.isPrimary && "-- Primary"} -- {w.status}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex justify-between">
-                        <dt className="text-sm text-gray-500">Ownership %</dt>
-                        <dd className="text-sm font-medium text-gray-900">{row.ownershipPct}%</dd>
-                      </div>
-                      <div className="flex justify-between">
-                        <dt className="text-sm text-gray-500">Pending Allocation</dt>
-                        <dd className="text-sm font-medium text-gray-900">{row.pendingAllocationPct}%</dd>
-                      </div>
-                    </dl>
+                    )}
                   </div>
-                );
-              })()}
+
+                  {/* Fund Eligibility (on-chain marker) */}
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Fund Eligibility (On-Chain)</h3>
+                    {selectedInvestor.fundEligibility ? (
+                      <dl className="space-y-2">
+                        <div className="flex justify-between">
+                          <dt className="text-sm text-gray-500">Status</dt>
+                          <dd><StatusBadge status={selectedInvestor.fundEligibility.status} /></dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-sm text-gray-500">Effective</dt>
+                          <dd className="text-sm font-medium text-gray-900">
+                            {selectedInvestor.fundEligibility.effectiveAt
+                              ? new Date(selectedInvestor.fundEligibility.effectiveAt).toLocaleDateString()
+                              : "N/A"}
+                          </dd>
+                        </div>
+                      </dl>
+                    ) : (
+                      <p className="text-sm text-gray-500">No eligibility record</p>
+                    )}
+                  </div>
+
+                  {/* Token balance / ownership from cap table */}
+                  {capTable && (() => {
+                    const row = capTable.rows.find(r => r.investorId === selectedInvestor.investorId);
+                    if (!row) return null;
+                    return (
+                      <div>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Token Ownership</h3>
+                        <dl className="space-y-2">
+                          <div className="flex justify-between">
+                            <dt className="text-sm text-gray-500">Token Balance</dt>
+                            <dd className="text-sm font-medium font-mono text-gray-900">{row.settledTokenBalance}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-sm text-gray-500">Ownership %</dt>
+                            <dd className="text-sm font-medium text-gray-900">{row.ownershipPct}%</dd>
+                          </div>
+                          <div className="flex justify-between">
+                            <dt className="text-sm text-gray-500">Pending Allocation</dt>
+                            <dd className="text-sm font-medium text-gray-900">{row.pendingAllocationPct}%</dd>
+                          </div>
+                        </dl>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </TechnicalDetails>
             </div>
           </div>
         </div>

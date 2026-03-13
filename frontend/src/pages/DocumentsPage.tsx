@@ -56,7 +56,19 @@ import {
   Search,
   Copy,
   Bell,
+  Download,
+  ShieldCheck,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
+import { API_BASE_URL } from "@/config/constants";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -101,6 +113,29 @@ function truncateHash(hash: string, len = 10): string {
 
 function copyToClipboard(text: string) {
   navigator.clipboard.writeText(text).catch(() => {});
+}
+
+// ── Inline expandable badge for on-chain anchor ─────────────
+
+function AnchoredBadgeWithTx({ txHash }: { readonly txHash: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="inline-flex flex-col">
+      <button
+        onClick={(e) => { e.stopPropagation(); setExpanded((prev) => !prev); }}
+        className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors"
+      >
+        <CheckCircle2 className="h-3 w-3" />
+        Anchored
+        {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+      </button>
+      {expanded && (
+        <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+          <ExplorerLink value={txHash} type="tx" />
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Table columns ────────────────────────────────────────────
@@ -151,21 +186,29 @@ const governingDocColumns: Column<FundDocument>[] = [
   },
   {
     key: "hash",
-    header: "SHA-256 Hash",
+    header: "Verified",
     render: (row) => {
       const hashHex = row.hash?.hashHex ?? "";
       if (!hashHex) return <span className="text-gray-400">--</span>;
       return (
-        <span className="inline-flex items-center gap-1">
-          <span className="font-mono text-xs text-gray-900">{truncateHash(hashHex)}</span>
-          <button
-            onClick={(e) => { e.stopPropagation(); copyToClipboard(hashHex); }}
-            className="text-gray-400 hover:text-gray-600 p-0.5"
-            title="Copy hash"
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </button>
-        </span>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => { e.stopPropagation(); copyToClipboard(hashHex); }}
+                className="inline-flex items-center gap-1 text-green-600 hover:text-green-700 transition-colors"
+                title="Click to copy SHA-256 hash"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                <span className="text-xs font-medium">Verified</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs">
+              <p className="text-xs text-gray-500 mb-1">SHA-256 Hash (click to copy)</p>
+              <p className="font-mono text-xs break-all">{hashHex}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       );
     },
   },
@@ -177,16 +220,38 @@ const governingDocColumns: Column<FundDocument>[] = [
         return <span className="text-gray-400 text-xs">Pending</span>;
       }
       const txHash = (row.metadata as Record<string, unknown>)?.anchorTxHash as string | undefined;
-      if (txHash) {
-        return <ExplorerLink value={txHash} type="tx" />;
+      if (!txHash) {
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+            <CheckCircle2 className="h-3 w-3" />
+            Anchored
+          </span>
+        );
       }
-      return <span className="text-xs text-green-700 font-medium">Anchored</span>;
+      return <AnchoredBadgeWithTx txHash={txHash} />;
     },
   },
   {
     key: "parseStatus",
     header: "Status",
     render: (row) => <StatusBadge status={mapParseStatus(row.parseStatus)} />,
+  },
+  {
+    key: "download",
+    header: "",
+    render: (row) => (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          window.open(`${API_BASE_URL}/documents/${row.documentId}/download`, "_blank");
+        }}
+        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
+        title={`Download ${row.originalFilename}`}
+      >
+        <Download className="h-3.5 w-3.5" />
+        Download
+      </button>
+    ),
   },
 ];
 
@@ -775,49 +840,58 @@ export default function DocumentsPage() {
                     )}
                   </div>
 
-                  {/* Right: Hashes */}
+                  {/* Right: Verification summary + expandable details */}
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <Hash className="h-4 w-4 text-gray-500" />
-                      Cryptographic Hashes
-                    </h4>
                     {hashesData && hashesData.length > 0 ? (
                       <div className="space-y-3">
-                        {hashesData.map((h: DocumentHash) => (
-                          <div
-                            key={h.hashId}
-                            className="rounded-md border border-gray-200 p-3"
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-medium text-gray-600 uppercase">
-                                {h.algorithm}
-                              </span>
-                              <StatusBadge
-                                status={
-                                  h.anchoredOnchain ? "Completed" : "Pending"
-                                }
-                              />
-                            </div>
-                            <p className="text-xs font-mono text-gray-900 break-all">
-                              {h.hashHex}
-                            </p>
-                            {h.anchor && (
-                              <div className="mt-2 text-xs text-gray-500 space-y-0.5">
-                                <p>Chain ID: {h.anchor.chainId}</p>
-                                <p className="break-all flex items-center gap-1">
-                                  Tx:{" "}
-                                  <ExplorerLink
-                                    value={h.anchor.txHash}
-                                    type="tx"
+                        {/* Summary: show verification status at a glance */}
+                        <div className="flex items-center gap-2 py-2">
+                          <ShieldCheck className="h-5 w-5 text-green-600" />
+                          <span className="text-sm font-medium text-gray-900">
+                            {hashesData.filter((h: DocumentHash) => h.anchoredOnchain).length} of{" "}
+                            {hashesData.length} hash{hashesData.length !== 1 ? "es" : ""} anchored on-chain
+                          </span>
+                        </div>
+
+                        <TechnicalDetails label="Verification Details">
+                          <div className="space-y-3">
+                            {hashesData.map((h: DocumentHash) => (
+                              <div
+                                key={h.hashId}
+                                className="rounded-md border border-gray-200 p-3"
+                              >
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs font-medium text-gray-600 uppercase">
+                                    {h.algorithm}
+                                  </span>
+                                  <StatusBadge
+                                    status={
+                                      h.anchoredOnchain ? "Completed" : "Pending"
+                                    }
                                   />
+                                </div>
+                                <p className="text-xs font-mono text-gray-900 break-all">
+                                  {h.hashHex}
                                 </p>
-                                {h.anchor.blockNumber && (
-                                  <p>Block: {h.anchor.blockNumber}</p>
+                                {h.anchor && (
+                                  <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+                                    <p>Chain ID: {h.anchor.chainId}</p>
+                                    <p className="break-all flex items-center gap-1">
+                                      Tx:{" "}
+                                      <ExplorerLink
+                                        value={h.anchor.txHash}
+                                        type="tx"
+                                      />
+                                    </p>
+                                    {h.anchor.blockNumber && (
+                                      <p>Block: {h.anchor.blockNumber}</p>
+                                    )}
+                                  </div>
                                 )}
                               </div>
-                            )}
+                            ))}
                           </div>
-                        ))}
+                        </TechnicalDetails>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 text-sm text-gray-500 py-4">

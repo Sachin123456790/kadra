@@ -143,16 +143,16 @@ export default function InvestorDashboardPage() {
         {/* Panel 1: Portfolio Summary */}
         <SectionCard title="Portfolio Summary">
           <dl className="space-y-3">
-            <SummaryRow label="Fund Name" value="Kadra Demo Fund I" />
+            <SummaryRow label="Fund Name" value="Angainor Demo Fund I" />
             <SummaryRow
               label="Legal Entity Name"
               value={investor.legalName}
             />
             <SummaryRow
-              label="Eligibility Marker"
+              label="Fund Eligibility"
               value={
                 <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                  Active: Kadra Demo Fund I
+                  Eligible
                 </span>
               }
             />

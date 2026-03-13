@@ -1,9 +1,9 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { Download, Copy, Check } from 'lucide-react';
+import { Download, Copy, Check, ChevronRight, ChevronDown } from 'lucide-react';
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from '@/config/constants';
 import { getCapTable, getCapitalAccounts } from '@/services/ownership.service';
 import { getSubscriptions } from '@/services/subscriptions.service';
@@ -13,13 +13,12 @@ import type { Subscription } from '@/services/subscriptions.service';
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { MetricCard } from "@/components/kadra/MetricCard";
 import { SectionCard } from "@/components/kadra/SectionCard";
-import { DataTable, Column } from "@/components/kadra/DataTable";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
-import { useState } from 'react';
+import { formatCompact } from "@/lib/format";
 
-const OWNERSHIP_COLORS = ['#4338ca', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff'] as const;
+const OWNERSHIP_COLORS = ['#1a1a1a', '#404040', '#666666', '#8c8c8c', '#b3b3b3', '#d9d9d9'] as const;
 
 const fmtCurrency = (n: number) =>
   n === 0
@@ -100,67 +99,78 @@ function enrichRows(
   });
 }
 
-/* ── Columns ── */
+/* ── Expandable Cap Table Row ── */
 
-const columns: Column<EnrichedCapTableRow>[] = [
-  {
-    key: "investorName",
-    header: "Investor",
-    render: (r) => <span className="font-medium text-gray-900">{r.investorName ?? "—"}</span>,
-  },
-  {
-    key: "walletAddress",
-    header: "Wallet",
-    render: (r) => (
-      <span className="inline-flex items-center">
-        <ExplorerLink value={r.walletAddress} type="address" />
-        <CopyButton text={r.walletAddress} />
-      </span>
-    ),
-  },
-  {
-    key: "ownershipPct",
-    header: "Ownership %",
-    render: (r) => <span className="text-gray-900">{r.ownershipPct.toFixed(2)}%</span>,
-  },
-  {
-    key: "settledTokenBalance",
-    header: "Token Balance",
-    render: (r) => (
-      <span className="font-mono text-gray-900">
-        {parseFloat(r.settledTokenBalance).toLocaleString("en-US")}
-      </span>
-    ),
-  },
-  {
-    key: "capitalContributed",
-    header: "Capital Contributed",
-    render: (r) => <span className="text-gray-900">{fmtCurrency(r.capitalContributed)}</span>,
-  },
-  {
-    key: "settledAt",
-    header: "Settlement Date",
-    render: (r) => <span className="text-gray-600">{fmtDate(r.settledAt)}</span>,
-  },
-  {
-    key: "settlementTxHash",
-    header: "Settlement Tx",
-    render: (r) =>
-      r.settlementTxHash ? (
-        <span className="inline-flex items-center">
-          <ExplorerLink value={r.settlementTxHash} type="tx" />
-          <CopyButton text={r.settlementTxHash} />
-        </span>
-      ) : (
-        <span className="text-gray-500">--</span>
-      ),
-  },
-  {
-    key: "governingHashHex",
-    header: "Governing LPA Hash",
-    render: (r) => <TruncatedHash hash={r.governingHashHex} />,
-  },
-];
+function CapTableRowItem({
+  row,
+  isExpanded,
+  onToggle,
+}: {
+  readonly row: EnrichedCapTableRow;
+  readonly isExpanded: boolean;
+  readonly onToggle: () => void;
+}) {
+  return (
+    <>
+      <tr
+        className="border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={onToggle}
+      >
+        <td className="px-4 py-3 text-gray-500">
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </td>
+        <td className="px-4 py-3 font-medium text-gray-900">{row.investorName ?? "—"}</td>
+        <td className="px-4 py-3 text-gray-900">{row.ownershipPct.toFixed(2)}%</td>
+        <td className="px-4 py-3 text-gray-900">{fmtCurrency(row.capitalContributed)}</td>
+        <td className="px-4 py-3 text-gray-600">{fmtDate(row.settledAt)}</td>
+      </tr>
+      {isExpanded && (
+        <tr className="border-b border-gray-100 bg-gray-50">
+          <td colSpan={5} className="px-8 py-4">
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+              <div>
+                <span className="text-gray-500 font-medium">Wallet</span>
+                <div className="mt-0.5 inline-flex items-center gap-1">
+                  <ExplorerLink value={row.walletAddress} type="address" />
+                  <CopyButton text={row.walletAddress} />
+                </div>
+              </div>
+              <div>
+                <span className="text-gray-500 font-medium">Token Balance</span>
+                <div className="mt-0.5 font-mono text-gray-900">
+                  {parseFloat(row.settledTokenBalance).toLocaleString("en-US")}
+                </div>
+              </div>
+              <div>
+                <span className="text-gray-500 font-medium">Settlement Tx</span>
+                <div className="mt-0.5">
+                  {row.settlementTxHash ? (
+                    <span className="inline-flex items-center gap-1">
+                      <ExplorerLink value={row.settlementTxHash} type="tx" />
+                      <CopyButton text={row.settlementTxHash} />
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">--</span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <span className="text-gray-500 font-medium">Governing LPA Hash</span>
+                <div className="mt-0.5">
+                  <TruncatedHash hash={row.governingHashHex} />
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
 
 /* ── Ownership Pie Chart ── */
 
@@ -199,7 +209,7 @@ function OwnershipPieChart({ rows }: OwnershipPieProps) {
             verticalAlign="bottom"
             iconType="circle"
             iconSize={8}
-            formatter={(value: string) => <span className="text-sm text-gray-600">{value}</span>}
+            formatter={(value: string) => <span className="text-base text-gray-600">{value}</span>}
           />
         </PieChart>
       </ResponsiveContainer>
@@ -211,18 +221,20 @@ function OwnershipPieChart({ rows }: OwnershipPieProps) {
 
 function TotalRow({ rows }: { readonly rows: ReadonlyArray<EnrichedCapTableRow> }) {
   const totalOwnership = rows.reduce((s, r) => s + r.ownershipPct, 0);
-  const totalTokens = rows.reduce((s, r) => s + parseFloat(r.settledTokenBalance), 0);
   const totalCapital = rows.reduce((s, r) => s + r.capitalContributed, 0);
 
   return (
-    <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
-      <div className="flex text-sm font-semibold text-gray-900">
-        <span className="flex-1">Total</span>
-        <span className="w-28 text-right">{totalOwnership.toFixed(2)}%</span>
-        <span className="w-32 text-right font-mono">{totalTokens.toLocaleString("en-US")}</span>
-        <span className="w-36 text-right">{fmtCurrency(totalCapital)}</span>
-      </div>
-    </div>
+    <table className="w-full text-sm">
+      <tfoot>
+        <tr className="bg-gray-50 border-t border-gray-200 font-semibold text-gray-900">
+          <td className="px-4 py-3 w-10" />
+          <td className="px-4 py-3">Total</td>
+          <td className="px-4 py-3">{totalOwnership.toFixed(2)}%</td>
+          <td className="px-4 py-3">{fmtCurrency(totalCapital)}</td>
+          <td className="px-4 py-3" />
+        </tr>
+      </tfoot>
+    </table>
   );
 }
 
@@ -257,6 +269,7 @@ function ExportCapTableButton({ fundId }: { readonly fundId: string }) {
 
 export default function CapTablePage() {
   const fundId = DEFAULT_FUND_CODE;
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.capTable(fundId),
@@ -316,7 +329,7 @@ export default function CapTablePage() {
         <MetricCard label="Total Ownership" value={`${totalOwnership.toFixed(1)}%`} />
         <MetricCard
           label="Settled Balance"
-          value={new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(totalSettled)}
+          value={formatCompact(totalSettled)}
         />
         <MetricCard label="Pending Allocations" value={pendingCount} />
       </div>
@@ -324,11 +337,32 @@ export default function CapTablePage() {
       <OwnershipPieChart rows={data.rows} />
 
       <SectionCard className="mt-6">
-        <DataTable
-          columns={columns}
-          data={enrichedRows}
-          getRowId={(r) => r.investorId ?? r.walletAddress}
-        />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="px-4 py-3 w-10" />
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Investor</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ownership %</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Capital Contributed</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Settlement Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {enrichedRows.map((row) => {
+                const rowId = row.investorId ?? row.walletAddress;
+                return (
+                  <CapTableRowItem
+                    key={rowId}
+                    row={row}
+                    isExpanded={expandedId === rowId}
+                    onToggle={() => setExpandedId(expandedId === rowId ? null : rowId)}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
         <TotalRow rows={enrichedRows} />
       </SectionCard>
     </div>

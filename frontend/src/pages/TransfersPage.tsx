@@ -13,7 +13,8 @@ import { SectionCard } from "@/components/kadra/SectionCard";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
-import { Copy, Loader2 } from "lucide-react";
+import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
+import { Copy, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Constants ────────────────────────────────────────────
@@ -148,20 +149,24 @@ function TransferRulesCard({
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
-              Identity Registry Address
+              Eligibility Required
+            </p>
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+              Yes
+            </span>
+          </div>
+        </div>
+      </div>
+      <TechnicalDetails label="Blockchain Details">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
+              Identity Registry
             </p>
             <ExplorerLink
               value={identityRegistryAddress}
               type="address"
             />
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
-              Eligibility Marker Required
-            </p>
-            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-              Yes
-            </span>
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
@@ -175,7 +180,7 @@ function TransferRulesCard({
             </div>
           </div>
         </div>
-      </div>
+      </TechnicalDetails>
     </SectionCard>
   );
 }
@@ -205,31 +210,22 @@ function TransferHistoryTable({
               Date
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-              From LP
+              From
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-              From Wallet
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-              To LP
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-              To Wallet
+              To
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
               Amount
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-              Pre-Check
+              Eligibility
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-              On-Chain Result
+              Result
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-              Tx Hash
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-              Timestamp
+              Time
             </th>
           </tr>
         </thead>
@@ -245,30 +241,25 @@ function TransferHistoryTable({
               <td className="px-4 py-3 text-gray-900">
                 {new Date(t.date).toLocaleDateString()}
               </td>
-              <td className="px-4 py-3 text-gray-900">
-                {t.fromLpName || "--"}
+              <td className="px-4 py-3 font-medium text-gray-900">
+                {t.fromLpName || truncateHex(t.fromWallet)}
               </td>
-              <td className="px-4 py-3">
-                <ExplorerLink value={t.fromWallet} type="address" />
-              </td>
-              <td className="px-4 py-3 text-gray-900">
-                {t.toLpName || "--"}
-              </td>
-              <td className="px-4 py-3">
-                <ExplorerLink value={t.toWallet} type="address" />
+              <td className="px-4 py-3 font-medium text-gray-900">
+                {t.toLpName || truncateHex(t.toWallet)}
               </td>
               <td className="px-4 py-3 text-gray-900">{fmt(t.amount)}</td>
               <td className="px-4 py-3">
-                <span
-                  className={cn(
-                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                    t.preCheckResult === "Eligible"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800",
-                  )}
-                >
-                  {t.preCheckResult}
-                </span>
+                {t.preCheckResult === "Eligible" ? (
+                  <span className="inline-flex items-center gap-1 text-green-700">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="text-xs">Eligible</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-red-600">
+                    <XCircle className="h-4 w-4" />
+                    <span className="text-xs">Not Eligible</span>
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3">
                 <span
@@ -279,20 +270,11 @@ function TransferHistoryTable({
                       : "bg-red-100 text-red-800",
                   )}
                 >
-                  {t.onChainResult}
+                  {t.onChainResult === "Executed" ? "Completed" : "Rejected"}
                 </span>
               </td>
-              <td className="px-4 py-3">
-                {t.txHash ? (
-                  <ExplorerLink value={t.txHash} type="tx" />
-                ) : (
-                  <span className="text-gray-400">--</span>
-                )}
-              </td>
               <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                <div>
-                  {new Date(t.timestamp).toLocaleString()}
-                </div>
+                <div>{new Date(t.timestamp).toLocaleString()}</div>
                 {t.failureReason && (
                   <p className="text-xs text-red-600 mt-0.5">
                     {t.failureReason}

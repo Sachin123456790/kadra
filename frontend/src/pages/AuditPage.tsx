@@ -118,10 +118,15 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
     },
     {
       key: "txHash",
-      header: "Hash Reference",
+      header: "Verification",
       render: (r) => {
         if (r.txHash) {
-          return <ExplorerLink value={r.txHash} type="tx" />;
+          return (
+            <span className="inline-flex items-center gap-1 text-green-600">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-xs">On-chain</span>
+            </span>
+          );
         }
         const docHash =
           (r.metadata?.documentHash as string) ??
@@ -129,26 +134,14 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
           null;
         if (docHash) {
           return (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500">Doc:</span>
-              <span className="font-mono text-xs text-gray-700" title={docHash}>
-                {truncateHash(docHash)}
-              </span>
-              <CopyButton value={docHash} />
-            </div>
+            <span className="inline-flex items-center gap-1 text-green-600">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-xs">Hashed</span>
+            </span>
           );
         }
         return <span className="text-gray-400">--</span>;
       },
-    },
-    {
-      key: "id",
-      header: "Immutable Ref ID",
-      render: (r) => (
-        <span className="font-mono text-xs text-gray-500" title={String(r.id)}>
-          {truncateHash(r.id)}
-        </span>
-      ),
     },
   ];
 
@@ -242,15 +235,13 @@ function DocumentProvenanceSection({
     },
     {
       key: "hash",
-      header: "SHA-256 Hash",
+      header: "Integrity",
       render: (r) =>
         r.hash ? (
-          <div className="flex items-center gap-1.5">
-            <span className="font-mono text-xs text-gray-700" title={r.hash}>
-              {truncateHash(r.hash)}
-            </span>
-            <CopyButton value={r.hash} />
-          </div>
+          <span className="inline-flex items-center gap-1 text-green-600" title={r.hash}>
+            <CheckCircle className="h-4 w-4" />
+            <span className="text-xs">Hashed</span>
+          </span>
         ) : (
           <span className="text-gray-400">--</span>
         ),
@@ -266,12 +257,15 @@ function DocumentProvenanceSection({
     },
     {
       key: "anchorTxHash",
-      header: "On-Chain Anchor",
+      header: "Anchored",
       render: (r) =>
         r.anchorTxHash ? (
-          <ExplorerLink value={r.anchorTxHash} type="tx" />
+          <span className="inline-flex items-center gap-1 text-green-600">
+            <CheckCircle className="h-4 w-4" />
+            <span className="text-xs">Yes</span>
+          </span>
         ) : (
-          <span className="text-gray-400">--</span>
+          <span className="text-gray-400">Pending</span>
         ),
     },
     {
@@ -493,7 +487,7 @@ function ExportSection({ fundId }: { readonly fundId: string }) {
               available={hasDistributions}
             />
             <ChecklistItem
-              label="On-Chain Proof References"
+              label="Verification Proof References"
               available={hasOnChainProofs}
             />
           </div>
@@ -643,9 +637,9 @@ export default function AuditPage() {
         subtitle="Event log, document provenance, and compliance export packages"
       />
 
+      <ExportSection fundId={fundId} />
       <EventLogSection fundId={fundId} />
       <DocumentProvenanceSection fundId={fundId} />
-      <ExportSection fundId={fundId} />
     </div>
   );
 }

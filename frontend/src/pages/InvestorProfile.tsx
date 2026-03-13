@@ -12,6 +12,7 @@ import { getInvestorTaxReport } from "@/services/tax.service";
 import type { LinkedWallet } from "@/services/wallet-profile.service";
 import { useWallet } from "@/hooks/useWallet";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
 import {
   Dialog,
   DialogContent,
@@ -102,8 +103,10 @@ function IdentitySection({
             <p className="text-sm font-medium text-gray-900">United States</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-1">Linked Wallets</p>
-            <p className="text-sm font-medium text-gray-900">{profile.walletCount}</p>
+            <p className="text-xs text-gray-500 mb-1">Account Status</p>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${profile.walletCount > 0 ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+              {profile.walletCount > 0 ? "Connected" : "Pending Setup"}
+            </span>
           </div>
         </div>
 
@@ -386,7 +389,7 @@ export default function InvestorProfile() {
 
   const fundName = useMemo(() => {
     const sub = dashboard?.subscriptions?.[0];
-    return (sub as Record<string, unknown> | undefined)?.fundName as string | undefined ?? "Kadra Demo Fund I";
+    return (sub as Record<string, unknown> | undefined)?.fundName as string | undefined ?? "Angainor Demo Fund I";
   }, [dashboard]);
 
   const openModal = () => {
@@ -450,7 +453,7 @@ export default function InvestorProfile() {
 
   return (
     <div>
-      <PageHeader title="Profile & Wallets" subtitle="Manage your identity, verification, and linked wallets" />
+      <PageHeader title="Profile" subtitle="Manage your identity and verification" />
 
       <div className="space-y-6">
         {/* Section 1: Identity and Verification */}
@@ -465,14 +468,29 @@ export default function InvestorProfile() {
         {/* Section 2: Tax Information */}
         <TaxInformationSection profile={{ legalName: profile?.legalName ?? "Investor" }} fundName={fundName} />
 
-        {/* Wallet Section (preserved) */}
-        <WalletSection
-          wallets={wallets ?? []}
-          onOpenModal={openModal}
-        />
+        {/* Wallet Status Badge (simple view) */}
+        <SectionCard title="Account Connection">
+          <div className="flex items-center gap-3">
+            <div className={`w-2.5 h-2.5 rounded-full ${(wallets ?? []).length > 0 ? "bg-green-500" : "bg-amber-400"}`} />
+            <span className="text-sm font-medium text-gray-900">
+              Wallet Status:
+            </span>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${(wallets ?? []).length > 0 ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+              {(wallets ?? []).length > 0 ? "Active" : "Pending"}
+            </span>
+          </div>
+
+          {/* Advanced wallet management behind collapsible */}
+          <TechnicalDetails label="Wallet Management (Advanced)">
+            <WalletSection
+              wallets={wallets ?? []}
+              onOpenModal={openModal}
+            />
+          </TechnicalDetails>
+        </SectionCard>
       </div>
 
-      {/* Wallet Connect Modal (preserved from original) */}
+      {/* Wallet Connect Modal (preserved from original, accessed via Advanced section) */}
       <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -559,14 +577,18 @@ export default function InvestorProfile() {
             {/* Step: Sign */}
             {step === "sign" && connectedAddr && (
               <div className="space-y-4">
-                <div className="rounded-lg bg-gray-50 p-4">
-                  <p className="text-xs text-gray-500 mb-1">Connected Address</p>
-                  <ExplorerLink value={connectedAddr ?? ""} type="address" truncate={false} />
-                </div>
-                <div className="rounded-lg bg-gray-50 p-4">
-                  <p className="text-xs text-gray-500 mb-1">Network</p>
-                  <p className="text-sm text-gray-900">{chainName(connectedChain || 1)}</p>
-                </div>
+                <TechnicalDetails label="Connection Details">
+                  <div className="space-y-3">
+                    <div className="rounded-lg bg-gray-50 p-4">
+                      <p className="text-xs text-gray-500 mb-1">Connected Address</p>
+                      <ExplorerLink value={connectedAddr ?? ""} type="address" truncate={false} />
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-4">
+                      <p className="text-xs text-gray-500 mb-1">Network</p>
+                      <p className="text-sm text-gray-900">{chainName(connectedChain || 1)}</p>
+                    </div>
+                  </div>
+                </TechnicalDetails>
                 <button
                   onClick={handleSign}
                   className="w-full rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"

@@ -19,7 +19,7 @@ const adminFaqs: FaqItem[] = [
   {
     category: 'Fund Setup',
     question: 'How do I upload and anchor a Master LPA?',
-    answer: 'Navigate to Subscriptions, click "Upload LPA", and select your Master LPA PDF. Kadra will generate a SHA-256 hash and anchor it on-chain with a timestamp and document reference. Subscription records are automatically created for each investor defined in the document.',
+    answer: 'Navigate to Subscriptions, click "Upload LPA", and select your Master LPA PDF. Angainor will generate a SHA-256 hash and anchor it on-chain with a timestamp and document reference. Subscription records are automatically created for each investor defined in the document.',
   },
   {
     category: 'Fund Setup',
@@ -29,7 +29,7 @@ const adminFaqs: FaqItem[] = [
   {
     category: 'Settlement',
     question: 'How does the 3-way settlement match work?',
-    answer: 'When you upload a wire confirmation, Kadra performs three validation checks: (1) the payment amount matches the subscription commitment, (2) the investor identity on the wire matches the subscription holder, and (3) the payment reference matches the subscription reference. All three must pass before settlement is confirmed. This eliminates the risk of double settlement.',
+    answer: 'When you upload a wire confirmation, Angainor performs three validation checks: (1) the payment amount matches the subscription commitment, (2) the investor identity on the wire matches the subscription holder, and (3) the payment reference matches the subscription reference. All three must pass before settlement is confirmed. This eliminates the risk of double settlement.',
   },
   {
     category: 'Settlement',
@@ -49,7 +49,7 @@ const adminFaqs: FaqItem[] = [
   {
     category: 'Distribution',
     question: 'How do waterfall distributions work?',
-    answer: 'The waterfall configuration is derived from the governing LPA and defines tiers for capital return, preferred return, and GP promote. When you preview a distribution, Kadra pulls the current ownership ledger, reads capital accounts, and applies waterfall tiers sequentially. The result is a per-LP breakdown showing gross and net amounts for each tier.',
+    answer: 'The waterfall configuration is derived from the governing LPA and defines tiers for capital return, preferred return, and GP promote. When you preview a distribution, Angainor pulls the current ownership ledger, reads capital accounts, and applies waterfall tiers sequentially. The result is a per-LP breakdown showing gross and net amounts for each tier.',
   },
   {
     category: 'Audit',
@@ -115,7 +115,7 @@ export default function HelpSupportPage() {
 
   return (
     <div>
-      <PageHeader title="Help & Support" subtitle="Learn how to use Kadra" />
+      <PageHeader title="Help & Support" subtitle="Learn how to use Angainor" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* FAQ Section - takes 2 columns */}
@@ -172,10 +172,10 @@ export default function HelpSupportPage() {
                 <div>
                   <p className="text-sm font-medium text-foreground">Email Support</p>
                   <a
-                    href="mailto:support@kadra.io"
+                    href="mailto:support@angainor.io"
                     className="text-sm text-primary hover:underline"
                   >
-                    support@kadra.io
+                    support@angainor.io
                   </a>
                 </div>
               </div>
@@ -184,10 +184,10 @@ export default function HelpSupportPage() {
                 <div>
                   <p className="text-sm font-medium text-foreground">Security Issues</p>
                   <a
-                    href="mailto:security@kadra.io"
+                    href="mailto:security@angainor.io"
                     className="text-sm text-primary hover:underline"
                   >
-                    security@kadra.io
+                    security@angainor.io
                   </a>
                 </div>
               </div>
@@ -219,9 +219,9 @@ export default function HelpSupportPage() {
           )}
 
           {/* About */}
-          <SectionCard title="About Kadra">
+          <SectionCard title="About Angainor">
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Kadra is the programmable infrastructure layer for private real estate funds.
+              Angainor is the programmable infrastructure layer for private real estate funds.
               It replaces manual, siloed back-office workflows with a blockchain-based
               settlement engine, automating administration, eliminating wire fraud, and
               reducing settlement times from weeks to seconds.

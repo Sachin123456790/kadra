@@ -76,7 +76,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <button className="lg:hidden text-topbar-foreground" onClick={() => setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <Link to={homeRoute} className="text-lg font-bold text-topbar-foreground tracking-tight">Kadra</Link>
+          <Link to={homeRoute} className="text-lg font-bold text-topbar-foreground tracking-tight">Angainor</Link>
           {isAdmin && fundData && (
             <div className="hidden sm:flex items-center gap-2 ml-2 pl-2 border-l border-topbar-foreground/20">
               <span className="text-sm font-medium text-topbar-foreground/80">{fundData.fundName}</span>
