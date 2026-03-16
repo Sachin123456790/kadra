@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
@@ -38,12 +39,19 @@ import {
   MoreHorizontal,
   Mail,
   Bell,
+  BarChart3,
 } from "lucide-react";
 import { HashDisplay } from "@/components/kadra/HashDisplay";
 import type { Subscription } from "@/services/subscriptions.service";
 import type { Investor } from "@/services/investors.service";
 
 // ── Helpers ──────────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, string> = {
+  SETTLED: "#4f46e5",
+  PENDING: "#fbbf24",
+  MISMATCH: "#f59e0b",
+};
 
 const fmt = (n: number): string =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -80,6 +88,7 @@ export default function SubscriptionsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [investorFilter, setInvestorFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const fundId = DEFAULT_FUND_CODE;
 
   // ── Create subscription form state
@@ -151,6 +160,36 @@ export default function SubscriptionsPage() {
     if (!subscriptions || subscriptions.length === 0) return 0;
     return Math.round((settledCount / subscriptions.length) * 100);
   }, [subscriptions, settledCount]);
+
+  const statusChartData = useMemo(() => {
+    if (!subscriptions) return [];
+    const counts: Record<string, number> = {};
+    for (const sub of subscriptions) {
+      const key = sub.status.toUpperCase();
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [subscriptions]);
+
+  const allocationStats = useMemo(() => {
+    if (!subscriptions || subscriptions.length === 0) return { top3Avg: 0, restAvg: 0 };
+    const sorted = [...subscriptions].sort((a, b) => b.allocationPct - a.allocationPct);
+    const top3 = sorted.slice(0, 3);
+    const rest = sorted.slice(3);
+    const top3Avg = top3.reduce((s, sub) => s + sub.allocationPct, 0) / top3.length;
+    const restAvg = rest.length > 0 ? rest.reduce((s, sub) => s + sub.allocationPct, 0) / rest.length : 0;
+    return { top3Avg: Math.round(top3Avg * 100) / 100, restAvg: Math.round(restAvg * 100) / 100 };
+  }, [subscriptions]);
+
+  const recentActivity = useMemo(() => {
+    if (!subscriptions) return [];
+    const sorted = [...subscriptions].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    return sorted.slice(0, 3);
+  }, [subscriptions]);
 
   // ── Unique investors for filter dropdown
   const uniqueInvestors = useMemo(() => {
@@ -254,7 +293,88 @@ export default function SubscriptionsPage() {
         <span className="text-sm text-muted-foreground">{settlementPct}% Settled</span>
         <div className="flex-1" />
         <span className="text-xs text-muted-foreground">{subscriptions.length} subscriptions</span>
+        <button
+          onClick={() => setShowAnalytics(prev => !prev)}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <BarChart3 className="h-3.5 w-3.5" />
+          {showAnalytics ? "Hide Analytics" : "Analytics"}
+        </button>
       </div>
+
+      {/* ── Collapsible analytics panel ────────────────────────── */}
+      {showAnalytics && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6 animate-fade-in">
+          {/* Status Breakdown */}
+          <SectionCard>
+            <h3 className="text-sm font-medium text-muted-foreground mb-2 text-center">Status Breakdown</h3>
+            <ResponsiveContainer width="100%" height={120}>
+              <PieChart>
+                <Pie
+                  data={statusChartData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={35}
+                  outerRadius={50}
+                >
+                  {statusChartData.map(entry => (
+                    <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#94a3b8"} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-center gap-4 mt-2">
+              <div className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#fbbf24" }} />
+                <span className="text-xs text-muted-foreground">Pending: {pendingCount}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#4f46e5" }} />
+                <span className="text-xs text-muted-foreground">Settled: {settledCount}</span>
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* Committed Total */}
+          <SectionCard>
+            <h3 className="text-sm font-medium text-muted-foreground mb-1">Committed Total</h3>
+            <p className="text-3xl font-bold text-foreground">{fmt(totalCommitted)}</p>
+            <p className="text-sm text-muted-foreground mt-1">{subscriptions.length} subscriptions</p>
+          </SectionCard>
+
+          {/* Settlement Velocity */}
+          <SectionCard>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">Settlement Velocity</h3>
+            <div className="w-full h-2.5 rounded-full bg-muted">
+              <div
+                className="h-2.5 rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${settlementPct}%` }}
+              />
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {settlementPct}% Complete (Target 90%)
+            </p>
+          </SectionCard>
+
+          {/* Average Allocation */}
+          <SectionCard>
+            <h3 className="text-sm font-medium text-muted-foreground mb-1">Average Allocation</h3>
+            <p className="text-sm text-foreground">Top 3 Investors Avg: <span className="font-semibold">{allocationStats.top3Avg}%</span></p>
+            <p className="text-sm text-foreground">Rest Avg: <span className="font-semibold">{allocationStats.restAvg}%</span></p>
+            <p className="text-xs text-muted-foreground mt-2">Recent Activity</p>
+            <div className="space-y-0.5 mt-1">
+              {recentActivity.map(sub => (
+                <p key={sub.subscriptionId} className="text-xs text-muted-foreground truncate">
+                  {sub.investorName || sub.investorId} &mdash; {fmt(Number(sub.committedAmount) || 0)}
+                </p>
+              ))}
+            </div>
+          </SectionCard>
+        </div>
+      )}
 
       {/* ── Filter bar ────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
