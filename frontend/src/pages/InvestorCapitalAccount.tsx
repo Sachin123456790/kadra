@@ -3,6 +3,7 @@ import { Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
+import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getInvestorCapitalAccount } from "@/services/investor-portal.service";
 
@@ -85,7 +86,16 @@ export default function InvestorCapitalAccount() {
     toast.info("Export feature coming soon");
   };
 
-  if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>;
+  if (isLoading) return (
+    <div className="p-6 space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+      <TableSkeleton rows={5} columns={3} />
+    </div>
+  );
   if (error)
     return (
       <ErrorAlert

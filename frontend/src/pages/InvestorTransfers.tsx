@@ -13,6 +13,7 @@ import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
 import { useWallet } from "@/hooks/useWallet";
 import type { InvestorTransferRequest } from "@/services/investor-portal.service";
+import { TableSkeleton } from "@/components/kadra/Skeleton";
 import { Shield, Search, AlertCircle, CheckCircle } from "lucide-react";
 
 const fmt = (n: number) =>
@@ -151,7 +152,7 @@ function InitiateTransferSection({
         let msg = "Transfer pre-check failed: ";
         if (!pc.senderEligible) msg += "Your wallet is not eligible for this fund.";
         else if (!pc.recipientEligible) msg += "Recipient is not eligible for this fund.";
-        else if (!pc.sufficientBalance) msg += "Insufficient token balance.";
+        else if (!pc.sufficientBalance) msg += "Insufficient settlement balance.";
         throw new Error(msg);
       }
 
@@ -492,7 +493,11 @@ export default function InvestorTransfersPage() {
     return dashboard?.summary?.tokenBalance ?? "0";
   }, [dashboard]);
 
-  if (transfersLoading) return <div className="p-6">Loading...</div>;
+  if (transfersLoading) return (
+    <div className="p-6 space-y-4">
+      <TableSkeleton rows={5} columns={6} />
+    </div>
+  );
   if (transfersError) return <ErrorAlert title="Failed to load transfers" message={(transfersError as Error).message} />;
 
   return (

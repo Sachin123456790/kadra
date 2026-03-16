@@ -481,7 +481,7 @@ export default function InvestorsPage() {
 
                   {/* Fund Eligibility (on-chain marker) */}
                   <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Fund Eligibility (On-Chain)</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Fund Eligibility</h3>
                     {selectedInvestor.fundEligibility ? (
                       <dl className="space-y-2">
                         <div className="flex justify-between">
@@ -508,10 +508,10 @@ export default function InvestorsPage() {
                     if (!row) return null;
                     return (
                       <div>
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Token Ownership</h3>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Fund Ownership</h3>
                         <dl className="space-y-2">
                           <div className="flex justify-between">
-                            <dt className="text-sm text-muted-foreground">Token Balance</dt>
+                            <dt className="text-sm text-muted-foreground">Settled Units</dt>
                             <dd className="text-sm font-medium font-mono text-foreground">{row.settledTokenBalance}</dd>
                           </div>
                           <div className="flex justify-between">

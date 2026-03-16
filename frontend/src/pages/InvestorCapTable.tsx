@@ -6,6 +6,7 @@ import { SectionCard } from "@/components/kadra/SectionCard";
 import { DataTable, Column } from "@/components/kadra/DataTable";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { TableSkeleton } from "@/components/kadra/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getInvestorCapTable } from "@/services";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
@@ -70,7 +71,11 @@ export default function InvestorCapTablePage() {
     queryFn: () => getInvestorCapTable(fundId).then((r) => r.data),
   });
 
-  if (isLoading) return <div className="p-6">Loading...</div>;
+  if (isLoading) return (
+    <div className="p-6 space-y-4">
+      <TableSkeleton rows={5} columns={4} />
+    </div>
+  );
   if (error) return <ErrorAlert title="Cap Table Error" message={(error as Error).message} />;
   if (!data || data.rows.length === 0) {
     return (

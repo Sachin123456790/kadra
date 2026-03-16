@@ -135,17 +135,14 @@ export default function InvestorDashboardPage() {
         <MetricCard
           label="Accrued Preferred Return"
           value={fmt(accruedPref)}
-          subtitle={caLoading ? "Loading..." : undefined}
         />
         <MetricCard
           label="Total Distributions"
           value={fmt(totalDistributions)}
-          subtitle={distLoading ? "Loading..." : undefined}
         />
         <MetricCard
           label="Capital Account Balance"
           value={fmt(endingBalance)}
-          subtitle={caLoading ? "Loading..." : undefined}
         />
       </div>
 

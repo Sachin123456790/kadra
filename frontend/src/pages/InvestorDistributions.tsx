@@ -15,6 +15,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
 import { Info } from "lucide-react";
 
 const fmt = (n: number) =>
@@ -312,7 +313,16 @@ export default function InvestorDistributionsPage() {
     setSelectedRunId(runId);
   }, []);
 
-  if (distLoading || breakdownLoading) return <div className="p-6">Loading...</div>;
+  if (distLoading || breakdownLoading) return (
+    <div className="p-6 space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+      <TableSkeleton rows={5} columns={7} />
+    </div>
+  );
   if (distError) return <ErrorAlert title="Failed to load distributions" message={(distError as Error).message} />;
 
   const hasDistributions = distributions && distributions.length > 0;

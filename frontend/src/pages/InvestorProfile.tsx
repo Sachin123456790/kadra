@@ -6,6 +6,7 @@ import { SectionCard } from "@/components/kadra/SectionCard";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { SkeletonCard } from "@/components/kadra/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMyProfile, getMyWallets, createWalletChallenge, verifyWalletLink, getMyDashboard } from "@/services";
 import { getInvestorTaxReport } from "@/services/tax.service";
@@ -338,7 +339,7 @@ function WalletSection({
         <div className="text-center py-8">
           <Wallet className="h-8 w-8 text-gray-400 mx-auto mb-3" />
           <p className="text-sm font-medium text-foreground mb-1">No wallets linked</p>
-          <p className="text-xs text-muted-foreground">Link a wallet to receive fund tokens and participate in transfers.</p>
+          <p className="text-xs text-muted-foreground">Link a wallet to receive fund allocations and participate in transfers.</p>
         </div>
       )}
 
@@ -448,7 +449,20 @@ export default function InvestorProfile() {
     }
   };
 
-  if (profileLoading || walletsLoading) return <div className="p-6">Loading...</div>;
+  if (profileLoading || walletsLoading) return (
+    <div className="p-6 space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    </div>
+  );
   if (profileError) return <ErrorAlert title="Failed to load profile" message={(profileError as Error).message} />;
 
   return (

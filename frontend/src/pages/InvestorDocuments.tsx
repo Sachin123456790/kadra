@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { DataTable, Column } from "@/components/kadra/DataTable";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
+import { TableSkeleton } from "@/components/kadra/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import {
   getInvestorDocuments,
@@ -161,7 +162,11 @@ export default function InvestorDocuments() {
     queryFn: () => getInvestorDocuments(fundId).then((r) => r.data),
   });
 
-  if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>;
+  if (isLoading) return (
+    <div className="p-6 space-y-4">
+      <TableSkeleton rows={5} columns={5} />
+    </div>
+  );
   if (error)
     return (
       <ErrorAlert
