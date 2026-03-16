@@ -176,15 +176,24 @@ export default function SubscriptionsPage() {
 
   // Cumulative committed capital over time for line chart
   const commitmentTimeline = useMemo(() => {
-    if (!subscriptions) return [];
-    const sorted = [...subscriptions]
-      .filter(s => s.createdAt)
-      .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+    if (!subscriptions || subscriptions.length === 0) return [];
+    // Use createdAt, fallback to settledAt, fallback to index-based ordering
+    const withDates = subscriptions.map((s, i) => ({
+      ...s,
+      sortDate: s.createdAt ?? s.settledAt ?? null,
+      index: i,
+    }));
+    const hasDates = withDates.some(s => s.sortDate);
+    const sorted = hasDates
+      ? [...withDates].filter(s => s.sortDate).sort((a, b) => new Date(a.sortDate!).getTime() - new Date(b.sortDate!).getTime())
+      : withDates; // no dates available — use insertion order
     let cumulative = 0;
     const points: { date: string; committed: number }[] = [];
     for (const sub of sorted) {
       cumulative += Number(sub.committedAmount) || 0;
-      const date = new Date(sub.createdAt!).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const date = sub.sortDate
+        ? new Date(sub.sortDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        : `#${sub.index + 1}`;
       // Merge same-date entries (keep latest cumulative)
       const existing = points.find(p => p.date === date);
       if (existing) {
