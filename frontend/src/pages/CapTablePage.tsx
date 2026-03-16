@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { Download, Copy, Check, ChevronRight, ChevronDown } from 'lucide-react';
+import { Download, ChevronRight, ChevronDown } from 'lucide-react';
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from '@/config/constants';
 import { getCapTable, getCapitalAccounts } from '@/services/ownership.service';
 import { getSubscriptions } from '@/services/subscriptions.service';
@@ -15,8 +15,10 @@ import { MetricCard } from "@/components/kadra/MetricCard";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import { HashDisplay } from "@/components/kadra/HashDisplay";
+import { CopyButton } from "@/components/kadra/CopyButton";
 import { formatCompact } from "@/lib/format";
 
 const OWNERSHIP_COLORS = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#2563eb', '#c026d3'] as const;
@@ -30,30 +32,6 @@ const fmtDate = (d: string | null | undefined) => {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 };
-
-/* ── Copy Button ── */
-
-function CopyButton({ text }: { readonly text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [text]);
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="ml-1 inline-flex text-gray-400 hover:text-gray-600 transition-colors"
-      title="Copy to clipboard"
-      type="button"
-    >
-      {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-    </button>
-  );
-}
 
 /* ── Merged row type ── */
 
@@ -101,53 +79,58 @@ function CapTableRowItem({
   return (
     <>
       <tr
-        className="border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+        className="border-b border-border cursor-pointer hover:bg-gray-50 transition-colors"
         onClick={onToggle}
       >
-        <td className="px-4 py-3 text-gray-500">
+        <td className="px-4 py-3 text-muted-foreground">
           {isExpanded ? (
             <ChevronDown className="h-4 w-4" />
           ) : (
             <ChevronRight className="h-4 w-4" />
           )}
         </td>
-        <td className="px-4 py-3 font-medium text-gray-900">{row.investorName ?? "—"}</td>
-        <td className="px-4 py-3 text-gray-900">{row.ownershipPct.toFixed(2)}%</td>
-        <td className="px-4 py-3 text-gray-900">{fmtCurrency(row.capitalContributed)}</td>
-        <td className="px-4 py-3 text-gray-600">{fmtDate(row.settledAt)}</td>
+        <td className="px-4 py-3 font-medium text-foreground">{row.investorName ?? "—"}</td>
+        <td className="px-4 py-3 text-foreground">
+          <span className="inline-flex items-center">
+            <span className="inline-block h-2 w-2 rounded-full bg-primary mr-1.5" />
+            {row.ownershipPct.toFixed(2)}%
+          </span>
+        </td>
+        <td className="px-4 py-3 text-foreground">{fmtCurrency(row.capitalContributed)}</td>
+        <td className="px-4 py-3 text-muted-foreground">{fmtDate(row.settledAt)}</td>
       </tr>
       {isExpanded && (
-        <tr className="border-b border-gray-100 bg-gray-50">
+        <tr className="border-b border-border bg-muted">
           <td colSpan={5} className="px-8 py-4">
             <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
               <div>
-                <span className="text-gray-500 font-medium">Wallet</span>
+                <span className="text-muted-foreground font-medium">Account Address</span>
                 <div className="mt-0.5 inline-flex items-center gap-1">
                   <ExplorerLink value={row.walletAddress} type="address" />
-                  <CopyButton text={row.walletAddress} />
+                  <CopyButton value={row.walletAddress} />
                 </div>
               </div>
               <div>
-                <span className="text-gray-500 font-medium">Token Balance</span>
-                <div className="mt-0.5 font-mono text-gray-900">
+                <span className="text-muted-foreground font-medium">Settled Units</span>
+                <div className="mt-0.5 font-mono text-foreground">
                   {parseFloat(row.settledTokenBalance).toLocaleString("en-US")}
                 </div>
               </div>
               <div>
-                <span className="text-gray-500 font-medium">Settlement Tx</span>
+                <span className="text-muted-foreground font-medium">Settlement Reference</span>
                 <div className="mt-0.5">
                   {row.settlementTxHash ? (
                     <span className="inline-flex items-center gap-1">
                       <ExplorerLink value={row.settlementTxHash} type="tx" />
-                      <CopyButton text={row.settlementTxHash} />
+                      <CopyButton value={row.settlementTxHash} />
                     </span>
                   ) : (
-                    <span className="text-gray-500">--</span>
+                    <span className="text-muted-foreground">--</span>
                   )}
                 </div>
               </div>
               <div>
-                <span className="text-gray-500 font-medium">Governing LPA Hash</span>
+                <span className="text-muted-foreground font-medium">Governing LPA Hash</span>
                 <div className="mt-0.5">
                   <HashDisplay value={row.governingHashHex} />
                 </div>
@@ -197,7 +180,7 @@ function OwnershipPieChart({ rows }: OwnershipPieProps) {
             verticalAlign="bottom"
             iconType="circle"
             iconSize={8}
-            formatter={(value: string) => <span className="text-base text-gray-600">{value}</span>}
+            formatter={(value: string) => <span className="text-base text-muted-foreground">{value}</span>}
           />
         </PieChart>
       </ResponsiveContainer>
@@ -214,11 +197,11 @@ function TotalRow({ rows }: { readonly rows: ReadonlyArray<EnrichedCapTableRow> 
   return (
     <table className="w-full text-sm">
       <tfoot>
-        <tr className="bg-gray-50 border-t border-gray-200 font-semibold text-gray-900">
+        <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-foreground">
           <td className="px-4 py-3 w-10" />
-          <td className="px-4 py-3">Total</td>
-          <td className="px-4 py-3">{totalOwnership.toFixed(2)}%</td>
-          <td className="px-4 py-3">{fmtCurrency(totalCapital)}</td>
+          <td className="px-4 py-3 font-semibold">Total</td>
+          <td className="px-4 py-3 font-semibold">{totalOwnership.toFixed(2)}%</td>
+          <td className="px-4 py-3 font-semibold">{fmtCurrency(totalCapital)}</td>
           <td className="px-4 py-3" />
         </tr>
       </tfoot>
@@ -244,7 +227,7 @@ function ExportCapTableButton({ fundId }: { readonly fundId: string }) {
     <button
       onClick={handleExport}
       disabled={exporting}
-      className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 transition-colors"
+      className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 transition-all duration-150 active:scale-[0.98] motion-reduce:transform-none"
       type="button"
     >
       <Download className="h-4 w-4" />
@@ -270,8 +253,15 @@ export default function CapTablePage() {
     queryFn: () => getSubscriptions(fundId).then(r => r.data),
   });
 
-  if (isLoading) return <div className="p-6">Loading...</div>;
-  if (error) return <ErrorAlert title="Cap Table Error" message={(error as Error).message} />;
+  if (isLoading) return (
+    <div className="p-6 space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+      </div>
+      <TableSkeleton rows={5} columns={5} />
+    </div>
+  );
+  if (error) return <ErrorAlert title="Unable to load cap table" message={`${(error as Error).message}. Try refreshing the page.`} />;
   if (!data || data.rows.length === 0) return (
     <div>
       <PageHeader
@@ -279,7 +269,7 @@ export default function CapTablePage() {
         subtitle="Current ownership and allocation breakdown"
         action={<ExportCapTableButton fundId={fundId} />}
       />
-      <EmptyState title="No cap table data" message="No ownership positions have been recorded yet." />
+      <EmptyState title="No ownership records yet" message="Settle investor subscriptions to populate the cap table." />
     </div>
   );
 
@@ -308,7 +298,7 @@ export default function CapTablePage() {
     <div>
       <PageHeader
         title="Cap Table"
-        subtitle={`Last updated from chain: ${lastUpdated}`}
+        subtitle={`Last updated: ${lastUpdated}`}
         action={<ExportCapTableButton fundId={fundId} />}
       />
 
@@ -316,7 +306,7 @@ export default function CapTablePage() {
         <MetricCard label="Total Investors" value={data.rows.length} />
         <MetricCard label="Total Ownership" value={`${totalOwnership.toFixed(1)}%`} />
         <MetricCard
-          label="Settled Balance"
+          label="Units Settled"
           value={formatCompact(totalSettled)}
         />
         <MetricCard label="Pending Allocations" value={pendingCount} />
@@ -328,12 +318,12 @@ export default function CapTablePage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
+              <tr className="border-b border-border">
                 <th className="px-4 py-3 w-10" />
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Investor</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ownership %</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Capital Contributed</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Settlement Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Investor</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Ownership %</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Capital Contributed</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Settlement Date</th>
               </tr>
             </thead>
             <tbody>

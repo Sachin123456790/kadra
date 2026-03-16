@@ -69,41 +69,41 @@ function IdentitySection({
         {/* Profile fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-gray-500 mb-1">Name</p>
-            <p className="text-sm font-medium text-gray-900">{profile.legalName}</p>
+            <p className="text-xs text-muted-foreground mb-1">Name</p>
+            <p className="text-sm font-medium text-foreground">{profile.legalName}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-1">Email</p>
-            <p className="text-sm font-medium text-gray-900">{profile.email}</p>
+            <p className="text-xs text-muted-foreground mb-1">Email</p>
+            <p className="text-sm font-medium text-foreground">{profile.email}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-1">KYC Status</p>
+            <p className="text-xs text-muted-foreground mb-1">KYC Status</p>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                 Verified
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-muted-foreground">
                 Last verified: {fmtDate(createdDate.toISOString())}
               </span>
             </div>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-1">Accreditation Status</p>
+            <p className="text-xs text-muted-foreground mb-1">Accreditation Status</p>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                 Accredited
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-muted-foreground">
                 Expires: {fmtDate(expiryDate.toISOString())}
               </span>
             </div>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-1">Residency</p>
-            <p className="text-sm font-medium text-gray-900">United States</p>
+            <p className="text-xs text-muted-foreground mb-1">Residency</p>
+            <p className="text-sm font-medium text-foreground">United States</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-1">Account Status</p>
+            <p className="text-xs text-muted-foreground mb-1">Account Status</p>
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${profile.walletCount > 0 ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
               {profile.walletCount > 0 ? "Connected" : "Pending Setup"}
             </span>
@@ -112,26 +112,26 @@ function IdentitySection({
 
         {/* Verification History */}
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-3">Verification History</h4>
+          <h4 className="text-sm font-medium text-foreground mb-3">Verification History</h4>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Check Type</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Date</th>
+                <tr className="border-b border-border">
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Check Type</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Date</th>
                 </tr>
               </thead>
               <tbody>
                 {verificationHistory.map((row) => (
-                  <tr key={row.checkType} className="border-b border-gray-100">
-                    <td className="px-4 py-2.5 text-gray-900">{row.checkType}</td>
+                  <tr key={row.checkType} className="border-b border-border">
+                    <td className="px-4 py-2.5 text-foreground">{row.checkType}</td>
                     <td className="px-4 py-2.5">
                       <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                         {row.status}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-gray-600">{row.date}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{row.date}</td>
                   </tr>
                 ))}
               </tbody>
@@ -173,11 +173,11 @@ function TaxInformationSection({ profile, fundName }: { profile: { legalName: st
         {/* Year selector */}
         <div className="flex items-center gap-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Tax Year</label>
+            <label className="block text-xs text-muted-foreground mb-1">Tax Year</label>
             <select
               value={taxYear}
               onChange={(e) => setTaxYear(Number(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+              className="px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-card"
             >
               {yearOptions.map((y) => (
                 <option key={y} value={y}>{y}</option>
@@ -192,48 +192,48 @@ function TaxInformationSection({ profile, fundName }: { profile: { legalName: st
         </div>
 
         {taxLoading ? (
-          <div className="py-6 text-center text-sm text-gray-500">Loading tax data...</div>
+          <div className="py-6 text-center text-sm text-muted-foreground">Loading tax data...</div>
         ) : !taxReport ? (
           <div className="py-6 text-center">
             <FileText className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">Tax data not yet available for this period.</p>
+            <p className="text-sm text-muted-foreground">Tax data not yet available for this period.</p>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-gray-500 mb-1">Tax Entity Name</p>
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-xs text-muted-foreground mb-1">Tax Entity Name</p>
+                <p className="text-sm font-medium text-foreground">
                   {taxReport.taxEntityName || `${profile.legalName} Trust`}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1">Fund Name</p>
-                <p className="text-sm font-medium text-gray-900">{fundName}</p>
+                <p className="text-xs text-muted-foreground mb-1">Fund Name</p>
+                <p className="text-sm font-medium text-foreground">{fundName}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1">Tax Year</p>
-                <p className="text-sm font-medium text-gray-900">{taxReport.taxYear}</p>
+                <p className="text-xs text-muted-foreground mb-1">Tax Year</p>
+                <p className="text-sm font-medium text-foreground">{taxReport.taxYear}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1">Ordinary Income</p>
-                <p className="text-sm font-medium text-gray-900">{fmt(Number(taxReport.ordinaryIncome))}</p>
+                <p className="text-xs text-muted-foreground mb-1">Ordinary Income</p>
+                <p className="text-sm font-medium text-foreground">{fmt(Number(taxReport.ordinaryIncome))}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1">Return of Capital</p>
-                <p className="text-sm font-medium text-gray-900">{fmt(Number(taxReport.returnOfCapital))}</p>
+                <p className="text-xs text-muted-foreground mb-1">Return of Capital</p>
+                <p className="text-sm font-medium text-foreground">{fmt(Number(taxReport.returnOfCapital))}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1">Long Term Capital Gain</p>
-                <p className="text-sm font-medium text-gray-900">{fmt(Number(taxReport.ltcg))}</p>
+                <p className="text-xs text-muted-foreground mb-1">Long Term Capital Gain</p>
+                <p className="text-sm font-medium text-foreground">{fmt(Number(taxReport.ltcg))}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1">Short Term Capital Gain</p>
-                <p className="text-sm font-medium text-gray-900">{fmt(Number(taxReport.stcg))}</p>
+                <p className="text-xs text-muted-foreground mb-1">Short Term Capital Gain</p>
+                <p className="text-sm font-medium text-foreground">{fmt(Number(taxReport.stcg))}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1">Total Distributions Received</p>
-                <p className="text-sm font-semibold text-gray-900">{fmt(Number(taxReport.totalDistributions))}</p>
+                <p className="text-xs text-muted-foreground mb-1">Total Distributions Received</p>
+                <p className="text-sm font-semibold text-foreground">{fmt(Number(taxReport.totalDistributions))}</p>
               </div>
             </div>
 
@@ -279,36 +279,36 @@ function WalletSection({
     <SectionCard title="Linked Wallets" action={linkWalletButton}>
       {wallets && wallets.length > 0 ? (
         <>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             Wallets verified through cryptographic ownership proof
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3 text-gray-500 font-medium text-xs uppercase tracking-wider">Address</th>
-                  <th className="text-left py-2 px-3 text-gray-500 font-medium text-xs uppercase tracking-wider">Network</th>
-                  <th className="text-left py-2 px-3 text-gray-500 font-medium text-xs uppercase tracking-wider">Status</th>
-                  <th className="text-left py-2 px-3 text-gray-500 font-medium text-xs uppercase tracking-wider">Label</th>
-                  <th className="text-right py-2 px-3 text-gray-500 font-medium text-xs uppercase tracking-wider">Actions</th>
+                <tr className="border-b border-border">
+                  <th className="text-left py-2 px-3 text-muted-foreground font-medium text-xs uppercase tracking-wider">Address</th>
+                  <th className="text-left py-2 px-3 text-muted-foreground font-medium text-xs uppercase tracking-wider">Network</th>
+                  <th className="text-left py-2 px-3 text-muted-foreground font-medium text-xs uppercase tracking-wider">Status</th>
+                  <th className="text-left py-2 px-3 text-muted-foreground font-medium text-xs uppercase tracking-wider">Label</th>
+                  <th className="text-right py-2 px-3 text-muted-foreground font-medium text-xs uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {wallets.map((w: LinkedWallet) => (
-                  <tr key={w.walletId} className="border-b border-gray-100 last:border-0">
+                  <tr key={w.walletId} className="border-b border-border last:border-0">
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-2">
                         <ExplorerLink value={w.address ?? ""} type="address" />
                         <button
                           onClick={() => copyAddress(w.address)}
-                          className="text-gray-400 hover:text-gray-600 transition-colors"
+                          className="text-muted-foreground hover:text-foreground transition-colors"
                           title="Copy address"
                         >
                           <Copy className="h-3 w-3" />
                         </button>
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-gray-500">{chainName(w.chainId)}</td>
+                    <td className="py-3 px-3 text-muted-foreground">{chainName(w.chainId)}</td>
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-2">
                         <StatusBadge status={w.walletStatus} />
@@ -319,11 +319,11 @@ function WalletSection({
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-gray-500">{w.label || "--"}</td>
+                    <td className="py-3 px-3 text-muted-foreground">{w.label || "--"}</td>
                     <td className="py-3 px-3 text-right">
                       <button
                         onClick={() => copyAddress(w.address)}
-                        className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                       >
                         Copy Full Address
                       </button>
@@ -337,18 +337,18 @@ function WalletSection({
       ) : (
         <div className="text-center py-8">
           <Wallet className="h-8 w-8 text-gray-400 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-900 mb-1">No wallets linked</p>
-          <p className="text-xs text-gray-500">Link a wallet to receive fund tokens and participate in transfers.</p>
+          <p className="text-sm font-medium text-foreground mb-1">No wallets linked</p>
+          <p className="text-xs text-muted-foreground">Link a wallet to receive fund tokens and participate in transfers.</p>
         </div>
       )}
 
       {/* Security Note */}
-      <div className="mt-4 pt-4 border-t border-gray-200">
+      <div className="mt-4 pt-4 border-t border-border">
         <div className="flex items-start gap-3">
           <Shield className="h-5 w-5 text-gray-400 mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-medium text-gray-900 mb-1">Wallet Security</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-sm font-medium text-foreground mb-1">Wallet Security</p>
+            <p className="text-xs text-muted-foreground">
               Wallet ownership is verified through a cryptographic signature. Linked wallets require separate
               admin approval for fund eligibility. Your private keys never leave your wallet.
             </p>
@@ -461,7 +461,7 @@ export default function InvestorProfile() {
           <IdentitySection profile={profile as typeof profile & { createdAt?: string }} />
         ) : (
           <SectionCard title="Identity and Verification">
-            <p className="text-sm text-gray-500">Profile not available.</p>
+            <p className="text-sm text-muted-foreground">Profile not available.</p>
           </SectionCard>
         )}
 
@@ -472,7 +472,7 @@ export default function InvestorProfile() {
         <SectionCard title="Account Connection">
           <div className="flex items-center gap-3">
             <div className={`w-2.5 h-2.5 rounded-full ${(wallets ?? []).length > 0 ? "bg-green-500" : "bg-amber-400"}`} />
-            <span className="text-sm font-medium text-gray-900">
+            <span className="text-sm font-medium text-foreground">
               Wallet Status:
             </span>
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${(wallets ?? []).length > 0 ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
@@ -521,7 +521,7 @@ export default function InvestorProfile() {
                     <button
                       key={i}
                       onClick={() => handleSelectProvider(p.provider)}
-                      className="w-full flex items-center gap-3 rounded-lg border border-gray-200 p-4 hover:bg-gray-50 transition-colors text-left"
+                      className="w-full flex items-center gap-3 rounded-lg border border-border p-4 hover:bg-gray-50 transition-colors text-left"
                     >
                       {p.icon ? (
                         <img src={p.icon} alt={p.name} className="h-8 w-8 rounded-md" />
@@ -531,16 +531,16 @@ export default function InvestorProfile() {
                         </div>
                       )}
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                        <p className="text-xs text-gray-500">Click to connect</p>
+                        <p className="text-sm font-medium text-foreground">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">Click to connect</p>
                       </div>
                     </button>
                   ))
                 ) : (
                   <div className="text-center py-6">
                     <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-3" />
-                    <p className="text-sm font-medium text-gray-900 mb-1">No wallet detected</p>
-                    <p className="text-xs text-gray-500 mb-4">
+                    <p className="text-sm font-medium text-foreground mb-1">No wallet detected</p>
+                    <p className="text-xs text-muted-foreground mb-4">
                       Install MetaMask or Phantom to link a wallet.
                     </p>
                     <div className="flex gap-3 justify-center">
@@ -570,7 +570,7 @@ export default function InvestorProfile() {
             {step === "connecting" && (
               <div className="flex flex-col items-center py-6">
                 <div className="h-10 w-10 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin mb-4" />
-                <p className="text-sm text-gray-500">Waiting for wallet approval...</p>
+                <p className="text-sm text-muted-foreground">Waiting for wallet approval...</p>
               </div>
             )}
 
@@ -579,13 +579,13 @@ export default function InvestorProfile() {
               <div className="space-y-4">
                 <TechnicalDetails label="Connection Details">
                   <div className="space-y-3">
-                    <div className="rounded-lg bg-gray-50 p-4">
-                      <p className="text-xs text-gray-500 mb-1">Connected Address</p>
+                    <div className="rounded-lg bg-muted p-4">
+                      <p className="text-xs text-muted-foreground mb-1">Connected Address</p>
                       <ExplorerLink value={connectedAddr ?? ""} type="address" truncate={false} />
                     </div>
-                    <div className="rounded-lg bg-gray-50 p-4">
-                      <p className="text-xs text-gray-500 mb-1">Network</p>
-                      <p className="text-sm text-gray-900">{chainName(connectedChain || 1)}</p>
+                    <div className="rounded-lg bg-muted p-4">
+                      <p className="text-xs text-muted-foreground mb-1">Network</p>
+                      <p className="text-sm text-foreground">{chainName(connectedChain || 1)}</p>
                     </div>
                   </div>
                 </TechnicalDetails>
@@ -595,7 +595,7 @@ export default function InvestorProfile() {
                 >
                   Sign Verification Message
                 </button>
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-xs text-muted-foreground text-center">
                   This will request a signature in your wallet. No transaction will be sent.
                 </p>
               </div>
@@ -605,7 +605,7 @@ export default function InvestorProfile() {
             {step === "verifying" && (
               <div className="flex flex-col items-center py-6">
                 <div className="h-10 w-10 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin mb-4" />
-                <p className="text-sm text-gray-500">Verifying ownership...</p>
+                <p className="text-sm text-muted-foreground">Verifying ownership...</p>
               </div>
             )}
 
@@ -615,8 +615,8 @@ export default function InvestorProfile() {
                 <div className="h-12 w-12 rounded-full bg-green-50 flex items-center justify-center mb-4">
                   <CheckCircle className="h-6 w-6 text-green-500" />
                 </div>
-                <p className="text-sm font-medium text-gray-900 mb-1">Wallet linked successfully</p>
-                <p className="text-xs text-gray-500 mb-4 text-center">
+                <p className="text-sm font-medium text-foreground mb-1">Wallet linked successfully</p>
+                <p className="text-xs text-muted-foreground mb-4 text-center">
                   An administrator will review and approve fund eligibility for this wallet.
                 </p>
                 <button
@@ -634,8 +634,8 @@ export default function InvestorProfile() {
                 <div className="h-12 w-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
                   <AlertCircle className="h-6 w-6 text-red-600" />
                 </div>
-                <p className="text-sm font-medium text-gray-900 mb-1">Verification failed</p>
-                <p className="text-xs text-gray-500 mb-4 text-center">
+                <p className="text-sm font-medium text-foreground mb-1">Verification failed</p>
+                <p className="text-xs text-muted-foreground mb-4 text-center">
                   {modalError || "An unexpected error occurred."}
                 </p>
                 <button

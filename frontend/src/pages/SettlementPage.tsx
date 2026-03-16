@@ -99,7 +99,7 @@ function ThreeWayMatchIcons({
             ) : (
               <XCircle className="h-4 w-4 text-red-600" />
             )}
-            <span className="text-xs text-gray-600">{item.label}</span>
+            <span className="text-xs text-muted-foreground">{item.label}</span>
           </div>
         );
       })}
@@ -183,7 +183,7 @@ function CapitalCallsSection({ fundId }: { readonly fundId: string }) {
       className="mb-6"
     >
       {isLoading ? (
-        <div className="flex items-center gap-2 p-4 text-gray-500">
+        <div className="flex items-center gap-2 p-4 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading capital calls...
         </div>
@@ -196,20 +196,20 @@ function CapitalCallsSection({ fundId }: { readonly fundId: string }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <tr className="border-b border-border">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Call #
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Amount Due
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Due Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Wire Instructions
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Status
                 </th>
               </tr>
@@ -218,18 +218,18 @@ function CapitalCallsSection({ fundId }: { readonly fundId: string }) {
               {calls.map((call: CapitalCall) => (
                 <tr
                   key={call.id}
-                  className="border-b border-gray-100"
+                  className="border-b border-border"
                 >
-                  <td className="px-4 py-3 font-medium text-gray-900">
+                  <td className="px-4 py-3 font-medium text-foreground">
                     {call.callNumber}
                   </td>
-                  <td className="px-4 py-3 text-gray-900">
+                  <td className="px-4 py-3 text-foreground">
                     {fmt(Number(call.amountDue))}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className="px-4 py-3 text-muted-foreground">
                     {new Date(call.dueDate).toLocaleDateString()}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 max-w-[200px]">
+                  <td className="px-4 py-3 text-muted-foreground max-w-[200px]">
                     {call.wireInstructions ? (
                       <span
                         className="block truncate"
@@ -320,12 +320,12 @@ function CapitalCallsSection({ fundId }: { readonly fundId: string }) {
                 disabled={createMutation.isPending}
                 className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                {createMutation.isPending ? "Creating..." : "Create"}
+                {createMutation.isPending ? "Issuing..." : "Issue Capital Call"}
               </button>
             </DialogFooter>
             {createMutation.isError && (
               <p className="mt-2 text-xs text-red-600">
-                {(createMutation.error as Error).message}
+                {(createMutation.error as Error).message}. Please check the inputs and try again.
               </p>
             )}
           </form>
@@ -425,6 +425,9 @@ function SettlementValidationSection({
     }) =>
       confirmSettlement(subscriptionId, settlementRecordId).then((r) => r.data),
     onSuccess: () => {
+      toast.success("Settlement confirmed successfully", {
+        description: "Ownership records and cap table have been updated.",
+      });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.subscriptions(fundId),
       });
@@ -433,7 +436,7 @@ function SettlementValidationSection({
 
   if (isLoading)
     return (
-      <div className="flex items-center gap-2 p-6 text-gray-500">
+      <div className="flex items-center gap-2 p-6 text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading settlement data...
       </div>
@@ -442,8 +445,8 @@ function SettlementValidationSection({
   if (error)
     return (
       <ErrorAlert
-        title="Failed to load settlement queue"
-        message={(error as Error).message}
+        title="Unable to load settlement queue"
+        message={`${(error as Error).message}. Try refreshing the page.`}
       />
     );
 
@@ -495,14 +498,14 @@ function SettlementValidationSection({
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-foreground">
                           {p.investor}
                         </p>
                         {vResult && (
                           <ThreeWayMatchIcons validation={vResult} />
                         )}
                       </div>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         {p.amount} · {p.ref}
                       </p>
                       {uploaded && (
@@ -534,17 +537,17 @@ function SettlementValidationSection({
               <>
                 {/* Wire Upload */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Wire Confirmation (PDF)
                   </label>
                   {currentUpload ? (
                     <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 p-3">
                       <FileText className="h-4 w-4 text-green-600" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="text-sm font-medium text-foreground truncate">
                           {currentUpload.name}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           ID: {currentUpload.documentId.slice(0, 8)}...
                         </p>
                       </div>
@@ -559,7 +562,7 @@ function SettlementValidationSection({
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadMutation.isPending}
-                      className="w-full flex items-center justify-center gap-2 rounded-md border-2 border-dashed border-gray-300 p-4 text-sm text-gray-500 hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-2 rounded-md border-2 border-dashed border-gray-300 p-4 text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
                     >
                       {uploadMutation.isPending ? (
                         <>
@@ -583,8 +586,7 @@ function SettlementValidationSection({
                   />
                   {uploadMutation.isError && (
                     <p className="mt-1 text-xs text-red-600">
-                      Upload failed:{" "}
-                      {(uploadMutation.error as Error).message}
+                      Upload failed: {(uploadMutation.error as Error).message}. Please check the file and try again.
                     </p>
                   )}
                 </div>
@@ -615,7 +617,7 @@ function SettlementValidationSection({
                         </span>
                         <div className="flex items-center gap-2">
                           <StatusIcon s={result} />
-                          <span className="text-xs font-medium capitalize text-gray-500">
+                          <span className="text-xs font-medium capitalize text-muted-foreground">
                             {result}
                           </span>
                         </div>
@@ -626,10 +628,10 @@ function SettlementValidationSection({
 
                 {currentValidation?.status === "FAILED" && (
                   <ErrorAlert
-                    title="Validation Failed"
+                    title="Validation did not pass"
                     message={
                       currentValidation.failureReasonCode ??
-                      "One or more checks did not pass. Manual review required."
+                      "One or more checks did not pass. Review the results above and re-upload corrected payment evidence."
                     }
                   />
                 )}
@@ -646,7 +648,7 @@ function SettlementValidationSection({
                   >
                     {validateMutation.isPending
                       ? "Validating..."
-                      : "Validate"}
+                      : "Run Validation"}
                   </button>
                   <button
                     onClick={() => {
@@ -666,7 +668,7 @@ function SettlementValidationSection({
                       currentValidation.status !== "PASSED" ||
                       confirmMutation.isPending
                     }
-                    className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                    className="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-all duration-150 active:scale-[0.98] motion-reduce:transform-none"
                   >
                     {confirmMutation.isPending
                       ? "Confirming..."
@@ -676,14 +678,14 @@ function SettlementValidationSection({
 
                 {!hasPaymentDoc && !uploadMutation.isPending && (
                   <p className="mt-2 text-xs text-amber-600">
-                    Upload a wire confirmation PDF before validating.
+                    Upload a wire confirmation PDF to enable validation.
                   </p>
                 )}
 
                 {confirmMutation.isError && (
                   <ErrorAlert
-                    title="Settlement failed"
-                    message={(confirmMutation.error as Error).message}
+                    title="Settlement confirmation failed"
+                    message={`${(confirmMutation.error as Error).message}. Please try again or contact support.`}
                     className="mt-3"
                   />
                 )}
@@ -691,7 +693,7 @@ function SettlementValidationSection({
                 {validateMutation.isError && (
                   <ErrorAlert
                     title="Validation failed"
-                    message={(validateMutation.error as Error).message}
+                    message={`${(validateMutation.error as Error).message}. Verify the uploaded document and try again.`}
                     className="mt-3"
                   />
                 )}
@@ -713,7 +715,7 @@ export default function SettlementPage() {
     <div>
       <PageHeader
         title="Settlement"
-        subtitle="Manage capital calls and verify payment evidence against subscription terms"
+        subtitle="Issue capital calls, upload payment evidence, and confirm investor settlements"
       />
 
       <Tabs defaultValue="history" className="mt-2">
@@ -744,7 +746,7 @@ function SettlementHistoryOnly({ fundId }: { readonly fundId: string }) {
 
   if (isLoading)
     return (
-      <div className="flex items-center gap-2 p-6 text-gray-500">
+      <div className="flex items-center gap-2 p-6 text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading settlement history...
       </div>
@@ -763,34 +765,34 @@ function SettlementHistoryOnly({ fundId }: { readonly fundId: string }) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200">
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">LP Name</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Committed Amount</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Allocation</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Three-Way Match</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Settlement Date</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Verification</th>
+            <tr className="border-b border-border">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">LP Name</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Committed Amount</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Allocation</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Three-Way Match</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Settlement Date</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Verification</th>
             </tr>
           </thead>
           <tbody>
             {settledSubs.map((sub) => (
-              <tr key={sub.subscriptionId} className="border-b border-gray-100">
-                <td className="px-4 py-3 font-medium text-gray-900">{sub.investorName || sub.investorId}</td>
-                <td className="px-4 py-3 text-gray-900">${Number(sub.committedAmount).toLocaleString()}</td>
-                <td className="px-4 py-3 text-gray-900">{Number(sub.allocationPct)}%</td>
+              <tr key={sub.subscriptionId} className="border-b border-border">
+                <td className="px-4 py-3 font-medium text-foreground">{sub.investorName || sub.investorId}</td>
+                <td className="px-4 py-3 text-foreground">${Number(sub.committedAmount).toLocaleString()}</td>
+                <td className="px-4 py-3 text-foreground">{Number(sub.allocationPct)}%</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     {["Amount", "Identity", "Reference"].map((label) => (
                       <div key={label} className="flex items-center gap-1">
                         <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-xs text-gray-600">{label}</span>
+                        <span className="text-xs text-muted-foreground">{label}</span>
                       </div>
                     ))}
                   </div>
                 </td>
                 <td className="px-4 py-3"><StatusBadge status="Settled" /></td>
-                <td className="px-4 py-3 text-gray-600">{sub.settledAt ? new Date(sub.settledAt).toLocaleDateString() : "--"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{sub.settledAt ? new Date(sub.settledAt).toLocaleDateString() : "--"}</td>
                 <td className="px-4 py-3">
                   {sub.settlementTxHash ? (
                     <span className="inline-flex items-center gap-1 text-green-600">

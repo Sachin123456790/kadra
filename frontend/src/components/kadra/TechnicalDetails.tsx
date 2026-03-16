@@ -26,7 +26,7 @@ export function TechnicalDetails({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-gray-500 transition-colors hover:text-gray-700"
+        className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         {open ? (
           <ChevronDown className="h-4 w-4" />

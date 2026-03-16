@@ -174,7 +174,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col gap-1">
                   <p className="text-sm font-medium">{user?.email || "Loading..."}</p>
-                  <p className="text-xs text-gray-500 capitalize">{user?.role || "Loading..."}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{user?.role || "Loading..."}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -245,7 +245,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         {sidebarOpen && <div className="fixed inset-0 bg-foreground/20 z-10 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6 animate-fade-in motion-reduce:animate-none">{children}</main>
       </div>
     </div>
   );

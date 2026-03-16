@@ -43,7 +43,7 @@ export function DataTable<T extends Record<string, any>>({
                   key={rowId ?? i}
                   onClick={() => onRowClick?.(row)}
                   className={cn(
-                    "border-b border-border transition-colors",
+                    "border-b border-border transition-colors duration-150 motion-reduce:transition-none",
                     onRowClick && "cursor-pointer hover:bg-muted/50",
                     selectedId && rowId === selectedId && "bg-sidebar-accent"
                   )}

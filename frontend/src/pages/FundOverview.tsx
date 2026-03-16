@@ -5,6 +5,7 @@ import { MetricCard } from "@/components/kadra/MetricCard";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import { ActivityFeed } from "@/components/kadra/ActivityFeed";
@@ -49,8 +50,8 @@ function ProgressBar({ label, value, max, color }: ProgressBarProps) {
   return (
     <div>
       <div className="flex justify-between text-sm mb-1">
-        <span className="text-gray-600">{label}</span>
-        <span className="font-medium text-gray-900">{fmt(value)}</span>
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium text-foreground">{fmt(value)}</span>
       </div>
       <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
         <div
@@ -72,9 +73,9 @@ function InfoRow({
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className="flex justify-between border-b border-gray-100 pb-2 last:border-0">
-      <dt className="text-sm text-gray-500">{label}</dt>
-      <dd className="text-sm font-medium text-gray-900">{children}</dd>
+    <div className="flex justify-between border-b border-border pb-2 last:border-0">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="text-sm font-medium text-foreground">{children}</dd>
     </div>
   );
 }
@@ -157,12 +158,19 @@ export default function FundOverviewPage() {
 
   /* ── Loading / Error / Empty ── */
 
-  if (fundLoading) return <div className="p-6 text-gray-500">Loading...</div>;
+  if (fundLoading) return (
+    <div className="p-6 space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+      </div>
+      <TableSkeleton rows={5} columns={4} />
+    </div>
+  );
   if (fundError)
     return (
       <ErrorAlert
-        title="Failed to load fund overview"
-        message={(fundError as Error).message}
+        title="Unable to load fund overview"
+        message={`${(fundError as Error).message}. Please refresh the page or contact support if the issue persists.`}
       />
     );
   if (!fundData || !metrics)
@@ -188,29 +196,41 @@ export default function FundOverviewPage() {
 
   return (
     <div>
-      <PageHeader title={fundData.fundName} subtitle="Fund Dashboard" />
+      <PageHeader title={fundData.fundName} subtitle="Overview of fund status, capital activity, and recent events" />
 
       {/* ── Top Metric Bar (4 cards) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <MetricCard
           label="Total AUM"
           value={formatCompact(metrics.settledCapital)}
-          subtitle={isFullyCommitted ? "Fully Committed" : "Partially Committed"}
+          subtitle={
+            isFullyCommitted
+              ? <span className="text-green-600 dark:text-green-400">Fully Committed</span>
+              : <span className="text-amber-600 dark:text-amber-400">Partially Committed</span>
+          }
+          className="[&>p:nth-child(2)]:text-3xl"
         />
         <MetricCard
           label="Fund Size"
           value={formatCompact(fundSize)}
           subtitle="Target Commitment"
+          className="[&>p:nth-child(2)]:text-3xl"
         />
         <MetricCard
-          label="Active LPs"
+          label="Active Investors"
           value={fundData.lpCount}
           subtitle={`of ${(fundData.lpCount ?? 0) + (fundData.pendingSubscriptions ?? 0)} total`}
+          className="[&>p:nth-child(2)]:text-3xl"
         />
         <MetricCard
           label="Pending Settlements"
           value={fundData.pendingSubscriptions}
-          subtitle={`${fundData.pendingSubscriptions ?? 0} awaiting confirmation`}
+          subtitle={
+            (fundData.pendingSubscriptions ?? 0) === 0
+              ? <span className="text-green-600 dark:text-green-400">All settled</span>
+              : <span className="text-amber-600 dark:text-amber-400">{fundData.pendingSubscriptions} awaiting confirmation</span>
+          }
+          className="[&>p:nth-child(2)]:text-3xl"
         />
       </div>
 
@@ -233,10 +253,10 @@ export default function FundOverviewPage() {
             <InfoRow label="Status">
               <StatusBadge status={fundData.status === "ACTIVE" ? "Passed" : fundData.status} />
             </InfoRow>
-            <InfoRow label="Transfer Restrictions Active">
+            <InfoRow label="Transfer Restrictions">
               <span className="inline-flex items-center gap-1.5 text-green-700 text-xs font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                Yes
+                Enforced
               </span>
             </InfoRow>
             <InfoRow label="Waterfall Version">
@@ -293,16 +313,19 @@ export default function FundOverviewPage() {
             </a>
           }
         >
-          <div className="max-h-64 overflow-y-auto">
-            <ActivityFeed
-              events={activityEvents ?? []}
-              isLoading={activityLoading}
-              maxItems={20}
-              showViewAll={false}
-              viewAllLink={ROUTES.AUDIT}
-            />
+          <div className="relative">
+            <div className="max-h-64 overflow-y-auto">
+              <ActivityFeed
+                events={activityEvents ?? []}
+                isLoading={activityLoading}
+                maxItems={20}
+                showViewAll={false}
+                viewAllLink={ROUTES.AUDIT}
+              />
+            </div>
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent dark:from-card" />
           </div>
-          <div className="border-t border-gray-100 pt-3 mt-3 text-center">
+          <div className="border-t border-border pt-3 mt-3 text-center">
             <a
               href={ROUTES.AUDIT}
               className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
@@ -334,7 +357,7 @@ export default function FundOverviewPage() {
               color="bg-green-500"
             />
 
-            <div className="border-t border-gray-100 pt-4">
+            <div className="border-t border-border pt-4">
               <dl className="space-y-3">
                 {/* GP Promote is $0 — correct for demo since no distributions have been run yet */}
                 <InfoRow label="GP Promote Accrued">{fmt(0)}</InfoRow>
@@ -354,18 +377,18 @@ export default function FundOverviewPage() {
           </div>
         </SectionCard>
 
-        {/* Panel 4: Contract Info */}
-        <SectionCard title="Contract Info">
+        {/* Panel 4: Fund Administration */}
+        <SectionCard title="Fund Administration">
           <dl className="space-y-3">
             <InfoRow label="Fund Name">{fundData.fundName}</InfoRow>
             <InfoRow label="Legal Form">Limited Partnership</InfoRow>
-            <InfoRow label="Deployment Status">
+            <InfoRow label="System Status">
               <StatusBadge status={isDeployed ? "Completed" : "Pending"} />
             </InfoRow>
-            <InfoRow label="Transfer Restrictions Active">
+            <InfoRow label="Transfer Restrictions">
               <span className="inline-flex items-center gap-1.5 text-green-700 text-xs font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                Yes
+                Enforced
               </span>
             </InfoRow>
           </dl>
@@ -387,19 +410,19 @@ export default function FundOverviewPage() {
                   type="address"
                 />
               </InfoRow>
-              <InfoRow label="Total Tokens Minted">
+              <InfoRow label="Total Units Issued">
                 {isDeployed ? "10,000 KDRA" : "N/A"}
               </InfoRow>
-              <InfoRow label="Tokens Outstanding">
+              <InfoRow label="Units Outstanding">
                 {isDeployed ? "10,000 KDRA" : "N/A"}
               </InfoRow>
-              <InfoRow label="Last On-Chain Event">
+              <InfoRow label="Last Recorded Event">
                 {lastOnChainEvent ? (
                   <div className="flex flex-col items-end gap-0.5">
                     <span className="text-xs font-medium text-gray-700">
                       {formatEventType(lastOnChainEvent.eventType)}
                     </span>
-                    <span className="text-xs text-gray-600">
+                    <span className="text-xs text-muted-foreground">
                       {new Date(lastOnChainEvent.occurredAt).toLocaleDateString()}{" "}
                       {new Date(lastOnChainEvent.occurredAt).toLocaleTimeString()}
                     </span>

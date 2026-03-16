@@ -36,21 +36,21 @@ function StatementRow({
   return (
     <div
       className={`flex items-center justify-between px-5 py-3.5 ${
-        even ? "bg-gray-50" : "bg-white"
-      } ${isTotal ? "border-t-2 border-gray-300" : ""}`}
+        even ? "bg-muted" : "bg-card"
+      } ${isTotal ? "border-t-2 border-border" : ""}`}
     >
       <div>
         <span
-          className={`text-sm ${isTotal ? "font-semibold text-gray-900" : "text-gray-700"}`}
+          className={`text-sm ${isTotal ? "font-semibold text-foreground" : "text-foreground"}`}
         >
           {label}
         </span>
         {sublabel && (
-          <span className="ml-2 text-xs text-gray-400">{sublabel}</span>
+          <span className="ml-2 text-xs text-muted-foreground">{sublabel}</span>
         )}
       </div>
       <span
-        className={`text-sm tabular-nums ${isTotal ? "font-semibold text-gray-900" : "font-medium text-gray-900"}`}
+        className={`text-sm tabular-nums ${isTotal ? "font-semibold text-foreground" : "font-medium text-foreground"}`}
       >
         {value}
       </span>
@@ -62,10 +62,10 @@ function EmptyCapitalAccount() {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <FileText className="h-12 w-12 text-indigo-300 mb-4" strokeWidth={1.5} />
-      <p className="text-sm font-medium text-gray-600">
+      <p className="text-sm font-medium text-muted-foreground">
         No capital account data available yet
       </p>
-      <p className="text-xs text-gray-400 mt-1">
+      <p className="text-xs text-muted-foreground mt-1">
         Your capital account statement will appear here once your investment is
         settled.
       </p>
@@ -85,7 +85,7 @@ export default function InvestorCapitalAccount() {
     toast.info("Export feature coming soon");
   };
 
-  if (isLoading) return <div className="p-6 text-gray-500">Loading...</div>;
+  if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>;
   if (error)
     return (
       <ErrorAlert
@@ -102,7 +102,7 @@ export default function InvestorCapitalAccount() {
         action={
           <button
             onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-gray-50 transition-colors"
           >
             <Download className="h-4 w-4" />
             Export Statement
@@ -113,13 +113,13 @@ export default function InvestorCapitalAccount() {
       {!account ? (
         <EmptyCapitalAccount />
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           {/* Statement Header */}
-          <div className="border-b border-gray-200 px-5 py-4">
-            <h3 className="text-base font-semibold text-gray-900">
+          <div className="border-b border-border px-5 py-4">
+            <h3 className="text-base font-semibold text-foreground">
               Capital Account Statement
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               As of {fmtDate(account.asOfDate)}
             </p>
           </div>

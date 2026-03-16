@@ -76,10 +76,10 @@ function EmptyDocuments() {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <FileText className="h-12 w-12 text-indigo-300 mb-4" strokeWidth={1.5} />
-      <p className="text-sm font-medium text-gray-600">
+      <p className="text-sm font-medium text-muted-foreground">
         No documents available yet
       </p>
-      <p className="text-xs text-gray-400 mt-1">
+      <p className="text-xs text-muted-foreground mt-1">
         Your legal documents will appear here once they are generated.
       </p>
     </div>
@@ -94,16 +94,16 @@ const columns: Column<InvestorDocument>[] = [
       const meta = (row as Record<string, unknown>).metadata as Record<string, unknown> | undefined;
       return (
         <div>
-          <span className="text-sm font-medium text-gray-900">{row.name}</span>
+          <span className="text-sm font-medium text-foreground">{row.name}</span>
           {row.type === "CAPITAL_CALL_NOTICE" && meta && (
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="text-xs text-muted-foreground mt-0.5">
               {meta.amountDue != null && <span>Amount Due: {fmtCurrency(Number(meta.amountDue))}</span>}
               {meta.amountDue != null && meta.dueDate != null && <span className="mx-1">&middot;</span>}
               {meta.dueDate != null && <span>Due: {fmtDate(String(meta.dueDate))}</span>}
             </div>
           )}
           {row.type === "DISTRIBUTION_NOTICE" && meta && meta.payoutAmount != null && (
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="text-xs text-muted-foreground mt-0.5">
               Payout: {fmtCurrency(Number(meta.payoutAmount))}
             </div>
           )}
@@ -120,7 +120,7 @@ const columns: Column<InvestorDocument>[] = [
     key: "createdAt",
     header: "Date Generated",
     render: (row) => (
-      <span className="text-sm text-gray-600">{fmtDate(row.createdAt)}</span>
+      <span className="text-sm text-muted-foreground">{fmtDate(row.createdAt)}</span>
     ),
   },
   {
@@ -161,7 +161,7 @@ export default function InvestorDocuments() {
     queryFn: () => getInvestorDocuments(fundId).then((r) => r.data),
   });
 
-  if (isLoading) return <div className="p-6 text-gray-500">Loading...</div>;
+  if (isLoading) return <div className="p-6 text-muted-foreground">Loading...</div>;
   if (error)
     return (
       <ErrorAlert
@@ -182,7 +182,7 @@ export default function InvestorDocuments() {
       {docs.length === 0 ? (
         <EmptyDocuments />
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           <DataTable
             columns={columns}
             data={docs}

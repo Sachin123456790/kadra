@@ -44,7 +44,7 @@ function resolveVariant(status: string): BadgeVariant {
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const variant = resolveVariant(status);
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", variantStyles[variant], className)}>
+    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors duration-200 motion-reduce:transition-none", variantStyles[variant], className)}>
       {status}
     </span>
   );

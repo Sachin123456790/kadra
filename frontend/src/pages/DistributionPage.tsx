@@ -18,6 +18,7 @@ import { MetricCard } from "@/components/kadra/MetricCard";
 import { DataTable, Column } from "@/components/kadra/DataTable";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
 import { HashDisplay } from "@/components/kadra/HashDisplay";
 
 const fmt = (n: number) =>
@@ -62,13 +63,13 @@ function WaterfallConfigSection({ config, lpaHash }: { readonly config: Waterfal
           {tiers.map((tier, idx) => (
             <div
               key={tier.name}
-              className="rounded-md border border-gray-200 bg-white p-4"
+              className="rounded-md border border-border bg-card p-4"
             >
-              <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Tier {idx + 1}
               </p>
-              <p className="mt-1 text-sm font-semibold text-gray-900">{tier.name}</p>
-              <p className="mt-1 text-xs text-gray-600">
+              <p className="mt-1 text-sm font-semibold text-foreground">{tier.name}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
                 {tier.description || `${tier.lpShare}% LPs / ${tier.gpShare}% GP`}
               </p>
             </div>
@@ -76,21 +77,21 @@ function WaterfallConfigSection({ config, lpaHash }: { readonly config: Waterfal
         </div>
 
         {/* Metadata row */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-gray-100">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-border">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Calculation Basis</p>
-            <p className="mt-1 text-sm text-gray-900">{config.calculationBasis ?? "IRR"}</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Calculation Basis</p>
+            <p className="mt-1 text-sm text-foreground">{config.calculationBasis ?? "IRR"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Waterfall Version</p>
-            <p className="mt-1 text-sm text-gray-900">{config.version ?? "1.0"}</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Waterfall Version</p>
+            <p className="mt-1 text-sm text-foreground">{config.version ?? "1.0"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Distribution Frequency</p>
-            <p className="mt-1 text-sm text-gray-900">{config.distributionFrequency ?? "—"}</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Distribution Frequency</p>
+            <p className="mt-1 text-sm text-foreground">{config.distributionFrequency ?? "—"}</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Status</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</p>
             <p className="mt-1">
               <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 border border-green-200">
                 <Lock className="h-3 w-3" />
@@ -99,7 +100,7 @@ function WaterfallConfigSection({ config, lpaHash }: { readonly config: Waterfal
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Derived From (LPA Hash)</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Derived From (LPA Reference)</p>
             <p className="mt-1">
               <HashDisplay value={lpaHash} />
             </p>
@@ -162,37 +163,37 @@ const breakdownColumns: Column<DistributionLineItem>[] = [
   {
     key: "investorName",
     header: "Investor",
-    render: (r) => <span className="font-medium text-gray-900">{r.investorName ?? "—"}</span>,
+    render: (r) => <span className="font-medium text-foreground">{r.investorName ?? "—"}</span>,
   },
   {
     key: "ownershipPctUsed",
     header: "Ownership %",
-    render: (r) => <span className="text-gray-900">{Number(r.ownershipPctUsed).toFixed(2)}%</span>,
+    render: (r) => <span className="text-foreground">{Number(r.ownershipPctUsed).toFixed(2)}%</span>,
   },
   {
     key: "grossAmount",
     header: "Gross Allocation",
-    render: (r) => <span className="text-gray-900">{fmt(parseFloat(r.grossAmount))}</span>,
+    render: (r) => <span className="text-foreground">{fmt(parseFloat(r.grossAmount))}</span>,
   },
   {
     key: "capitalReturned",
     header: "Capital Returned",
-    render: (r) => <span className="text-gray-900">{fmt(getTierValue(r, 'returnOfCapital', 'Return of Capital'))}</span>,
+    render: (r) => <span className="text-foreground">{fmt(getTierValue(r, 'returnOfCapital', 'Return of Capital'))}</span>,
   },
   {
     key: "preferredReturn",
     header: "Preferred Return",
-    render: (r) => <span className="text-gray-900">{fmt(getTierValue(r, 'preferredReturn', 'Preferred Return'))}</span>,
+    render: (r) => <span className="text-foreground">{fmt(getTierValue(r, 'preferredReturn', 'Preferred Return'))}</span>,
   },
   {
     key: "residualShare",
     header: "Residual Share",
-    render: (r) => <span className="text-gray-900">{fmt(getTierValue(r, 'residualLp', 'Residual LP'))}</span>,
+    render: (r) => <span className="text-foreground">{fmt(getTierValue(r, 'residualLp', 'Residual LP'))}</span>,
   },
   {
     key: "netAmount",
     header: "Net Distribution",
-    render: (r) => <span className="font-semibold text-gray-900">{fmt(parseFloat(r.netAmount))}</span>,
+    render: (r) => <span className="font-semibold text-foreground">{fmt(parseFloat(r.netAmount))}</span>,
   },
 ];
 
@@ -264,7 +265,7 @@ function SimulationSection({
       {/* Input fields */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
-          <label htmlFor="exitProceeds" className="block text-sm font-medium text-gray-900 mb-1">
+          <label htmlFor="exitProceeds" className="block text-sm font-medium text-foreground mb-1">
             Total Exit Proceeds ($)
           </label>
           <input
@@ -278,11 +279,11 @@ function SimulationSection({
               setShouldRun(false);
             }}
             placeholder="e.g. 3000000"
-            className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="block w-full rounded-md border border-gray-300 bg-card px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
         </div>
         <div>
-          <label htmlFor="holdPeriod" className="block text-sm font-medium text-gray-900 mb-1">
+          <label htmlFor="holdPeriod" className="block text-sm font-medium text-foreground mb-1">
             Hold Period (years)
           </label>
           <input
@@ -296,7 +297,7 @@ function SimulationSection({
               setShouldRun(false);
             }}
             placeholder="e.g. 5"
-            className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="block w-full rounded-md border border-gray-300 bg-card px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
         </div>
       </div>
@@ -307,13 +308,13 @@ function SimulationSection({
         className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 transition-colors"
         type="button"
       >
-        {previewLoading ? "Running..." : "Run Simulation"}
+        {previewLoading ? "Calculating..." : "Run Simulation"}
       </button>
 
       {/* Results */}
       {previewError && (
         <div className="mt-6">
-          <ErrorAlert title="Simulation Error" message={(previewError as Error).message} />
+          <ErrorAlert title="Simulation failed" message={`${(previewError as Error).message}. Adjust the inputs and try again.`} />
         </div>
       )}
 
@@ -322,7 +323,11 @@ function SimulationSection({
           {/* Summary cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard label="Total Gross" value={fmt(totalGross)} />
-            <MetricCard label="Total Net to LPs" value={fmt(totalNet)} />
+            <MetricCard
+              label="Total Net to LPs"
+              value={fmt(totalNet)}
+              subtitle={<span className="text-green-600 dark:text-green-400 font-medium">Net distributable</span>}
+            />
             <MetricCard label="GP Promote" value={fmt(totalGross - totalNet)} />
             <MetricCard label="Investors" value={previewData.lineItems.length} />
           </div>
@@ -356,7 +361,7 @@ function SimulationSection({
         <div className="mt-6">
           <EmptyState
             title="No distribution data"
-            message="No settled ownership positions to distribute against."
+            message="Configure waterfall rules and run a simulation to see projected distributions."
           />
         </div>
       )}
@@ -371,7 +376,7 @@ const capitalAccountColumns: Column<CapitalAccountSummary>[] = [
     key: "investorName",
     header: "LP Name",
     render: (r) => (
-      <span className="font-medium text-gray-900">
+      <span className="font-medium text-foreground">
         {r.investor?.legalName ?? "—"}
       </span>
     ),
@@ -379,38 +384,38 @@ const capitalAccountColumns: Column<CapitalAccountSummary>[] = [
   {
     key: "initialContribution",
     header: "Capital Contributed",
-    render: (r) => <span className="text-gray-900">{fmt(parseFloat(r.initialContribution))}</span>,
+    render: (r) => <span className="text-foreground">{fmt(parseFloat(r.initialContribution))}</span>,
   },
   {
     key: "capitalReturned",
     header: "Capital Returned",
-    render: (r) => <span className="text-gray-900">{fmt(parseFloat(r.capitalReturned))}</span>,
+    render: (r) => <span className="text-foreground">{fmt(parseFloat(r.capitalReturned))}</span>,
   },
   {
     key: "accruedPreferredReturn",
     header: "Pref Return Accrued",
-    render: (r) => <span className="text-gray-900">{fmt(parseFloat(r.accruedPreferredReturn))}</span>,
+    render: (r) => <span className="text-foreground">{fmt(parseFloat(r.accruedPreferredReturn))}</span>,
   },
   {
     key: "distributionsReceived",
     header: "Distributions Received",
     render: (r) => {
       const val = (r as CapitalAccountSummary & { distributionsReceived?: string }).distributionsReceived;
-      return <span className="text-gray-900">{fmt(val ? parseFloat(val) : 0)}</span>;
+      return <span className="text-foreground">{fmt(val ? parseFloat(val) : 0)}</span>;
     },
   },
   {
     key: "endingBalance",
     header: "Ending Balance",
     render: (r) => (
-      <span className="font-semibold text-gray-900">{fmt(parseFloat(r.endingBalance))}</span>
+      <span className="font-semibold text-foreground">{fmt(parseFloat(r.endingBalance))}</span>
     ),
   },
   {
     key: "asOfDate",
     header: "As Of",
     render: (r) => (
-      <span className="text-gray-600">
+      <span className="text-muted-foreground">
         {r.asOfDate
           ? new Date(r.asOfDate).toLocaleDateString("en-US", {
               year: "numeric",
@@ -425,34 +430,34 @@ const capitalAccountColumns: Column<CapitalAccountSummary>[] = [
 
 function CapitalAccountDetail({ account }: { readonly account: CapitalAccountSummary }) {
   return (
-    <div className="bg-gray-50 px-6 py-4 border-t border-gray-100">
-      <h5 className="text-sm font-semibold text-gray-900 mb-3">
+    <div className="bg-muted px-6 py-4 border-t border-border">
+      <h5 className="text-sm font-semibold text-foreground mb-3">
         Capital Account Statement — {account.investor?.legalName ?? "Unknown"}
       </h5>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Opening Balance</p>
-          <p className="mt-1 text-sm text-gray-900">{fmt(parseFloat(account.openingBalance))}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Opening Balance</p>
+          <p className="mt-1 text-sm text-foreground">{fmt(parseFloat(account.openingBalance))}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Initial Contribution</p>
-          <p className="mt-1 text-sm text-gray-900">{fmt(parseFloat(account.initialContribution))}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Initial Contribution</p>
+          <p className="mt-1 text-sm text-foreground">{fmt(parseFloat(account.initialContribution))}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Capital Returned</p>
-          <p className="mt-1 text-sm text-gray-900">{fmt(parseFloat(account.capitalReturned))}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Capital Returned</p>
+          <p className="mt-1 text-sm text-foreground">{fmt(parseFloat(account.capitalReturned))}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Preferred Return Accrued</p>
-          <p className="mt-1 text-sm text-gray-900">{fmt(parseFloat(account.accruedPreferredReturn))}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Preferred Return Accrued</p>
+          <p className="mt-1 text-sm text-foreground">{fmt(parseFloat(account.accruedPreferredReturn))}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Ending Balance</p>
-          <p className="mt-1 text-sm font-semibold text-gray-900">{fmt(parseFloat(account.endingBalance))}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Ending Balance</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">{fmt(parseFloat(account.endingBalance))}</p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">As Of Date</p>
-          <p className="mt-1 text-sm text-gray-900">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">As Of Date</p>
+          <p className="mt-1 text-sm text-foreground">
             {account.asOfDate
               ? new Date(account.asOfDate).toLocaleDateString("en-US", {
                   year: "numeric",
@@ -510,7 +515,7 @@ function CapitalAccountsSection({ fundId }: { readonly fundId: string }) {
           ))}
         </div>
       ) : error ? (
-        <ErrorAlert title="Capital Accounts Error" message={(error as Error).message} />
+        <ErrorAlert title="Unable to load capital accounts" message={`${(error as Error).message}. Try refreshing the page.`} />
       ) : !accounts || accounts.length === 0 ? (
         <EmptyState
           title="No capital accounts"
@@ -561,12 +566,19 @@ export default function DistributionPage() {
     return lpa?.hash?.hashHex ?? null;
   }, [documents]);
 
-  if (waterfallLoading) return <div className="p-6">Loading...</div>;
-  if (waterfallError) return <ErrorAlert title="Waterfall Config Error" message={(waterfallError as Error).message} />;
+  if (waterfallLoading) return (
+    <div className="p-6 space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+      </div>
+      <TableSkeleton rows={5} columns={6} />
+    </div>
+  );
+  if (waterfallError) return <ErrorAlert title="Unable to load waterfall configuration" message={`${(waterfallError as Error).message}. Try refreshing the page.`} />;
 
   return (
     <div>
-      <PageHeader title="Distribution" subtitle="Waterfall configuration, simulation, and capital accounts" />
+      <PageHeader title="Distribution" subtitle="Review waterfall terms, simulate distributions, and view capital accounts" />
 
       {/* Section 1: Waterfall Configuration */}
       {waterfallData && <WaterfallConfigSection config={waterfallData} lpaHash={lpaHash} />}

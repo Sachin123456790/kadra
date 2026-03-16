@@ -38,7 +38,7 @@ function OwnershipPieChart({ rows }: { rows: InvestorCapTableRow[] }) {
 
   return (
     <SectionCard>
-      <h3 className="text-sm font-medium text-gray-600 mb-4">Fund Ownership</h3>
+      <h3 className="text-sm font-medium text-muted-foreground mb-4">Fund Ownership</h3>
       <ResponsiveContainer width="100%" height={280}>
         <PieChart>
           <Pie

@@ -6,6 +6,7 @@ import { ActivityFeed } from "@/components/kadra/ActivityFeed";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { SkeletonCard } from "@/components/kadra/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import {
   getMyDashboard,
@@ -48,7 +49,16 @@ export default function InvestorDashboardPage() {
     queryFn: () => getInvestorActivityFeed(fundId).then((r) => r.data),
   });
 
-  if (dashLoading) return <div className="p-6 text-gray-500">Loading...</div>;
+  if (dashLoading) return (
+    <div className="p-6 space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+      </div>
+    </div>
+  );
   if (dashError)
     return (
       <ErrorAlert
@@ -151,7 +161,7 @@ export default function InvestorDashboardPage() {
             <SummaryRow
               label="Fund Eligibility"
               value={
-                <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 border border-green-200">
                   Eligible
                 </span>
               }
@@ -160,13 +170,13 @@ export default function InvestorDashboardPage() {
               label="Ownership"
               value={
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden max-w-[120px]">
+                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden max-w-[120px]">
                     <div
                       className="h-full rounded-full bg-indigo-600"
                       style={{ width: `${Math.min(ownershipPct, 100)}%` }}
                     />
                   </div>
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-foreground">
                     {ownershipPct.toFixed(1)}%
                   </span>
                 </div>
@@ -220,9 +230,9 @@ function SummaryRow({
   readonly value: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-gray-100 pb-2 last:border-0">
-      <dt className="text-sm text-gray-500">{label}</dt>
-      <dd className="text-sm font-medium text-gray-900">
+    <div className="flex items-center justify-between border-b border-border pb-2 last:border-0">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="text-sm font-medium text-foreground">
         {typeof value === "string" || typeof value === "number" ? value : value}
       </dd>
     </div>

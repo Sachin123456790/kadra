@@ -40,40 +40,40 @@ function TransferEligibilityPanel() {
   const badgeStyle = (active: boolean) =>
     active
       ? "bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"
-      : "bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600";
+      : "bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground";
 
   return (
     <SectionCard title="Transfer Eligibility">
-      <div className="bg-gray-50 rounded-lg p-5">
+      <div className="bg-muted rounded-lg p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Transfer Eligibility</span>
+            <span className="text-sm text-muted-foreground">Transfer Eligibility</span>
             <span className={`inline-flex items-center rounded-full ${badgeStyle(isEligible)}`}>
               {isEligible ? "Active" : "Inactive"}
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Fund Membership</span>
+            <span className="text-sm text-muted-foreground">Fund Membership</span>
             <span className={`inline-flex items-center rounded-full ${badgeStyle(isEligible)}`}>
               {isEligible ? "Verified" : "Pending"}
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">KYC Status</span>
+            <span className="text-sm text-muted-foreground">KYC Status</span>
             <span className={`inline-flex items-center rounded-full ${badgeStyle(isVerified)}`}>
               {isVerified ? "Verified" : "Pending"}
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Accreditation Status</span>
+            <span className="text-sm text-muted-foreground">Accreditation Status</span>
             <span className={`inline-flex items-center rounded-full ${badgeStyle(isVerified)}`}>
               {isVerified ? "Accredited" : "Pending"}
             </span>
           </div>
         </div>
-        <div className="flex items-start gap-2 pt-3 border-t border-gray-200">
+        <div className="flex items-start gap-2 pt-3 border-t border-border">
           <Shield className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             Transfers are permitted only to verified investors who are eligible members of this fund.
           </p>
         </div>
@@ -238,10 +238,10 @@ function InitiateTransferSection({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Recipient panel */}
           <div>
-            <h4 className="text-sm font-medium text-gray-900 mb-3">Recipient</h4>
+            <h4 className="text-sm font-medium text-foreground mb-3">Recipient</h4>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">LP Email Address</label>
+                <label className="block text-sm font-medium text-foreground mb-1">LP Email Address</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
@@ -249,7 +249,7 @@ function InitiateTransferSection({
                     value={recipientEmail}
                     onChange={(e) => handleRecipientSearch(e.target.value)}
                     placeholder="Search by email..."
-                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full pl-9 pr-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     disabled={transferStep !== "idle"}
                   />
                 </div>
@@ -275,19 +275,19 @@ function InitiateTransferSection({
 
           {/* Amount panel */}
           <div>
-            <h4 className="text-sm font-medium text-gray-900 mb-3">Amount</h4>
+            <h4 className="text-sm font-medium text-foreground mb-3">Amount</h4>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Transfer Amount</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Transfer Amount</label>
                 <input
                   type="number"
                   value={tokenAmount}
                   onChange={(e) => setTokenAmount(e.target.value)}
                   placeholder="e.g. 500"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   disabled={transferStep !== "idle"}
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Current allocation: {tokenBalance} units
                 </p>
               </div>
@@ -378,13 +378,13 @@ function TransferHistorySection({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Direction</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Counterparty</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Amount</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Result</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Reason</th>
+              <tr className="border-b border-border">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Direction</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Counterparty</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Amount</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Result</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Reason</th>
               </tr>
             </thead>
             <tbody>
@@ -395,9 +395,9 @@ function TransferHistorySection({
                 return (
                   <tr
                     key={t.id}
-                    className={`border-b border-gray-200 ${blocked ? "bg-red-50" : ""}`}
+                    className={`border-b border-border ${blocked ? "bg-red-50" : ""}`}
                   >
-                    <td className="px-4 py-3 text-gray-900">
+                    <td className="px-4 py-3 text-foreground">
                       {new Date(t.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3">
@@ -413,12 +413,12 @@ function TransferHistorySection({
                     </td>
                     <td className="px-4 py-3">
                       <div>
-                        <span className="block text-sm font-medium text-gray-900">
+                        <span className="block text-sm font-medium text-foreground">
                           {getCounterpartyName(t) || "LP Investor"}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                    <td className="px-4 py-3 font-medium text-foreground">
                       {fmt(Number(t.tokenAmount))}
                     </td>
                     <td className="px-4 py-3">
@@ -431,12 +431,12 @@ function TransferHistorySection({
                           Executed
                         </span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                        <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
                           {t.requestStatus}
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
                       {blocked ? (t.precheckReasonText || t.precheckReasonCode || "Eligibility check failed") : "--"}
                     </td>
                   </tr>

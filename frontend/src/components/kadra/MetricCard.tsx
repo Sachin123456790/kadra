@@ -12,7 +12,7 @@ export function MetricCard({ label, value, subtitle, className }: MetricCardProp
   return (
     <div className={cn("rounded-lg border border-border bg-card p-4", className)}>
       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-card-foreground">{value}</p>
+      <p className="mt-1 text-2xl font-semibold text-card-foreground transition-all duration-300 motion-reduce:transition-none">{value}</p>
       {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
     </div>
   );

@@ -70,10 +70,10 @@ function relativeTime(dateString: string): string {
 function SkeletonLine() {
   return (
     <div className="flex items-start gap-3 py-3 animate-pulse">
-      <div className="h-5 w-28 rounded-full bg-gray-200" />
+      <div className="h-5 w-28 rounded-full bg-border" />
       <div className="flex-1 space-y-1.5">
-        <div className="h-3.5 w-3/4 rounded bg-gray-200" />
-        <div className="h-3 w-1/3 rounded bg-gray-200" />
+        <div className="h-3.5 w-3/4 rounded bg-border" />
+        <div className="h-3 w-1/3 rounded bg-border" />
       </div>
     </div>
   );
@@ -129,7 +129,7 @@ export function ActivityFeed({
 }: ActivityFeedProps) {
   if (isLoading) {
     return (
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-border">
         {Array.from({ length: 5 }).map((_, i) => (
           <SkeletonLine key={i} />
         ))}
@@ -139,7 +139,7 @@ export function ActivityFeed({
 
   if (!events || events.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-gray-500">
+      <p className="py-8 text-center text-sm text-muted-foreground">
         No activity yet.
       </p>
     );
@@ -149,7 +149,7 @@ export function ActivityFeed({
 
   return (
     <div>
-      <ul className="divide-y divide-gray-100">
+      <ul className="divide-y divide-border">
         {displayed.map((event) => {
           const label = formatEventType(event.eventType);
           const color = EVENT_COLOR_MAP[event.eventType] ?? "gray";
@@ -163,16 +163,16 @@ export function ActivityFeed({
               </span>
 
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-900 truncate">
+                <p className="text-sm text-foreground truncate">
                   {buildDescription(event)}
                 </p>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                   <span title={new Date(event.occurredAt).toLocaleString()}>
                     {relativeTime(event.occurredAt)}
                   </span>
                   {event.txHash && (
                     <>
-                      <span className="text-gray-300">|</span>
+                      <span className="text-muted-foreground/50">|</span>
                       <ExplorerLink value={event.txHash} type="tx" />
                     </>
                   )}
@@ -184,7 +184,7 @@ export function ActivityFeed({
       </ul>
 
       {showViewAll && events.length > maxItems && (
-        <div className="mt-4 border-t border-gray-100 pt-3 text-center">
+        <div className="mt-4 border-t border-border pt-3 text-center">
           <a
             href={viewAllLink}
             className="text-sm font-medium text-indigo-600 hover:text-indigo-800"

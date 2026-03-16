@@ -83,13 +83,13 @@ function WaterfallBreakdownSection({
     <SectionCard title="Waterfall Breakdown">
       {distributions.length > 0 && (
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             Select Distribution Event
           </label>
           <select
             value={selectedRunId ?? selectedItem?.run.id ?? ""}
             onChange={(e) => onSelectRun(e.target.value)}
-            className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+            className="w-full max-w-xs px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-card"
           >
             {distributions.map((d) => (
               <option key={d.run.id} value={d.run.id}>
@@ -105,23 +105,23 @@ function WaterfallBreakdownSection({
         {WATERFALL_TIERS.map((tier) => (
           <div
             key={tier.tier}
-            className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+            className="border border-border rounded-lg p-4 bg-muted"
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
                 {tier.tier}
               </span>
-              <h4 className="text-sm font-semibold text-gray-900">{tier.name}</h4>
+              <h4 className="text-sm font-semibold text-foreground">{tier.name}</h4>
             </div>
-            <p className="text-xs text-gray-500 mb-3">{tier.description}</p>
+            <p className="text-xs text-muted-foreground mb-3">{tier.description}</p>
             <div className="flex gap-4 text-xs">
               <div>
-                <span className="text-gray-500">LP Share: </span>
-                <span className="font-medium text-gray-900">{tier.lpShare}</span>
+                <span className="text-muted-foreground">LP Share: </span>
+                <span className="font-medium text-foreground">{tier.lpShare}</span>
               </div>
               <div>
-                <span className="text-gray-500">GP Share: </span>
-                <span className="font-medium text-gray-900">{tier.gpShare}</span>
+                <span className="text-muted-foreground">GP Share: </span>
+                <span className="font-medium text-foreground">{tier.gpShare}</span>
               </div>
             </div>
           </div>
@@ -130,23 +130,23 @@ function WaterfallBreakdownSection({
 
       {/* Investor-specific numbers from selected distribution */}
       {selectedItem ? (
-        <div className="border border-gray-200 rounded-lg p-5 bg-white">
+        <div className="border border-border rounded-lg p-5 bg-card">
           <div className="flex items-center gap-2 mb-4">
-            <h4 className="text-sm font-semibold text-gray-900">
+            <h4 className="text-sm font-semibold text-foreground">
               Your Distribution — {new Date(selectedItem.run.asOfTimestamp).toLocaleDateString()}
             </h4>
             <StatusBadge status={selectedItem.run.runStatus} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <p className="text-xs text-gray-500 mb-1">Ownership %</p>
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-xs text-muted-foreground mb-1">Ownership %</p>
+              <p className="text-sm font-medium text-foreground">
                 {selectedItem.ownershipPctUsed != null ? fmtPct(selectedItem.ownershipPctUsed) : "--"}
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-1">Return of Capital</p>
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-xs text-muted-foreground mb-1">Return of Capital</p>
+              <p className="text-sm font-medium text-foreground">
                 <TooltipNumber
                   value={selectedItem.returnOfCapitalAmount}
                   breakdown={`Tier 1: 100% to LP. Your share based on ${selectedItem.ownershipPctUsed ?? 0}% ownership.`}
@@ -154,8 +154,8 @@ function WaterfallBreakdownSection({
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-1">Preferred Return</p>
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-xs text-muted-foreground mb-1">Preferred Return</p>
+              <p className="text-sm font-medium text-foreground">
                 <TooltipNumber
                   value={selectedItem.prefAmount}
                   breakdown={`Tier 2: ${prefRate} simple annual preferred return on contributed capital.`}
@@ -163,8 +163,8 @@ function WaterfallBreakdownSection({
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-1">GP Promote</p>
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-xs text-muted-foreground mb-1">GP Promote</p>
+              <p className="text-sm font-medium text-foreground">
                 <TooltipNumber
                   value={selectedItem.promoteAmount}
                   breakdown="Tier 3-4: GP catch-up and carried interest (20% GP share of profits above pref)."
@@ -172,8 +172,8 @@ function WaterfallBreakdownSection({
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-1">Gross Amount</p>
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-xs text-muted-foreground mb-1">Gross Amount</p>
+              <p className="text-sm font-medium text-foreground">
                 <TooltipNumber
                   value={selectedItem.grossAmount}
                   breakdown="Total gross distribution before any withholding or adjustments."
@@ -181,8 +181,8 @@ function WaterfallBreakdownSection({
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-1">Net Amount</p>
-              <p className="text-lg font-semibold text-gray-900">
+              <p className="text-xs text-muted-foreground mb-1">Net Amount</p>
+              <p className="text-lg font-semibold text-foreground">
                 <TooltipNumber
                   value={selectedItem.netAmount}
                   breakdown={`Net amount received: Gross (${fmt(Number(selectedItem.grossAmount))}) minus any withholding.`}
@@ -194,7 +194,7 @@ function WaterfallBreakdownSection({
       ) : (
         <div className="text-center py-6">
           <Info className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Select a distribution event to view your breakdown.</p>
+          <p className="text-sm text-muted-foreground">Select a distribution event to view your breakdown.</p>
         </div>
       )}
     </SectionCard>
@@ -259,14 +259,14 @@ function DistributionHistoryTable({
       key: "waterfallVersion",
       header: "Waterfall Version",
       render: () => (
-        <span className="text-sm text-gray-600">1.0</span>
+        <span className="text-sm text-muted-foreground">1.0</span>
       ),
     },
     {
       key: "id",
       header: "Reference",
       render: (r) => (
-        <span className="font-mono text-xs text-gray-500">
+        <span className="font-mono text-xs text-muted-foreground">
           {r.id.slice(0, 8)}...
         </span>
       ),

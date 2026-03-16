@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { TableSkeleton } from "@/components/kadra/Skeleton";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import { HashDisplay } from "@/components/kadra/HashDisplay";
 import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
@@ -117,16 +118,16 @@ function TransferRulesCard({
 }) {
   return (
     <SectionCard title="Transfer Rules" className="mb-6">
-      <div className="rounded-lg bg-gray-50 p-5">
+      <div className="rounded-lg bg-muted p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
               Transfer Restriction Type
             </p>
-            <p className="text-sm font-medium text-gray-900">LP Only</p>
+            <p className="text-sm font-medium text-foreground">LP Only</p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
               Eligibility Required
             </p>
             <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
@@ -138,7 +139,7 @@ function TransferRulesCard({
       <TechnicalDetails label="Blockchain Details">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
               Identity Registry
             </p>
             <ExplorerLink
@@ -147,7 +148,7 @@ function TransferRulesCard({
             />
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
               Rules Derived From
             </p>
             <HashDisplay value={lpaHash} />
@@ -178,26 +179,26 @@ function TransferHistoryTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-200">
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+          <tr className="border-b border-border">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Date
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               From
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               To
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Amount
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Eligibility
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Result
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Time
             </th>
           </tr>
@@ -207,20 +208,20 @@ function TransferHistoryTable({
             <tr
               key={t.id}
               className={cn(
-                "border-b border-gray-100",
+                "border-b border-border",
                 t.isFailed && "bg-red-50",
               )}
             >
-              <td className="px-4 py-3 text-gray-900">
+              <td className="px-4 py-3 text-foreground">
                 {new Date(t.date).toLocaleDateString()}
               </td>
-              <td className="px-4 py-3 font-medium text-gray-900">
+              <td className="px-4 py-3 font-medium text-foreground">
                 {t.fromLpName || <HashDisplay value={t.fromWallet} />}
               </td>
-              <td className="px-4 py-3 font-medium text-gray-900">
+              <td className="px-4 py-3 font-medium text-foreground">
                 {t.toLpName || <HashDisplay value={t.toWallet} />}
               </td>
-              <td className="px-4 py-3 text-gray-900">{fmt(t.amount)}</td>
+              <td className="px-4 py-3 text-foreground">{fmt(t.amount)}</td>
               <td className="px-4 py-3">
                 {t.preCheckResult === "Eligible" ? (
                   <span className="inline-flex items-center gap-1 text-green-700">
@@ -246,7 +247,7 @@ function TransferHistoryTable({
                   {t.onChainResult === "Executed" ? "Completed" : "Rejected"}
                 </span>
               </td>
-              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+              <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                 <div>{new Date(t.timestamp).toLocaleString()}</div>
                 {t.failureReason && (
                   <p className="text-xs text-red-600 mt-0.5">
@@ -322,11 +323,10 @@ export default function TransfersPage() {
       <div>
         <PageHeader
           title="Transfers"
-          subtitle="Transfer rules enforcement and activity monitoring"
+          subtitle="View transfer rules, eligibility checks, and activity history"
         />
-        <div className="flex items-center gap-2 p-6 text-gray-500">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading transfer data...
+        <div className="p-6 space-y-6">
+          <TableSkeleton rows={5} columns={7} />
         </div>
       </div>
     );
@@ -337,13 +337,11 @@ export default function TransfersPage() {
       <div>
         <PageHeader
           title="Transfers"
-          subtitle="Transfer rules enforcement and activity monitoring"
+          subtitle="View transfer rules, eligibility checks, and activity history"
         />
         <ErrorAlert
-          title="Failed to load transfers"
-          message={
-            ((failedError || successError) as Error).message
-          }
+          title="Unable to load transfer history"
+          message={`${((failedError || successError) as Error).message}. Try refreshing the page.`}
         />
       </div>
     );

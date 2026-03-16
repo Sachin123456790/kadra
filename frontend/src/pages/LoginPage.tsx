@@ -43,8 +43,8 @@ function LoginIllustration() {
         </g>
       </svg>
       <div className="mt-8 text-center">
-        <h2 className="text-xl font-semibold text-gray-900 mb-1">Fund Infrastructure, Simplified</h2>
-        <p className="text-gray-500 text-sm max-w-sm">Blockchain-verified settlement, automated compliance, and real-time cap table management.</p>
+        <h2 className="text-xl font-semibold text-foreground mb-1">Fund Infrastructure, Simplified</h2>
+        <p className="text-muted-foreground text-sm max-w-sm">Blockchain-verified settlement, automated compliance, and real-time cap table management.</p>
       </div>
     </div>
   );
@@ -124,7 +124,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-white">
+    <div className="min-h-screen flex bg-card">
       {/* Left side - Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-12 lg:px-16 xl:px-24">
         <div className="w-full max-w-md mx-auto">
@@ -133,12 +133,12 @@ export default function LoginPage() {
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">A</span>
             </div>
-            <span className="text-lg font-bold text-gray-900 tracking-tight">Angainor</span>
+            <span className="text-lg font-bold text-foreground tracking-tight">Angainor</span>
           </div>
 
           {/* Heading */}
           <div className="mb-8">
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground leading-tight">
               {mode === "signin" ? (
                 <>
                   Hello,
@@ -153,7 +153,7 @@ export default function LoginPage() {
                 </>
               )}
             </h1>
-            <p className="mt-3 text-base text-gray-500">
+            <p className="mt-3 text-base text-muted-foreground">
               {mode === "signin"
                 ? "Sign in to access your fund management portal"
                 : "Create your investor account to get started"}
@@ -170,7 +170,7 @@ export default function LoginPage() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Full Name"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                  className="w-full rounded-lg border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                   autoComplete="name"
                 />
               </div>
@@ -186,7 +186,7 @@ export default function LoginPage() {
                   setError("");
                 }}
                 placeholder="Email address"
-                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                className="w-full rounded-lg border border-border bg-card px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 autoComplete="email"
                 autoFocus
               />
@@ -202,13 +202,13 @@ export default function LoginPage() {
                   setError("");
                 }}
                 placeholder={mode === "signup" ? "Create a password" : "Password"}
-                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                className="w-full rounded-lg border border-border bg-card px-4 py-3 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 autoComplete={mode === "signup" ? "new-password" : "current-password"}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground transition-colors"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -235,7 +235,7 @@ export default function LoginPage() {
           </form>
 
           {/* Toggle mode */}
-          <p className="mt-8 text-sm text-gray-600">
+          <p className="mt-8 text-sm text-muted-foreground">
             {mode === "signin" ? (
               <>
                 Don't have an account?{" "}

@@ -116,27 +116,8 @@
   }
 }
 
-/* ── Dark-mode overrides for explicit gray text classes ── */
-/* These ensure text remains visible when pages use hardcoded gray shades */
+/* ── Dark-mode overrides for colored status pills and hover states ── */
 @layer utilities {
-  .dark .text-gray-900 { color: hsl(210 20% 92%) !important; }
-  .dark .text-gray-800 { color: hsl(210 18% 85%) !important; }
-  .dark .text-gray-700 { color: hsl(210 15% 75%) !important; }
-  .dark .text-gray-600 { color: hsl(220 9% 65%) !important; }
-  .dark .text-gray-500 { color: hsl(220 9% 56%) !important; }
-  .dark .text-gray-400 { color: hsl(220 9% 50%) !important; }
-
-  /* Background overrides */
-  .dark .bg-white { background-color: hsl(224 18% 13%) !important; }
-  .dark .bg-gray-50 { background-color: hsl(224 16% 16%) !important; }
-  .dark .bg-gray-100 { background-color: hsl(224 16% 18%) !important; }
-  .dark .bg-gray-200 { background-color: hsl(224 14% 22%) !important; }
-
-  /* Border overrides */
-  .dark .border-gray-100 { border-color: hsl(224 14% 20%) !important; }
-  .dark .border-gray-200 { border-color: hsl(224 14% 22%) !important; }
-  .dark .border-gray-300 { border-color: hsl(224 14% 25%) !important; }
-
   /* Status pill overrides — green */
   .dark .bg-green-50 { background-color: hsl(142 40% 14%) !important; }
   .dark .bg-green-100 { background-color: hsl(142 35% 18%) !important; }
@@ -208,4 +189,10 @@
   /* Hover states for indigo buttons */
   .dark .hover\:text-indigo-800:hover { color: hsl(234 60% 70%) !important; }
   .dark .hover\:bg-indigo-700:hover { background-color: hsl(234 55% 40%) !important; }
+}
+
+/* ── Subtle micro-interaction keyframes ── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }

@@ -29,7 +29,7 @@ export function HashDisplay({
   const [copied, setCopied] = useState(false);
 
   if (!value || value === "—") {
-    return <span className={`text-gray-500 ${className}`}>{fallback}</span>;
+    return <span className={`text-muted-foreground ${className}`}>{fallback}</span>;
   }
 
   const handleCopy = () => {
@@ -43,7 +43,7 @@ export function HashDisplay({
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
       {revealed && (
-        <span className="font-mono text-xs text-gray-500">
+        <span className="font-mono text-xs text-muted-foreground">
           {truncateHex(value)}
         </span>
       )}
@@ -57,7 +57,7 @@ export function HashDisplay({
             setRevealed(true);
           }
         }}
-        className="text-gray-400 hover:text-gray-600 transition-colors inline-flex"
+        className="text-muted-foreground hover:text-foreground transition-colors inline-flex"
         title={revealed ? `Copy: ${value}` : "Reveal"}
       >
         {copied ? (
@@ -73,7 +73,7 @@ export function HashDisplay({
         <button
           type="button"
           onClick={() => setRevealed(false)}
-          className="text-gray-400 hover:text-gray-600 transition-colors inline-flex"
+          className="text-muted-foreground hover:text-foreground transition-colors inline-flex"
           title="Hide"
         >
           <EyeOff className="h-3.5 w-3.5" />

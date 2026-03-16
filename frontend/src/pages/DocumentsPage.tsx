@@ -164,8 +164,8 @@ const governingDocColumns: Column<FundDocument>[] = [
     header: "Document Name",
     render: (row) => (
       <div className="flex items-center gap-2">
-        <FileText className="h-4 w-4 text-gray-500" />
-        <span className="font-medium text-gray-900">{row.originalFilename}</span>
+        <FileText className="h-4 w-4 text-muted-foreground" />
+        <span className="font-medium text-foreground">{row.originalFilename}</span>
       </div>
     ),
   },
@@ -173,14 +173,14 @@ const governingDocColumns: Column<FundDocument>[] = [
     key: "documentType",
     header: "Type",
     render: (row) => (
-      <span className="text-gray-600">{row.documentType ?? "Master LPA"}</span>
+      <span className="text-muted-foreground">{row.documentType ?? "Master LPA"}</span>
     ),
   },
   {
     key: "createdAt",
     header: "Upload Date",
     render: (row) => (
-      <span className="text-gray-600">
+      <span className="text-muted-foreground">
         {new Date(row.createdAt).toLocaleDateString()}
       </span>
     ),
@@ -205,7 +205,7 @@ const governingDocColumns: Column<FundDocument>[] = [
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-xs">
-              <p className="text-xs text-gray-500 mb-1">SHA-256 Hash (click to copy)</p>
+              <p className="text-xs text-muted-foreground mb-1">SHA-256 Hash (click to copy)</p>
               <p className="font-mono text-xs break-all">{hashHex}</p>
             </TooltipContent>
           </Tooltip>
@@ -215,7 +215,7 @@ const governingDocColumns: Column<FundDocument>[] = [
   },
   {
     key: "anchorRef",
-    header: "On-Chain Anchor",
+    header: "Anchored",
     render: (row) => {
       if (!row.hash?.anchoredOnchain) {
         return <span className="text-gray-400 text-xs">Pending</span>;
@@ -265,7 +265,7 @@ function noticeStatusBadge(status: string) {
     SENT: "bg-blue-50 text-blue-700",
     VIEWED: "bg-green-50 text-green-700",
   };
-  const classes = colorMap[status.toUpperCase()] ?? "bg-gray-100 text-gray-500";
+  const classes = colorMap[status.toUpperCase()] ?? "bg-gray-100 text-muted-foreground";
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${classes}`}>
       {status}
@@ -322,7 +322,7 @@ function NoticeTableWithFilter({
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               showUnopenedOnly
                 ? "bg-amber-100 text-amber-800 border border-amber-300"
-                : "bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200"
+                : "bg-gray-100 text-gray-600 border border-border hover:bg-gray-200"
             }`}
           >
             <Eye className="h-3.5 w-3.5" />
@@ -333,7 +333,7 @@ function NoticeTableWithFilter({
           {showUnopenedOnly && (
             <button
               onClick={() => setShowUnopenedOnly(false)}
-              className="text-xs text-gray-500 hover:text-gray-700 underline"
+              className="text-xs text-muted-foreground hover:text-gray-700 underline"
             >
               Show all
             </button>
@@ -661,7 +661,7 @@ export default function DocumentsPage() {
   });
 
   const noticeColumns: Column<NoticeRow>[] = [
-    { key: "type", header: "Notice Type", render: (r) => <span className="font-medium text-gray-900">{r.type}</span> },
+    { key: "type", header: "Notice Type", render: (r) => <span className="font-medium text-foreground">{r.type}</span> },
     { key: "recipientName", header: "Recipient LP" },
     { key: "generatedAt", header: "Date Generated", render: (r) => r.generatedAt ? new Date(r.generatedAt).toLocaleDateString() : "--" },
     {
@@ -671,7 +671,7 @@ export default function DocumentsPage() {
         if (!r.documentHash) return <span className="text-gray-400">--</span>;
         return (
           <span className="inline-flex items-center gap-1">
-            <span className="font-mono text-xs text-gray-900">{truncateHash(r.documentHash)}</span>
+            <span className="font-mono text-xs text-foreground">{truncateHash(r.documentHash)}</span>
             <button
               onClick={(e) => { e.stopPropagation(); copyToClipboard(r.documentHash); }}
               className="text-gray-400 hover:text-gray-600 p-0.5"
@@ -700,7 +700,7 @@ export default function DocumentsPage() {
     <div>
       <PageHeader
         title="Documents"
-        subtitle="Upload, review, and approve fund governing documents"
+        subtitle="Upload governing documents, review extracted terms, and manage notices"
       />
 
       {/* Success banner */}
@@ -741,15 +741,15 @@ export default function DocumentsPage() {
         <TabsContent value="governing">
           <SectionCard title="Uploaded Documents" className="mb-6">
             {docsLoading && (
-              <div className="flex items-center gap-2 py-8 justify-center text-sm text-gray-500">
+              <div className="flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
                 Loading documents...
               </div>
             )}
             {docsError && (
               <ErrorAlert
-                title="Failed to load documents"
-                message={(docsError as Error).message}
+                title="Unable to load documents"
+                message={`${(docsError as Error).message}. Try refreshing the page.`}
               />
             )}
             {!docsLoading && !docsError && (!documents || documents.length === 0) && (
@@ -808,7 +808,7 @@ export default function DocumentsPage() {
                       value={selectedDoc.documentType ?? "Master LPA"}
                     />
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Parse Status</span>
+                      <span className="text-sm text-muted-foreground">Parse Status</span>
                       <StatusBadge
                         status={mapParseStatus(
                           parseStatusData?.parseStatus ?? selectedDoc.parseStatus,
@@ -816,7 +816,7 @@ export default function DocumentsPage() {
                       />
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Hash Status</span>
+                      <span className="text-sm text-muted-foreground">Hash Status</span>
                       <StatusBadge
                         status={mapHashStatus(
                           parseStatusData?.hashStatus ?? (selectedDoc.hash?.anchoredOnchain ? "ANCHORED" : "PENDING"),
@@ -848,9 +848,9 @@ export default function DocumentsPage() {
                         {/* Summary: show verification status at a glance */}
                         <div className="flex items-center gap-2 py-2">
                           <ShieldCheck className="h-5 w-5 text-green-600" />
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className="text-sm font-medium text-foreground">
                             {hashesData.filter((h: DocumentHash) => h.anchoredOnchain).length} of{" "}
-                            {hashesData.length} hash{hashesData.length !== 1 ? "es" : ""} anchored on-chain
+                            {hashesData.length} hash{hashesData.length !== 1 ? "es" : ""} verified and anchored
                           </span>
                         </div>
 
@@ -859,10 +859,10 @@ export default function DocumentsPage() {
                             {hashesData.map((h: DocumentHash) => (
                               <div
                                 key={h.hashId}
-                                className="rounded-md border border-gray-200 p-3"
+                                className="rounded-md border border-border p-3"
                               >
                                 <div className="flex items-center justify-between mb-1">
-                                  <span className="text-xs font-medium text-gray-600 uppercase">
+                                  <span className="text-xs font-medium text-muted-foreground uppercase">
                                     {h.algorithm}
                                   </span>
                                   <StatusBadge
@@ -871,11 +871,11 @@ export default function DocumentsPage() {
                                     }
                                   />
                                 </div>
-                                <p className="text-xs font-mono text-gray-900 break-all">
+                                <p className="text-xs font-mono text-foreground break-all">
                                   {h.hashHex}
                                 </p>
                                 {h.anchor && (
-                                  <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+                                  <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
                                     <p>Chain ID: {h.anchor.chainId}</p>
                                     <p className="break-all flex items-center gap-1">
                                       Tx:{" "}
@@ -895,7 +895,7 @@ export default function DocumentsPage() {
                         </TechnicalDetails>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
                         <Clock className="h-4 w-4" />
                         Hash computation in progress...
                       </div>
@@ -913,7 +913,7 @@ export default function DocumentsPage() {
                       <p className="font-medium">Payment Evidence Document</p>
                       <p className="text-blue-600 mt-1">
                         Wire confirmations are used during settlement validation to verify payment.
-                        Their SHA-256 hash is anchored on-chain for tamper-proof provenance.
+                        Each document is cryptographically hashed for tamper-proof provenance.
                       </p>
                     </div>
                   </div>
@@ -927,7 +927,7 @@ export default function DocumentsPage() {
                   className="mb-6"
                 >
                   {extractedFields.length === 0 ? (
-                    <div className="flex items-center gap-2 py-6 justify-center text-sm text-gray-500">
+                    <div className="flex items-center gap-2 py-6 justify-center text-sm text-muted-foreground">
                       <Clock className="h-4 w-4" />
                       No extracted fields available.
                     </div>
@@ -935,14 +935,14 @@ export default function DocumentsPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-gray-200">
-                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                          <tr className="border-b border-border">
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                               Field Name
                             </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                               Value
                             </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                               Confidence
                             </th>
                           </tr>
@@ -951,14 +951,14 @@ export default function DocumentsPage() {
                           {extractedFields.map((field) => (
                             <tr
                               key={field.fieldId}
-                              className="border-b border-gray-100"
+                              className="border-b border-border"
                             >
-                              <td className="px-4 py-3 text-gray-900 font-medium">
+                              <td className="px-4 py-3 text-foreground font-medium">
                                 {field.fieldName}
                               </td>
                               <td className="px-4 py-3">
                                 {isApproved ? (
-                                  <span className="text-gray-900">
+                                  <span className="text-foreground">
                                     {fieldDisplayValue(field)}
                                   </span>
                                 ) : (
@@ -975,7 +975,7 @@ export default function DocumentsPage() {
                                         [field.fieldId]: e.target.value,
                                       }))
                                     }
-                                    className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                   />
                                 )}
                               </td>
@@ -1025,8 +1025,8 @@ export default function DocumentsPage() {
               {isParsed && isMasterLpa && !isApproved && (
                 <SectionCard title="Admin Notes" className="mb-6">
                   <div className="flex items-start gap-2 mb-2">
-                    <StickyNote className="h-4 w-4 text-gray-500 mt-1" />
-                    <span className="text-sm text-gray-600">
+                    <StickyNote className="h-4 w-4 text-muted-foreground mt-1" />
+                    <span className="text-sm text-muted-foreground">
                       Add notes or comments for this document review. These will be
                       saved when you approve the document.
                     </span>
@@ -1036,7 +1036,7 @@ export default function DocumentsPage() {
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Enter additional notes, observations, or instructions..."
                     rows={3}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </SectionCard>
               )}
@@ -1044,7 +1044,7 @@ export default function DocumentsPage() {
               {/* Show saved notes on approved docs */}
               {isParsed && isMasterLpa && isApproved && (selectedDoc?.metadata as Record<string, unknown>)?.notes && (
                 <SectionCard title="Admin Notes" className="mb-6">
-                  <p className="text-sm text-gray-900">
+                  <p className="text-sm text-foreground">
                     {String((selectedDoc?.metadata as Record<string, unknown>)?.notes)}
                   </p>
                 </SectionCard>
@@ -1089,20 +1089,20 @@ export default function DocumentsPage() {
                       <div className="overflow-x-auto mb-4">
                         <table className="w-full text-sm">
                           <thead>
-                            <tr className="border-b border-gray-200">
-                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                            <tr className="border-b border-border">
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                 Investor
                               </th>
-                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                 Email
                               </th>
-                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                 Wallet
                               </th>
-                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                 Verification
                               </th>
-                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                 Eligibility
                               </th>
                             </tr>
@@ -1115,12 +1115,12 @@ export default function DocumentsPage() {
                               return (
                                 <tr
                                   key={inv.investorId}
-                                  className="border-b border-gray-100"
+                                  className="border-b border-border"
                                 >
-                                  <td className="px-4 py-3 font-medium text-gray-900">
+                                  <td className="px-4 py-3 font-medium text-foreground">
                                     {inv.legalName}
                                   </td>
-                                  <td className="px-4 py-3 text-gray-600">
+                                  <td className="px-4 py-3 text-muted-foreground">
                                     {inv.email}
                                   </td>
                                   <td className="px-4 py-3">
@@ -1168,7 +1168,7 @@ export default function DocumentsPage() {
         <TabsContent value="notices">
           <SectionCard title="Generated Notices">
             {noticesLoading && (
-              <div className="flex items-center gap-2 py-8 justify-center text-sm text-gray-500">
+              <div className="flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
                 Loading notices...
               </div>
@@ -1200,7 +1200,7 @@ export default function DocumentsPage() {
                 id="doc-type-select"
                 value={uploadDocType}
                 onChange={(e) => setUploadDocType(e.target.value)}
-                className="w-full sm:w-64 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full sm:w-64 rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
                 {DOCUMENT_TYPE_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -1224,14 +1224,14 @@ export default function DocumentsPage() {
               `}
             >
               <Upload className="h-10 w-10 text-gray-400 mb-3" />
-              <p className="text-sm font-medium text-gray-900 mb-1">
+              <p className="text-sm font-medium text-foreground mb-1">
                 {uploadMutation.isPending
                   ? "Uploading..."
                   : "Drop a PDF here, or click to browse"}
               </p>
-              <p className="text-xs text-gray-500">
-                Accepted format: PDF. The document will be hashed (SHA-256) and
-                parsed. On-chain anchoring occurs after admin approval.
+              <p className="text-xs text-muted-foreground">
+                Accepted format: PDF. The document will be verified, parsed, and
+                cryptographically anchored after admin approval.
               </p>
               <input
                 ref={fileInputRef}
@@ -1243,7 +1243,7 @@ export default function DocumentsPage() {
             </div>
 
             {uploadMutation.isPending && (
-              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
                 Uploading and processing document...
               </div>
@@ -1275,10 +1275,10 @@ export default function DocumentsPage() {
       }}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-gray-900">
+            <DialogTitle className="text-foreground">
               Confirm Subscription Creation
             </DialogTitle>
-            <DialogDescription className="text-gray-500">
+            <DialogDescription className="text-muted-foreground">
               Add or remove investors below. Allocation must total 100%.
             </DialogDescription>
           </DialogHeader>
@@ -1286,18 +1286,18 @@ export default function DocumentsPage() {
           {/* Investor table */}
           <div className="overflow-x-auto max-h-72 overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b border-gray-200">
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <thead className="sticky top-0 bg-card">
+                <tr className="border-b border-border">
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Investor
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Wallet
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Allocation %
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Committed Amount
                   </th>
                   <th className="px-3 py-2 w-10" />
@@ -1305,8 +1305,8 @@ export default function DocumentsPage() {
               </thead>
               <tbody>
                 {subscriptionDrafts.map((draft, idx) => (
-                  <tr key={draft.investorId} className="border-b border-gray-100">
-                    <td className="px-3 py-2 font-medium text-gray-900">
+                  <tr key={draft.investorId} className="border-b border-border">
+                    <td className="px-3 py-2 font-medium text-foreground">
                       {draft.investorName}
                     </td>
                     <td className="px-3 py-2">
@@ -1322,7 +1322,7 @@ export default function DocumentsPage() {
                         onChange={(e) =>
                           updateDraft(idx, "allocationPct", parseFloat(e.target.value) || 0)
                         }
-                        className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -1334,7 +1334,7 @@ export default function DocumentsPage() {
                         onChange={(e) =>
                           updateDraft(idx, "committedAmount", parseFloat(e.target.value) || 0)
                         }
-                        className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -1350,7 +1350,7 @@ export default function DocumentsPage() {
                 ))}
                 {subscriptionDrafts.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-gray-500">
+                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
                       No investors added yet. Use the button below to add investors.
                     </td>
                   </tr>
@@ -1364,7 +1364,7 @@ export default function DocumentsPage() {
             <div className="relative flex-1">
               <button
                 onClick={() => setShowAddDropdown(!showAddDropdown)}
-                className="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-indigo-400 hover:text-indigo-600 transition-colors w-full"
+                className="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-muted-foreground hover:border-indigo-400 hover:text-indigo-600 transition-colors w-full"
               >
                 <Plus className="h-4 w-4" />
                 Add Investor
@@ -1386,21 +1386,21 @@ export default function DocumentsPage() {
                   : available;
 
                 return (
-                  <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-md border border-gray-200 bg-white shadow-lg">
-                    <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-md border border-border bg-card shadow-lg">
+                    <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                       <Search className="h-4 w-4 text-gray-400" />
                       <input
                         type="text"
                         value={investorSearch}
                         onChange={(e) => setInvestorSearch(e.target.value)}
                         placeholder="Search by name or email..."
-                        className="flex-1 text-sm text-gray-900 placeholder-gray-400 outline-none"
+                        className="flex-1 text-sm text-foreground placeholder-gray-400 outline-none"
                         autoFocus
                       />
                     </div>
                     <div className="max-h-40 overflow-y-auto">
                       {filtered.length === 0 ? (
-                        <div className="px-3 py-3 text-sm text-gray-500 text-center">
+                        <div className="px-3 py-3 text-sm text-muted-foreground text-center">
                           {available.length === 0
                             ? "All eligible investors are already added"
                             : "No matching investors"}
@@ -1415,8 +1415,8 @@ export default function DocumentsPage() {
                               className="flex items-center justify-between w-full px-3 py-2 text-sm text-left hover:bg-indigo-50 transition-colors"
                             >
                               <div>
-                                <span className="font-medium text-gray-900">{inv.legalName}</span>
-                                <span className="ml-2 text-gray-500">{inv.email}</span>
+                                <span className="font-medium text-foreground">{inv.legalName}</span>
+                                <span className="ml-2 text-muted-foreground">{inv.email}</span>
                               </div>
                               {wallet && (
                                 <HashDisplay value={wallet.address} />
@@ -1436,7 +1436,7 @@ export default function DocumentsPage() {
               size="sm"
               onClick={redistributeEqually}
               disabled={subscriptionDrafts.length === 0}
-              className="text-gray-600 whitespace-nowrap"
+              className="text-muted-foreground whitespace-nowrap"
             >
               Split Equally
             </Button>
@@ -1449,20 +1449,20 @@ export default function DocumentsPage() {
             const isValid = Math.abs(totalPct - 100) <= 0.01;
             return (
               <>
-                <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted px-4 py-3 text-sm">
                   <span className="font-medium text-gray-700">
                     {subscriptionDrafts.length} investor{subscriptionDrafts.length !== 1 ? "s" : ""}
                   </span>
                   <div className="flex items-center gap-6">
-                    <span className="text-gray-600">
+                    <span className="text-muted-foreground">
                       Allocation:{" "}
                       <span className={`font-semibold ${isValid ? "text-green-700" : "text-red-600"}`}>
                         {totalPct.toFixed(2)}%
                       </span>
                     </span>
-                    <span className="text-gray-600">
+                    <span className="text-muted-foreground">
                       Committed:{" "}
-                      <span className="font-semibold text-gray-900">{fmt(totalAmt)}</span>
+                      <span className="font-semibold text-foreground">{fmt(totalAmt)}</span>
                     </span>
                   </div>
                 </div>
@@ -1534,9 +1534,9 @@ function DetailRow({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-sm text-gray-500">{label}</span>
+      <span className="text-sm text-muted-foreground">{label}</span>
       <span
-        className={`text-sm text-gray-900 ${mono ? "font-mono text-xs" : ""}`}
+        className={`text-sm text-foreground ${mono ? "font-mono text-xs" : ""}`}
       >
         {value}
       </span>

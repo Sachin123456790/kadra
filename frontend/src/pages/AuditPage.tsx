@@ -29,13 +29,14 @@ import { DataTable, Column } from "@/components/kadra/DataTable";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { TableSkeleton } from "@/components/kadra/Skeleton";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import {
   CheckCircle,
   Circle,
   Loader2,
-  Copy,
 } from "lucide-react";
+import { CopyButton } from "@/components/kadra/CopyButton";
 import { formatEventType } from "@/lib/format";
 
 // ── Helpers ──────────────────────────────────────────────
@@ -45,21 +46,6 @@ function truncateHash(hash: string | number | null | undefined): string {
   const s = String(hash);
   if (s.length <= 16) return s || "--";
   return `${s.slice(0, 10)}...${s.slice(-6)}`;
-}
-
-function CopyButton({ value }: { readonly value: string }) {
-  const handleCopy = () => {
-    navigator.clipboard.writeText(value).catch(() => {});
-  };
-  return (
-    <button
-      onClick={handleCopy}
-      className="inline-flex items-center text-gray-400 hover:text-gray-600 transition-colors"
-      title="Copy to clipboard"
-    >
-      <Copy className="h-3.5 w-3.5" />
-    </button>
-  );
 }
 
 function triggerCsvDownload(filename: string, content: string) {
@@ -112,7 +98,7 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
       key: "occurredAt",
       header: "Timestamp",
       render: (r) => (
-        <span className="text-gray-600">
+        <span className="text-muted-foreground">
           {new Date(r.occurredAt).toLocaleString()}
         </span>
       ),
@@ -125,7 +111,7 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
           return (
             <span className="inline-flex items-center gap-1 text-green-600">
               <CheckCircle className="h-4 w-4" />
-              <span className="text-xs">On-chain</span>
+              <span className="text-xs">Verified</span>
             </span>
           );
         }
@@ -149,14 +135,11 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
   return (
     <SectionCard title="Event and Evidence Log" className="mb-6">
       {isLoading ? (
-        <div className="flex items-center gap-2 p-4 text-gray-500">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading event log...
-        </div>
+        <TableSkeleton rows={5} columns={4} />
       ) : error ? (
         <ErrorAlert
-          title="Failed to load event log"
-          message={(error as Error).message}
+          title="Unable to load event log"
+          message={`${(error as Error).message}. Try refreshing the page.`}
         />
       ) : events.length === 0 ? (
         <EmptyState
@@ -170,7 +153,7 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
             data={events}
             getRowId={(r) => String(r.id)}
           />
-          <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-4">
+          <div className="flex items-center justify-between pt-4 border-t border-border mt-4">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
@@ -178,7 +161,7 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
             >
               Previous
             </button>
-            <span className="text-sm text-gray-500">Page {page + 1}</span>
+            <span className="text-sm text-muted-foreground">Page {page + 1}</span>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={events.length < EVENT_LOG_PAGE_SIZE}
@@ -229,7 +212,7 @@ function DocumentProvenanceSection({
       key: "originalName",
       header: "Original PDF Reference",
       render: (r) => (
-        <span className="text-sm font-medium text-gray-900">
+        <span className="text-sm font-medium text-foreground">
           {r.originalName}
         </span>
       ),
@@ -251,7 +234,7 @@ function DocumentProvenanceSection({
       key: "createdAt",
       header: "Ingestion Timestamp",
       render: (r) => (
-        <span className="text-gray-600">
+        <span className="text-muted-foreground">
           {new Date(r.createdAt).toLocaleString()}
         </span>
       ),
@@ -276,7 +259,7 @@ function DocumentProvenanceSection({
         const state = verifyState[r.id] ?? "idle";
         if (state === "verifying") {
           return (
-            <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Verifying...
             </span>
@@ -294,7 +277,7 @@ function DocumentProvenanceSection({
           return (
             <span className="inline-flex items-center gap-1 text-xs text-red-600">
               <Circle className="h-3.5 w-3.5" />
-              Hash Mismatch
+              Integrity Check Failed
             </span>
           );
         }
@@ -313,14 +296,11 @@ function DocumentProvenanceSection({
   return (
     <SectionCard title="Document Provenance" className="mb-6">
       {isLoading ? (
-        <div className="flex items-center gap-2 p-4 text-gray-500">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading documents...
-        </div>
+        <TableSkeleton rows={4} columns={5} />
       ) : error ? (
         <ErrorAlert
-          title="Failed to load document provenance"
-          message={(error as Error).message}
+          title="Unable to load document provenance"
+          message={`${(error as Error).message}. Try refreshing the page.`}
         />
       ) : docs.length === 0 ? (
         <EmptyState
@@ -355,7 +335,7 @@ function ChecklistItem({
         <Circle className="h-4 w-4 text-gray-300 flex-shrink-0" />
       )}
       <span
-        className={`text-sm ${available ? "text-gray-900" : "text-gray-500"}`}
+        className={`text-sm ${available ? "text-foreground" : "text-muted-foreground"}`}
       >
         {label}
       </span>
@@ -432,17 +412,17 @@ function ExportSection({ fundId }: { readonly fundId: string }) {
         <button
           onClick={() => createMutation.mutate()}
           disabled={createMutation.isPending}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all duration-150 active:scale-[0.98] motion-reduce:transform-none disabled:opacity-50"
         >
           {createMutation.isPending
             ? "Generating..."
-            : "Generate Audit Packet"}
+            : "Generate Audit Package"}
         </button>
         {createMutation.isError && (
           <div className="mt-3">
             <ErrorAlert
-              title="Export Generation Failed"
-              message={(createMutation.error as Error).message}
+              title="Export generation failed"
+              message={`${(createMutation.error as Error).message}. Please try again or contact support.`}
             />
           </div>
         )}
@@ -457,8 +437,8 @@ function ExportSection({ fundId }: { readonly fundId: string }) {
 
       {/* Checklists */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-lg border border-gray-200 p-5">
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">
+        <div className="rounded-lg border border-border p-5">
+          <h4 className="text-sm font-semibold text-foreground mb-3">
             Audit ZIP Checklist
           </h4>
           <div className="space-y-0.5">
@@ -488,14 +468,14 @@ function ExportSection({ fundId }: { readonly fundId: string }) {
               available={hasDistributions}
             />
             <ChecklistItem
-              label="Verification Proof References"
+              label="Cryptographic Verification Proofs"
               available={hasOnChainProofs}
             />
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 p-5">
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">
+        <div className="rounded-lg border border-border p-5">
+          <h4 className="text-sm font-semibold text-foreground mb-3">
             K-1 ZIP Checklist
           </h4>
           <div className="space-y-0.5">
@@ -537,7 +517,7 @@ function DownloadButton({
   }, [exportId]);
 
   if (status !== "READY")
-    return <span className="text-xs text-gray-500">--</span>;
+    return <span className="text-xs text-muted-foreground">--</span>;
 
   return (
     <button
@@ -607,7 +587,7 @@ function AuditExportTable({
   const isLoading = results.some((r) => r.isLoading);
   if (isLoading)
     return (
-      <div className="flex items-center gap-2 p-4 text-gray-500">
+      <div className="flex items-center gap-2 p-4 text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading exports...
       </div>
@@ -635,7 +615,7 @@ export default function AuditPage() {
     <div>
       <PageHeader
         title="Audit & Exports"
-        subtitle="Event log, document provenance, and compliance export packages"
+        subtitle="Review the event log, verify document provenance, and generate compliance packages"
       />
 
       <ExportSection fundId={fundId} />

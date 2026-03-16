@@ -6,6 +6,7 @@ import { DataTable, Column } from "@/components/kadra/DataTable";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { TableSkeleton } from "@/components/kadra/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getInvestors, getSubscriptions, getDocuments } from "@/services";
 import { getCapTable, getCapitalAccounts } from "@/services/ownership.service";
@@ -134,7 +135,7 @@ export default function InvestorsPage() {
       header: "Wallet",
       render: (r) => (
         r.wallet !== "No wallet linked" ? (
-          <Wallet className="h-4 w-4 text-gray-500" />
+          <Wallet className="h-4 w-4 text-muted-foreground" />
         ) : (
           <span className="text-xs text-gray-400">--</span>
         )
@@ -173,7 +174,7 @@ export default function InvestorsPage() {
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
           r.eligibilityOnChain === "Yes"
             ? "bg-green-50 text-green-700"
-            : "bg-gray-100 text-gray-500"
+            : "bg-gray-100 text-muted-foreground"
         }`}>
           {r.eligibilityOnChain}
         </span>
@@ -183,7 +184,7 @@ export default function InvestorsPage() {
       key: "ownership",
       header: "Ownership %",
       render: (r) => (
-        <span className="text-sm text-gray-900">
+        <span className="text-sm text-foreground">
           {r.ownership > 0 ? `${r.ownership}%` : "--"}
         </span>
       ),
@@ -195,10 +196,10 @@ export default function InvestorsPage() {
         const colorMap: Record<string, string> = {
           Settled: "bg-green-50 text-green-700",
           Pending: "bg-amber-50 text-amber-700",
-          "Not Started": "bg-gray-100 text-gray-500",
+          "Not Started": "bg-gray-100 text-muted-foreground",
         };
         return (
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[r.settlementStatus] ?? "bg-gray-100 text-gray-500"}`}>
+          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[r.settlementStatus] ?? "bg-gray-100 text-muted-foreground"}`}>
             {r.settlementStatus}
           </span>
         );
@@ -207,7 +208,7 @@ export default function InvestorsPage() {
     {
       key: "lastActivity",
       header: "Last Activity",
-      render: (r) => <span className="text-xs text-gray-600">{r.lastActivity || "--"}</span>,
+      render: (r) => <span className="text-xs text-muted-foreground">{r.lastActivity || "--"}</span>,
     },
     {
       key: "actions",
@@ -223,9 +224,13 @@ export default function InvestorsPage() {
     },
   ];
 
-  if (isLoading) return <div className="p-6">Loading...</div>;
+  if (isLoading) return (
+    <div className="p-6 space-y-6">
+      <TableSkeleton rows={6} columns={8} />
+    </div>
+  );
   if (error) return <ErrorAlert title="Failed to load investors" message={(error as Error).message} />;
-  if (!investors || investors.length === 0) return <EmptyState title="No investors" message="No investors have been registered yet." />;
+  if (!investors || investors.length === 0) return <EmptyState title="No investors registered" message="Add investors to begin the onboarding process." />;
 
   // Derive data for selected investor modal
   const selectedCapitalAccount: CapitalAccountSummary | undefined =
@@ -263,18 +268,18 @@ export default function InvestorsPage() {
             onClick={() => setSelectedInvestor(null)}
           />
           {/* Modal */}
-          <div className="relative bg-white border border-gray-200 rounded-xl shadow-lg w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto">
+          <div className="relative bg-card border border-border rounded-xl shadow-lg w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between p-6 border-b border-border">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{selectedInvestor.legalName}</h2>
-                <p className="text-sm text-gray-500">Investor Details</p>
+                <h2 className="text-lg font-semibold text-foreground">{selectedInvestor.legalName}</h2>
+                <p className="text-sm text-muted-foreground">Investor Details</p>
               </div>
               <button
                 onClick={() => setSelectedInvestor(null)}
                 className="p-1 rounded-md hover:bg-gray-100 transition-colors"
               >
-                <X className="h-5 w-5 text-gray-500" />
+                <X className="h-5 w-5 text-muted-foreground" />
               </button>
             </div>
 
@@ -282,26 +287,26 @@ export default function InvestorsPage() {
             <div className="p-6 space-y-6">
               {/* Identity */}
               <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Identity</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Identity</h3>
                 <dl className="space-y-3">
                   <div className="flex items-center gap-3">
                     <User className="h-4 w-4 text-gray-400 shrink-0" />
                     <div className="flex-1">
-                      <dt className="text-xs text-gray-500">Legal Name</dt>
-                      <dd className="text-sm font-medium text-gray-900">{selectedInvestor.legalName}</dd>
+                      <dt className="text-xs text-muted-foreground">Legal Name</dt>
+                      <dd className="text-sm font-medium text-foreground">{selectedInvestor.legalName}</dd>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Mail className="h-4 w-4 text-gray-400 shrink-0" />
                     <div className="flex-1">
-                      <dt className="text-xs text-gray-500">Email</dt>
-                      <dd className="text-sm text-gray-900">{selectedInvestor.email}</dd>
+                      <dt className="text-xs text-muted-foreground">Email</dt>
+                      <dd className="text-sm text-foreground">{selectedInvestor.email}</dd>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Shield className="h-4 w-4 text-gray-400 shrink-0" />
                     <div className="flex-1">
-                      <dt className="text-xs text-gray-500">Verification Status</dt>
+                      <dt className="text-xs text-muted-foreground">Verification Status</dt>
                       <dd className="mt-1"><StatusBadge status={selectedInvestor.verificationStatus} /></dd>
                     </div>
                   </div>
@@ -310,10 +315,10 @@ export default function InvestorsPage() {
 
               {/* Documents section */}
               <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Documents</h3>
-                <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50/50">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Documents</h3>
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/50">
                   <FileTextIcon className="h-4 w-4 text-gray-400 shrink-0" />
-                  <span className="text-sm text-gray-900">
+                  <span className="text-sm text-foreground">
                     {selectedInvestorDocCount > 0
                       ? `${selectedInvestorDocCount} document${selectedInvestorDocCount !== 1 ? "s" : ""}`
                       : "No documents"}
@@ -323,49 +328,49 @@ export default function InvestorsPage() {
 
               {/* Compliance Flags */}
               <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Compliance Flags</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Compliance Flags</h3>
                 <dl className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <dt className="text-sm text-gray-500 flex items-center gap-2">
+                    <dt className="text-sm text-muted-foreground flex items-center gap-2">
                       {selectedInvestor.verificationStatus === "Verified"
                         ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
                         : <XCircle className="h-3.5 w-3.5 text-red-500" />}
                       KYC Verified
                     </dt>
-                    <dd className="text-sm text-gray-900">
+                    <dd className="text-sm text-foreground">
                       {selectedInvestor.verificationStatus === "Verified" ? "Yes" : "No"}
                       {selectedInvestor.verificationStatus === "Verified" &&
                         selectedInvestor.fundEligibility?.effectiveAt && (
-                          <span className="ml-2 text-xs text-gray-500">
+                          <span className="ml-2 text-xs text-muted-foreground">
                             {new Date(selectedInvestor.fundEligibility.effectiveAt).toLocaleDateString()}
                           </span>
                         )}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <dt className="text-sm text-gray-500 flex items-center gap-2">
+                    <dt className="text-sm text-muted-foreground flex items-center gap-2">
                       {selectedInvestor.verificationStatus === "Verified"
                         ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
                         : <XCircle className="h-3.5 w-3.5 text-gray-400" />}
                       Accreditation Status
                     </dt>
-                    <dd className="text-sm text-gray-900">
+                    <dd className="text-sm text-foreground">
                       {selectedInvestor.verificationStatus === "Verified" ? "Accredited" : "Unaccredited"}
                       {selectedInvestor.verificationStatus === "Verified" &&
                         selectedInvestor.fundEligibility?.effectiveAt && (
-                          <span className="ml-2 text-xs text-gray-500">
+                          <span className="ml-2 text-xs text-muted-foreground">
                             {new Date(selectedInvestor.fundEligibility.effectiveAt).toLocaleDateString()}
                           </span>
                         )}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <dt className="text-sm text-gray-500">Eligibility</dt>
+                    <dt className="text-sm text-muted-foreground">Eligibility</dt>
                     <dd className="text-sm">
                       {selectedInvestor.fundEligibility ? (
                         <StatusBadge status={selectedInvestor.fundEligibility.status} />
                       ) : (
-                        <span className="text-gray-500">Inactive</span>
+                        <span className="text-muted-foreground">Inactive</span>
                       )}
                     </dd>
                   </div>
@@ -374,38 +379,38 @@ export default function InvestorsPage() {
 
               {/* Capital Account Summary */}
               <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Capital Account</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Capital Account</h3>
                 {selectedCapitalAccount ? (
                   <dl className="space-y-2">
                     <div className="flex justify-between">
-                      <dt className="text-sm text-gray-500">Capital Contributed</dt>
-                      <dd className="text-sm font-medium text-gray-900">
+                      <dt className="text-sm text-muted-foreground">Capital Contributed</dt>
+                      <dd className="text-sm font-medium text-foreground">
                         {fmtCurrency(Number(selectedCapitalAccount.initialContribution))}
                       </dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-sm text-gray-500">Capital Returned</dt>
-                      <dd className="text-sm font-medium text-gray-900">
+                      <dt className="text-sm text-muted-foreground">Capital Returned</dt>
+                      <dd className="text-sm font-medium text-foreground">
                         {fmtCurrency(Number(selectedCapitalAccount.capitalReturned))}
                       </dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-sm text-gray-500">Accrued Pref Return</dt>
-                      <dd className="text-sm font-medium text-gray-900">
+                      <dt className="text-sm text-muted-foreground">Accrued Pref Return</dt>
+                      <dd className="text-sm font-medium text-foreground">
                         {fmtCurrency(Number(selectedCapitalAccount.accruedPreferredReturn))}
                       </dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-sm text-gray-500">Ending Balance</dt>
-                      <dd className="text-sm font-medium text-gray-900">
+                      <dt className="text-sm text-muted-foreground">Ending Balance</dt>
+                      <dd className="text-sm font-medium text-foreground">
                         {fmtCurrency(Number(selectedCapitalAccount.endingBalance))}
                       </dd>
                     </div>
                   </dl>
                 ) : (
-                  <div className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 bg-gray-50/50">
+                  <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/50">
                     <DollarSign className="h-4 w-4 text-gray-400 shrink-0" />
-                    <span className="text-sm text-gray-500">N/A</span>
+                    <span className="text-sm text-muted-foreground">N/A</span>
                   </div>
                 )}
               </div>
@@ -413,33 +418,33 @@ export default function InvestorsPage() {
               {/* Subscription Details */}
               {selectedInvestorSubs.length > 0 && (
                 <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Subscriptions</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Subscriptions</h3>
                   <div className="space-y-3">
                     {selectedInvestorSubs.map((sub) => (
-                      <div key={sub.subscriptionId} className="p-3 rounded-lg border border-gray-200 bg-gray-50/50 space-y-2">
+                      <div key={sub.subscriptionId} className="p-3 rounded-lg border border-border bg-muted/50 space-y-2">
                         <div className="flex items-center gap-3">
                           <FileTextIcon className="h-4 w-4 text-gray-400 shrink-0" />
                           <div className="flex-1">
-                            <dt className="text-xs text-gray-500">Subscription Ref</dt>
-                            <dd className="text-sm font-medium text-gray-900">{sub.subscriptionRef}</dd>
+                            <dt className="text-xs text-muted-foreground">Subscription Ref</dt>
+                            <dd className="text-sm font-medium text-foreground">{sub.subscriptionRef}</dd>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
                           <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
                           <div className="flex-1">
-                            <dt className="text-xs text-gray-500">Settlement Date</dt>
-                            <dd className="text-sm text-gray-900">
+                            <dt className="text-xs text-muted-foreground">Settlement Date</dt>
+                            <dd className="text-sm text-foreground">
                               {sub.settledAt ? new Date(sub.settledAt).toLocaleString() : "Not settled"}
                             </dd>
                           </div>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Status</span>
+                          <span className="text-muted-foreground">Status</span>
                           <StatusBadge status={sub.status} />
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Committed</span>
-                          <span className="font-medium text-gray-900">
+                          <span className="text-muted-foreground">Committed</span>
+                          <span className="font-medium text-foreground">
                             ${Number(sub.committedAmount).toLocaleString()}
                           </span>
                         </div>
@@ -454,17 +459,17 @@ export default function InvestorsPage() {
                 <div className="space-y-6">
                   {/* Wallets */}
                   <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Wallets</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Wallets</h3>
                     {selectedInvestor.wallets.length === 0 ? (
-                      <p className="text-sm text-gray-500">No wallets linked</p>
+                      <p className="text-sm text-muted-foreground">No wallets linked</p>
                     ) : (
                       <div className="space-y-2">
                         {selectedInvestor.wallets.map((w) => (
-                          <div key={w.walletId} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50/50">
+                          <div key={w.walletId} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/50">
                             <Wallet className="h-4 w-4 text-gray-400 shrink-0" />
                             <div className="flex-1 min-w-0">
                               <div className="text-sm"><ExplorerLink value={w.address} type="address" /></div>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-muted-foreground">
                                 Chain {w.chainId} {w.isPrimary && "-- Primary"} -- {w.status}
                               </p>
                             </div>
@@ -476,16 +481,16 @@ export default function InvestorsPage() {
 
                   {/* Fund Eligibility (on-chain marker) */}
                   <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Fund Eligibility (On-Chain)</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Fund Eligibility (On-Chain)</h3>
                     {selectedInvestor.fundEligibility ? (
                       <dl className="space-y-2">
                         <div className="flex justify-between">
-                          <dt className="text-sm text-gray-500">Status</dt>
+                          <dt className="text-sm text-muted-foreground">Status</dt>
                           <dd><StatusBadge status={selectedInvestor.fundEligibility.status} /></dd>
                         </div>
                         <div className="flex justify-between">
-                          <dt className="text-sm text-gray-500">Effective</dt>
-                          <dd className="text-sm font-medium text-gray-900">
+                          <dt className="text-sm text-muted-foreground">Effective</dt>
+                          <dd className="text-sm font-medium text-foreground">
                             {selectedInvestor.fundEligibility.effectiveAt
                               ? new Date(selectedInvestor.fundEligibility.effectiveAt).toLocaleDateString()
                               : "N/A"}
@@ -493,7 +498,7 @@ export default function InvestorsPage() {
                         </div>
                       </dl>
                     ) : (
-                      <p className="text-sm text-gray-500">No eligibility record</p>
+                      <p className="text-sm text-muted-foreground">No eligibility record</p>
                     )}
                   </div>
 
@@ -503,19 +508,19 @@ export default function InvestorsPage() {
                     if (!row) return null;
                     return (
                       <div>
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Token Ownership</h3>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Token Ownership</h3>
                         <dl className="space-y-2">
                           <div className="flex justify-between">
-                            <dt className="text-sm text-gray-500">Token Balance</dt>
-                            <dd className="text-sm font-medium font-mono text-gray-900">{row.settledTokenBalance}</dd>
+                            <dt className="text-sm text-muted-foreground">Token Balance</dt>
+                            <dd className="text-sm font-medium font-mono text-foreground">{row.settledTokenBalance}</dd>
                           </div>
                           <div className="flex justify-between">
-                            <dt className="text-sm text-gray-500">Ownership %</dt>
-                            <dd className="text-sm font-medium text-gray-900">{row.ownershipPct}%</dd>
+                            <dt className="text-sm text-muted-foreground">Ownership %</dt>
+                            <dd className="text-sm font-medium text-foreground">{row.ownershipPct}%</dd>
                           </div>
                           <div className="flex justify-between">
-                            <dt className="text-sm text-gray-500">Pending Allocation</dt>
-                            <dd className="text-sm font-medium text-gray-900">{row.pendingAllocationPct}%</dd>
+                            <dt className="text-sm text-muted-foreground">Pending Allocation</dt>
+                            <dd className="text-sm font-medium text-foreground">{row.pendingAllocationPct}%</dd>
                           </div>
                         </dl>
                       </div>

@@ -7,6 +7,7 @@ import { SectionCard } from "@/components/kadra/SectionCard";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { TableSkeleton } from "@/components/kadra/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getSubscriptions, getInvestors, getDocuments, createSubscriptions } from "@/services";
 import {
@@ -124,15 +125,19 @@ export default function SubscriptionsPage() {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
-  if (isLoading) return <div className="p-6">Loading...</div>;
-  if (error) return <ErrorAlert title="Failed to load subscriptions" message={(error as Error).message} />;
+  if (isLoading) return (
+    <div className="p-6 space-y-6">
+      <TableSkeleton rows={5} columns={7} />
+    </div>
+  );
+  if (error) return <ErrorAlert title="Unable to load subscriptions" message={`${(error as Error).message}. Try refreshing the page.`} />;
   if (!subscriptions || subscriptions.length === 0) return <EmptyState title="No subscriptions" message="No subscription records exist yet." />;
 
   return (
     <div>
       <PageHeader
         title="Subscriptions"
-        subtitle="Track subscription commitments and settlement status"
+        subtitle="Manage investor subscriptions, allocations, and settlement progress"
         action={
           <Button
             onClick={() => {
@@ -151,7 +156,7 @@ export default function SubscriptionsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
         <SectionCard className="lg:col-span-1">
-          <h3 className="text-sm font-medium text-gray-500 mb-2 text-center">Status Breakdown</h3>
+          <h3 className="text-sm font-medium text-muted-foreground mb-2 text-center">Status Breakdown</h3>
           <ResponsiveContainer width="100%" height={140}>
             <PieChart>
               <Pie
@@ -179,14 +184,14 @@ export default function SubscriptionsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 w-8" />
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Investor</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Allocation %</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Committed</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Created</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Settled</th>
+              <tr className="border-b border-border">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground w-8" />
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Investor</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Allocation %</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Committed</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Created</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Settled</th>
               </tr>
             </thead>
             <tbody>
@@ -215,8 +220,8 @@ export default function SubscriptionsPage() {
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-gray-900">Create Subscription</DialogTitle>
-            <DialogDescription className="text-gray-500">
+            <DialogTitle className="text-foreground">Create Subscription</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Add a new subscription record for an investor.
             </DialogDescription>
           </DialogHeader>
@@ -231,7 +236,7 @@ export default function SubscriptionsPage() {
                 id="lp-select"
                 value={createLpId}
                 onChange={(e) => setCreateLpId(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
                 <option value="">Select an investor...</option>
                 {(investorsData ?? []).map((inv: Investor) => (
@@ -255,7 +260,7 @@ export default function SubscriptionsPage() {
                 value={createAmount}
                 onChange={(e) => setCreateAmount(e.target.value)}
                 placeholder="e.g. 2000000"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
 
@@ -273,7 +278,7 @@ export default function SubscriptionsPage() {
                 value={createAllocation}
                 onChange={(e) => setCreateAllocation(e.target.value)}
                 placeholder="e.g. 20"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
 
@@ -282,12 +287,12 @@ export default function SubscriptionsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 LPA Reference
               </label>
-              <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <div className="flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2">
                 <FileText className="h-4 w-4 text-gray-400 shrink-0" />
                 {latestLpaHash ? (
                   <HashDisplay value={latestLpaHash} />
                 ) : (
-                  <span className="text-sm text-gray-500">No LPA document uploaded</span>
+                  <span className="text-sm text-muted-foreground">No LPA document uploaded</span>
                 )}
               </div>
             </div>
@@ -331,32 +336,32 @@ function SubscriptionTableRow({
     <>
       <tr
         onClick={onToggle}
-        className="border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+        className="border-b border-border cursor-pointer hover:bg-gray-50 transition-colors"
       >
-        <td className="px-4 py-3 text-gray-500">
+        <td className="px-4 py-3 text-muted-foreground">
           {isExpanded
             ? <ChevronDown className="h-4 w-4" />
             : <ChevronRight className="h-4 w-4" />}
         </td>
-        <td className="px-4 py-3 font-medium text-gray-900">{sub.investorName || sub.investorId}</td>
-        <td className="px-4 py-3 text-gray-900">{sub.allocationPct}%</td>
-        <td className="px-4 py-3 text-gray-900">{fmt(Number(sub.committedAmount) || 0)}</td>
+        <td className="px-4 py-3 font-medium text-foreground">{sub.investorName || sub.investorId}</td>
+        <td className="px-4 py-3 text-foreground">{sub.allocationPct}%</td>
+        <td className="px-4 py-3 text-foreground">{fmt(Number(sub.committedAmount) || 0)}</td>
         <td className="px-4 py-3">{statusBadge(sub.status)}</td>
-        <td className="px-4 py-3 text-gray-600">{sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : "--"}</td>
-        <td className="px-4 py-3 text-gray-600">{sub.settledAt ? new Date(sub.settledAt).toLocaleDateString() : "--"}</td>
+        <td className="px-4 py-3 text-muted-foreground">{sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : "--"}</td>
+        <td className="px-4 py-3 text-muted-foreground">{sub.settledAt ? new Date(sub.settledAt).toLocaleDateString() : "--"}</td>
       </tr>
 
       {/* Expanded detail row */}
       {isExpanded && (
-        <tr className="bg-gray-50/50">
+        <tr className="bg-muted/50">
           <td colSpan={7} className="px-8 py-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Subscription Reference */}
               <div className="flex items-start gap-3">
                 <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Subscription Reference</p>
-                  <p className="text-sm text-gray-900">{sub.subscriptionRef}</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">Subscription Reference</p>
+                  <p className="text-sm text-foreground">{sub.subscriptionRef}</p>
                 </div>
               </div>
 
@@ -364,7 +369,7 @@ function SubscriptionTableRow({
               <div className="flex items-start gap-3">
                 <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Record ID</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">Record ID</p>
                   <HashDisplay value={sub.subscriptionId} />
                 </div>
               </div>
@@ -373,8 +378,8 @@ function SubscriptionTableRow({
               <div className="flex items-start gap-3">
                 <Wallet className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Wallet Address</p>
-                  <HashDisplay value={walletAddress} fallback="No wallet linked" />
+                  <p className="text-xs text-muted-foreground mb-0.5">Account Address</p>
+                  <HashDisplay value={walletAddress} fallback="No account linked" />
                 </div>
               </div>
 
@@ -382,7 +387,7 @@ function SubscriptionTableRow({
               <div className="flex items-start gap-3">
                 <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Governing Document Reference</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">Governing Document Reference</p>
                   <HashDisplay value={sub.governingHashHex} fallback="N/A" />
                 </div>
               </div>
@@ -391,18 +396,18 @@ function SubscriptionTableRow({
               <div className="flex items-start gap-3">
                 <Calendar className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div className="space-y-1">
-                  <p className="text-xs text-gray-500 mb-0.5">Timestamps</p>
+                  <p className="text-xs text-muted-foreground mb-0.5">Timestamps</p>
                   <div className="flex items-center gap-2 text-sm">
                     <Clock className="h-3.5 w-3.5 text-gray-400" />
-                    <span className="text-gray-500">Created:</span>
-                    <span className="text-gray-900">
+                    <span className="text-muted-foreground">Created:</span>
+                    <span className="text-foreground">
                       {sub.createdAt ? new Date(sub.createdAt).toLocaleString() : "N/A"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Clock className="h-3.5 w-3.5 text-gray-400" />
-                    <span className="text-gray-500">Settled:</span>
-                    <span className="text-gray-900">
+                    <span className="text-muted-foreground">Settled:</span>
+                    <span className="text-foreground">
                       {sub.settledAt ? new Date(sub.settledAt).toLocaleString() : "Not settled"}
                     </span>
                   </div>
