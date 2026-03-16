@@ -18,7 +18,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Copy, Plus, Wallet, FileText, Calendar, Clock } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Wallet, FileText, Calendar, Clock } from "lucide-react";
+import { HashDisplay } from "@/components/kadra/HashDisplay";
 import type { Subscription } from "@/services/subscriptions.service";
 import type { Investor } from "@/services/investors.service";
 
@@ -32,15 +33,6 @@ const STATUS_COLORS: Record<string, string> = {
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
-
-function truncateId(id: string, len = 8): string {
-  if (!id || id.length <= len * 2) return id;
-  return `${id.slice(0, len)}...${id.slice(-4)}`;
-}
-
-function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text).catch(() => {});
-}
 
 function statusBadge(status: string) {
   if (status === "MISMATCH") {
@@ -293,7 +285,7 @@ export default function SubscriptionsPage() {
               <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
                 <FileText className="h-4 w-4 text-gray-400 shrink-0" />
                 {latestLpaHash ? (
-                  <span className="font-mono text-xs text-gray-900 truncate">{truncateId(latestLpaHash, 12)}</span>
+                  <HashDisplay value={latestLpaHash} />
                 ) : (
                   <span className="text-sm text-gray-500">No LPA document uploaded</span>
                 )}
@@ -373,16 +365,7 @@ function SubscriptionTableRow({
                 <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Record ID</p>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="text-sm font-mono text-gray-900">{truncateId(sub.subscriptionId)}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); copyToClipboard(sub.subscriptionId); }}
-                      className="text-gray-400 hover:text-gray-600 p-0.5"
-                      title="Copy subscription ID"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </button>
-                  </span>
+                  <HashDisplay value={sub.subscriptionId} />
                 </div>
               </div>
 
@@ -391,9 +374,7 @@ function SubscriptionTableRow({
                 <Wallet className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Wallet Address</p>
-                  <p className="text-sm font-mono text-gray-900">
-                    {walletAddress ? truncateId(walletAddress) : "No wallet linked"}
-                  </p>
+                  <HashDisplay value={walletAddress} fallback="No wallet linked" />
                 </div>
               </div>
 
@@ -402,9 +383,7 @@ function SubscriptionTableRow({
                 <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Governing Document Reference</p>
-                  <p className="text-sm font-mono text-gray-900">
-                    {sub.governingHashHex ? truncateId(sub.governingHashHex) : "N/A"}
-                  </p>
+                  <HashDisplay value={sub.governingHashHex} fallback="N/A" />
                 </div>
               </div>
 

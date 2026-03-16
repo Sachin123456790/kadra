@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { MetricCard } from "@/components/kadra/MetricCard";
 import { SectionCard } from "@/components/kadra/SectionCard";
@@ -19,7 +18,7 @@ import { QUERY_KEYS, DEFAULT_FUND_CODE, ROUTES } from "@/config/constants";
 import { getFundOverview, getActivityFeed, getDocuments } from "@/services";
 import { getCapitalCalls } from "@/services/capital-calls.service";
 import { getCapitalAccounts } from "@/services/ownership.service";
-import { formatCompact } from "@/lib/format";
+import { formatCompact, formatEventType } from "@/lib/format";
 
 const IDENTITY_REGISTRY_ADDRESS = "0x55822888507cac67bE5C11516e00C4597E7c78fb";
 
@@ -60,35 +59,6 @@ function ProgressBar({ label, value, max, color }: ProgressBarProps) {
         />
       </div>
     </div>
-  );
-}
-
-/* ── Copy button for addresses ── */
-
-function CopyableAddress({ address }: { readonly address: string }) {
-  const truncated = address.length > 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
-
-  const handleCopy = () => {
-    void navigator.clipboard.writeText(address).then(() => {
-      toast.success("Address copied to clipboard");
-    });
-  };
-
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="font-mono text-xs text-gray-900">{truncated}</span>
-      <button
-        onClick={handleCopy}
-        className="text-gray-400 hover:text-gray-600 transition-colors"
-        title="Copy address"
-        type="button"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-        </svg>
-      </button>
-    </span>
   );
 }
 
@@ -223,16 +193,14 @@ export default function FundOverviewPage() {
       {/* ── Top Metric Bar (4 cards) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <MetricCard
-          label="Status"
-          value={fundData.status}
-          subtitle={
-            <StatusBadge status={fundData.status === "ACTIVE" ? "Passed" : fundData.status} />
-          }
+          label="Total AUM"
+          value={formatCompact(metrics.settledCapital)}
+          subtitle={isFullyCommitted ? "Fully Committed" : "Partially Committed"}
         />
         <MetricCard
-          label="Total AUM / Fund Size"
-          value={`${formatCompact(metrics.settledCapital)} / ${formatCompact(fundSize)}`}
-          subtitle={isFullyCommitted ? "Fully Committed" : "Partially Committed"}
+          label="Fund Size"
+          value={formatCompact(fundSize)}
+          subtitle="Target Commitment"
         />
         <MetricCard
           label="Active LPs"
@@ -429,7 +397,7 @@ export default function FundOverviewPage() {
                 {lastOnChainEvent ? (
                   <div className="flex flex-col items-end gap-0.5">
                     <span className="text-xs font-medium text-gray-700">
-                      {lastOnChainEvent.eventType.replace(/_/g, " ")}
+                      {formatEventType(lastOnChainEvent.eventType)}
                     </span>
                     <span className="text-xs text-gray-600">
                       {new Date(lastOnChainEvent.occurredAt).toLocaleDateString()}{" "}

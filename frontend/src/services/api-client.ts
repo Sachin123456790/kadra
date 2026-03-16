@@ -116,7 +116,8 @@ async function handleResponse<T>(res: Response, retryFn?: () => Promise<Response
     );
   }
 
-  const body = await res.json();
+  const text = await res.text();
+  const body = text ? JSON.parse(text) : null;
 
   if (!res.ok) {
     throw new ApiRequestError(
@@ -127,7 +128,7 @@ async function handleResponse<T>(res: Response, retryFn?: () => Promise<Response
     );
   }
 
-  return body as T;
+  return (body ?? { data: null, meta: {} }) as T;
 }
 
 // ── GET / POST / Upload wrappers ───────────────────────────

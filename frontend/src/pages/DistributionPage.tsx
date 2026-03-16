@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { AlertTriangle, Lock, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
+import { AlertTriangle, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from '@/config/constants';
 import { getWaterfallConfig } from '@/services/fund.service';
 import { previewDistribution } from '@/services/distribution.service';
@@ -18,46 +18,10 @@ import { MetricCard } from "@/components/kadra/MetricCard";
 import { DataTable, Column } from "@/components/kadra/DataTable";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
+import { HashDisplay } from "@/components/kadra/HashDisplay";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
-
-/* ── Copy Button ── */
-
-function CopyButton({ text }: { readonly text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [text]);
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="ml-1 inline-flex text-gray-400 hover:text-gray-600 transition-colors"
-      title="Copy to clipboard"
-      type="button"
-    >
-      {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-    </button>
-  );
-}
-
-/* ── Truncated Hash ── */
-
-function TruncatedHash({ hash }: { readonly hash: string | null | undefined }) {
-  if (!hash || hash === "—") return <span className="text-gray-500">—</span>;
-  const truncated = hash.length > 12 ? `${hash.slice(0, 6)}...${hash.slice(-4)}` : hash;
-  return (
-    <span className="inline-flex items-center">
-      <span className="font-mono text-xs text-gray-600">{truncated}</span>
-      <CopyButton text={hash} />
-    </span>
-  );
-}
 
 /* ── Waterfall Tier Card ── */
 
@@ -137,7 +101,7 @@ function WaterfallConfigSection({ config, lpaHash }: { readonly config: Waterfal
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-gray-500">Derived From (LPA Hash)</p>
             <p className="mt-1">
-              <TruncatedHash hash={lpaHash} />
+              <HashDisplay value={lpaHash} />
             </p>
           </div>
         </div>

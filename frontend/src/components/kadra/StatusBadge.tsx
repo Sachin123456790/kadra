@@ -31,8 +31,18 @@ interface StatusBadgeProps {
   className?: string;
 }
 
+function resolveVariant(status: string): BadgeVariant {
+  if (variantMap[status]) return variantMap[status];
+  const lower = status.toLowerCase();
+  if (lower.includes("verified") || lower.includes("settled") || lower.includes("completed") || lower.includes("minted") || lower.includes("deployed") || lower.includes("granted") || lower.includes("anchored")) return "success";
+  if (lower.includes("pending") || lower.includes("issued") || lower.includes("attempted") || lower.includes("updated") || lower.includes("generated")) return "warning";
+  if (lower.includes("failed") || lower.includes("rejected") || lower.includes("revoked")) return "destructive";
+  if (lower.includes("created") || lower.includes("uploaded") || lower.includes("linked") || lower.includes("response") || lower.includes("sent")) return "info";
+  return "default";
+}
+
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const variant = variantMap[status] || "default";
+  const variant = resolveVariant(status);
   return (
     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", variantStyles[variant], className)}>
       {status}

@@ -115,3 +115,97 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
 }
+
+/* ── Dark-mode overrides for explicit gray text classes ── */
+/* These ensure text remains visible when pages use hardcoded gray shades */
+@layer utilities {
+  .dark .text-gray-900 { color: hsl(210 20% 92%) !important; }
+  .dark .text-gray-800 { color: hsl(210 18% 85%) !important; }
+  .dark .text-gray-700 { color: hsl(210 15% 75%) !important; }
+  .dark .text-gray-600 { color: hsl(220 9% 65%) !important; }
+  .dark .text-gray-500 { color: hsl(220 9% 56%) !important; }
+  .dark .text-gray-400 { color: hsl(220 9% 50%) !important; }
+
+  /* Background overrides */
+  .dark .bg-white { background-color: hsl(224 18% 13%) !important; }
+  .dark .bg-gray-50 { background-color: hsl(224 16% 16%) !important; }
+  .dark .bg-gray-100 { background-color: hsl(224 16% 18%) !important; }
+  .dark .bg-gray-200 { background-color: hsl(224 14% 22%) !important; }
+
+  /* Border overrides */
+  .dark .border-gray-100 { border-color: hsl(224 14% 20%) !important; }
+  .dark .border-gray-200 { border-color: hsl(224 14% 22%) !important; }
+  .dark .border-gray-300 { border-color: hsl(224 14% 25%) !important; }
+
+  /* Status pill overrides — green */
+  .dark .bg-green-50 { background-color: hsl(142 40% 14%) !important; }
+  .dark .bg-green-100 { background-color: hsl(142 35% 18%) !important; }
+  .dark .text-green-700 { color: hsl(142 60% 55%) !important; }
+  .dark .text-green-800 { color: hsl(142 55% 60%) !important; }
+
+  /* Status pill overrides — red */
+  .dark .bg-red-50 { background-color: hsl(0 40% 14%) !important; }
+  .dark .bg-red-100 { background-color: hsl(0 35% 18%) !important; }
+  .dark .text-red-600 { color: hsl(0 65% 60%) !important; }
+  .dark .text-red-700 { color: hsl(0 60% 55%) !important; }
+  .dark .text-red-800 { color: hsl(0 55% 60%) !important; }
+
+  /* Status pill overrides — blue */
+  .dark .bg-blue-50 { background-color: hsl(217 40% 14%) !important; }
+  .dark .bg-blue-100 { background-color: hsl(217 35% 18%) !important; }
+  .dark .text-blue-700 { color: hsl(217 70% 60%) !important; }
+  .dark .text-blue-800 { color: hsl(217 65% 60%) !important; }
+
+  /* Status pill overrides — yellow/amber */
+  .dark .bg-yellow-50 { background-color: hsl(38 40% 14%) !important; }
+  .dark .bg-yellow-100 { background-color: hsl(38 35% 18%) !important; }
+  .dark .text-yellow-700 { color: hsl(38 70% 55%) !important; }
+  .dark .text-yellow-800 { color: hsl(38 65% 60%) !important; }
+  .dark .bg-amber-50 { background-color: hsl(38 40% 14%) !important; }
+  .dark .bg-amber-100 { background-color: hsl(38 35% 18%) !important; }
+  .dark .text-amber-700 { color: hsl(38 70% 55%) !important; }
+  .dark .text-amber-800 { color: hsl(38 65% 60%) !important; }
+
+  /* Status pill overrides — indigo */
+  .dark .bg-indigo-50 { background-color: hsl(234 40% 14%) !important; }
+  .dark .bg-indigo-100 { background-color: hsl(234 35% 18%) !important; }
+  .dark .text-indigo-600 { color: hsl(234 70% 65%) !important; }
+  .dark .text-indigo-700 { color: hsl(234 65% 60%) !important; }
+  .dark .text-indigo-800 { color: hsl(234 60% 65%) !important; }
+
+  /* Table/card surface overrides */
+  .dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: hsl(224 14% 22%) !important;
+  }
+  .dark .hover\:bg-gray-50:hover { background-color: hsl(224 16% 16%) !important; }
+  .dark .hover\:bg-gray-100:hover { background-color: hsl(224 16% 18%) !important; }
+  .dark .hover\:text-gray-700:hover { color: hsl(210 15% 75%) !important; }
+  .dark .hover\:text-gray-600:hover { color: hsl(220 9% 65%) !important; }
+
+  /* Form inputs — browser default bg is white, override for dark mode */
+  .dark input:not([type="checkbox"]):not([type="radio"]),
+  .dark textarea,
+  .dark select {
+    background-color: hsl(224 16% 16%) !important;
+    color: hsl(210 20% 92%) !important;
+    border-color: hsl(224 14% 25%) !important;
+  }
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: hsl(220 9% 50%) !important;
+  }
+
+  /* Purple pill overrides */
+  .dark .bg-purple-100 { background-color: hsl(270 35% 18%) !important; }
+  .dark .text-purple-800 { color: hsl(270 60% 65%) !important; }
+
+  /* Border overrides for colored borders */
+  .dark .border-green-200 { border-color: hsl(142 30% 22%) !important; }
+  .dark .border-red-200 { border-color: hsl(0 30% 22%) !important; }
+  .dark .border-blue-200 { border-color: hsl(217 30% 22%) !important; }
+  .dark .border-amber-200 { border-color: hsl(38 30% 22%) !important; }
+
+  /* Hover states for indigo buttons */
+  .dark .hover\:text-indigo-800:hover { color: hsl(234 60% 70%) !important; }
+  .dark .hover\:bg-indigo-700:hover { background-color: hsl(234 55% 40%) !important; }
+}

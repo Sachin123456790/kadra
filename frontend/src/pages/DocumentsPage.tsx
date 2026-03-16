@@ -30,6 +30,7 @@ import { StatusBadge } from "@/components/kadra/StatusBadge";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { HashDisplay } from "@/components/kadra/HashDisplay";
 import { MetricCard } from "@/components/kadra/MetricCard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -1122,10 +1123,8 @@ export default function DocumentsPage() {
                                   <td className="px-4 py-3 text-gray-600">
                                     {inv.email}
                                   </td>
-                                  <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                                    {wallet
-                                      ? `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`
-                                      : "None"}
+                                  <td className="px-4 py-3">
+                                    <HashDisplay value={wallet?.address} fallback="None" />
                                   </td>
                                   <td className="px-4 py-3">
                                     <StatusBadge
@@ -1310,10 +1309,8 @@ export default function DocumentsPage() {
                     <td className="px-3 py-2 font-medium text-gray-900">
                       {draft.investorName}
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs text-gray-600">
-                      {draft.walletAddress
-                        ? `${draft.walletAddress.slice(0, 6)}...${draft.walletAddress.slice(-4)}`
-                        : "None"}
+                    <td className="px-3 py-2">
+                      <HashDisplay value={draft.walletAddress} fallback="None" />
                     </td>
                     <td className="px-3 py-2">
                       <input
@@ -1422,9 +1419,7 @@ export default function DocumentsPage() {
                                 <span className="ml-2 text-gray-500">{inv.email}</span>
                               </div>
                               {wallet && (
-                                <span className="font-mono text-xs text-gray-400">
-                                  {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
-                                </span>
+                                <HashDisplay value={wallet.address} />
                               )}
                             </button>
                           );

@@ -36,6 +36,7 @@ import {
   Loader2,
   Copy,
 } from "lucide-react";
+import { formatEventType } from "@/lib/format";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ function EventLogSection({ fundId }: { readonly fundId: string }) {
     {
       key: "eventType",
       header: "Event Type",
-      render: (r) => <StatusBadge status={r.eventType} />,
+      render: (r) => <StatusBadge status={formatEventType(r.eventType)} />,
     },
     {
       key: "actor",

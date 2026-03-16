@@ -13,8 +13,9 @@ import { SectionCard } from "@/components/kadra/SectionCard";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { HashDisplay } from "@/components/kadra/HashDisplay";
 import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
-import { Copy, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Constants ────────────────────────────────────────────
@@ -27,29 +28,6 @@ const fmt = (n: number) =>
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(n);
-
-function truncateHex(hex: string): string {
-  if (!hex || hex.length <= 12) return hex || "--";
-  return `${hex.slice(0, 6)}...${hex.slice(-4)}`;
-}
-
-function CopyButton({ value }: { readonly value: string }) {
-  const handleCopy = () => {
-    navigator.clipboard.writeText(value).catch(() => {
-      /* silently fail in unsupported contexts */
-    });
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="inline-flex items-center text-gray-400 hover:text-gray-600 transition-colors"
-      title="Copy to clipboard"
-    >
-      <Copy className="h-3.5 w-3.5" />
-    </button>
-  );
-}
 
 // ── Unified Transfer Row ─────────────────────────────────
 
@@ -172,12 +150,7 @@ function TransferRulesCard({
             <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">
               Rules Derived From
             </p>
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs text-gray-700">
-                {truncateHex(lpaHash)}
-              </span>
-              {lpaHash && <CopyButton value={lpaHash} />}
-            </div>
+            <HashDisplay value={lpaHash} />
           </div>
         </div>
       </TechnicalDetails>
@@ -242,10 +215,10 @@ function TransferHistoryTable({
                 {new Date(t.date).toLocaleDateString()}
               </td>
               <td className="px-4 py-3 font-medium text-gray-900">
-                {t.fromLpName || truncateHex(t.fromWallet)}
+                {t.fromLpName || <HashDisplay value={t.fromWallet} />}
               </td>
               <td className="px-4 py-3 font-medium text-gray-900">
-                {t.toLpName || truncateHex(t.toWallet)}
+                {t.toLpName || <HashDisplay value={t.toWallet} />}
               </td>
               <td className="px-4 py-3 text-gray-900">{fmt(t.amount)}</td>
               <td className="px-4 py-3">

@@ -1,18 +1,6 @@
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { formatEventType } from "@/lib/format";
 import type { ActivityEvent } from "@/services/fund.service";
-
-/* ── Event type → human-readable label + color ── */
-
-const EVENT_LABEL_MAP: Record<string, string> = {
-  LPA_UPLOADED: "LPA Uploaded",
-  SUBSCRIPTION_CREATED: "Subscription Created",
-  SETTLEMENT_CONFIRMED: "Settlement Verified",
-  TOKEN_MINTED: "Tokens Minted",
-  TRANSFER_REQUESTED: "Transfer Attempted",
-  TRANSFER_EXECUTED: "Transfer Executed",
-  CAPITAL_CALL_ISSUED: "Capital Call Issued",
-  DISTRIBUTION_COMPLETED: "Distribution Simulation Run",
-};
 
 type BadgeColor = "indigo" | "green" | "amber" | "red" | "blue" | "gray";
 
@@ -21,10 +9,23 @@ const EVENT_COLOR_MAP: Record<string, BadgeColor> = {
   SUBSCRIPTION_CREATED: "blue",
   SETTLEMENT_CONFIRMED: "green",
   TOKEN_MINTED: "green",
+  TOKEN_DEPLOYED: "green",
   TRANSFER_REQUESTED: "amber",
   TRANSFER_EXECUTED: "indigo",
+  TRANSFER_FAILED: "red",
   CAPITAL_CALL_ISSUED: "amber",
+  CAPITAL_CALL_STATUS_UPDATED: "blue",
+  CAPITAL_CALL_RESPONSE_RECORDED: "blue",
   DISTRIBUTION_COMPLETED: "blue",
+  NOTICE_GENERATED: "indigo",
+  NOTICE_SENT: "blue",
+  DOCUMENT_UPLOADED: "indigo",
+  DOCUMENT_ANCHORED: "green",
+  INVESTOR_CREATED: "blue",
+  INVESTOR_VERIFIED: "green",
+  ELIGIBILITY_GRANTED: "green",
+  ELIGIBILITY_REVOKED: "red",
+  WALLET_LINKED: "indigo",
 };
 
 const BADGE_STYLES: Record<BadgeColor, string> = {
@@ -111,7 +112,12 @@ function buildDescription(event: ActivityEvent): string {
     parts.push(payload.description);
   }
 
-  return parts.length > 0 ? parts.join(" - ") : event.aggregateType;
+  if (parts.length > 0) return parts.join(" - ");
+  // Fallback: convert SNAKE_CASE aggregateType to Title Case
+  return event.aggregateType
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
 }
 
 export function ActivityFeed({
@@ -145,7 +151,7 @@ export function ActivityFeed({
     <div>
       <ul className="divide-y divide-gray-100">
         {displayed.map((event) => {
-          const label = EVENT_LABEL_MAP[event.eventType] ?? event.eventType;
+          const label = formatEventType(event.eventType);
           const color = EVENT_COLOR_MAP[event.eventType] ?? "gray";
 
           return (

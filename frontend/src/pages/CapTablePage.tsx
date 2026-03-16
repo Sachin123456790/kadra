@@ -16,9 +16,10 @@ import { SectionCard } from "@/components/kadra/SectionCard";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { EmptyState } from "@/components/kadra/EmptyState";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { HashDisplay } from "@/components/kadra/HashDisplay";
 import { formatCompact } from "@/lib/format";
 
-const OWNERSHIP_COLORS = ['#1a1a1a', '#404040', '#666666', '#8c8c8c', '#b3b3b3', '#d9d9d9'] as const;
+const OWNERSHIP_COLORS = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#2563eb', '#c026d3'] as const;
 
 const fmtCurrency = (n: number) =>
   n === 0
@@ -51,19 +52,6 @@ function CopyButton({ text }: { readonly text: string }) {
     >
       {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
-  );
-}
-
-/* ── Truncated Hash with Copy ── */
-
-function TruncatedHash({ hash }: { readonly hash: string | null | undefined }) {
-  if (!hash || hash === "—") return <span className="text-gray-500">—</span>;
-  const truncated = hash.length > 12 ? `${hash.slice(0, 6)}...${hash.slice(-4)}` : hash;
-  return (
-    <span className="inline-flex items-center">
-      <span className="font-mono text-xs text-gray-600">{truncated}</span>
-      <CopyButton text={hash} />
-    </span>
   );
 }
 
@@ -161,7 +149,7 @@ function CapTableRowItem({
               <div>
                 <span className="text-gray-500 font-medium">Governing LPA Hash</span>
                 <div className="mt-0.5">
-                  <TruncatedHash hash={row.governingHashHex} />
+                  <HashDisplay value={row.governingHashHex} />
                 </div>
               </div>
             </div>
