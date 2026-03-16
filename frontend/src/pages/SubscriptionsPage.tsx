@@ -91,7 +91,7 @@ export default function SubscriptionsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [investorFilter, setInvestorFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(true);
   const fundId = DEFAULT_FUND_CODE;
 
   // ── Create subscription form state
