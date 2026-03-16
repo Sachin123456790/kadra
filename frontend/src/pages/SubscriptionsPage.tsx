@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+} from "recharts";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { SectionCard } from "@/components/kadra/SectionCard";
 import { StatusBadge } from "@/components/kadra/StatusBadge";
@@ -171,24 +174,26 @@ export default function SubscriptionsPage() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [subscriptions]);
 
-  const allocationStats = useMemo(() => {
-    if (!subscriptions || subscriptions.length === 0) return { top3Avg: 0, restAvg: 0 };
-    const sorted = [...subscriptions].sort((a, b) => b.allocationPct - a.allocationPct);
-    const top3 = sorted.slice(0, 3);
-    const rest = sorted.slice(3);
-    const top3Avg = top3.reduce((s, sub) => s + sub.allocationPct, 0) / top3.length;
-    const restAvg = rest.length > 0 ? rest.reduce((s, sub) => s + sub.allocationPct, 0) / rest.length : 0;
-    return { top3Avg: Math.round(top3Avg * 100) / 100, restAvg: Math.round(restAvg * 100) / 100 };
-  }, [subscriptions]);
-
-  const recentActivity = useMemo(() => {
+  // Cumulative committed capital over time for line chart
+  const commitmentTimeline = useMemo(() => {
     if (!subscriptions) return [];
-    const sorted = [...subscriptions].sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
-    });
-    return sorted.slice(0, 3);
+    const sorted = [...subscriptions]
+      .filter(s => s.createdAt)
+      .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+    let cumulative = 0;
+    const points: { date: string; committed: number }[] = [];
+    for (const sub of sorted) {
+      cumulative += Number(sub.committedAmount) || 0;
+      const date = new Date(sub.createdAt!).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      // Merge same-date entries (keep latest cumulative)
+      const existing = points.find(p => p.date === date);
+      if (existing) {
+        existing.committed = cumulative;
+      } else {
+        points.push({ date, committed: cumulative });
+      }
+    }
+    return points;
   }, [subscriptions]);
 
   // ── Unique investors for filter dropdown
@@ -304,11 +309,11 @@ export default function SubscriptionsPage() {
 
       {/* ── Collapsible analytics panel ────────────────────────── */}
       {showAnalytics && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6 animate-fade-in">
-          {/* Status Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 animate-fade-in">
+          {/* Status Breakdown — donut */}
           <SectionCard>
             <h3 className="text-sm font-medium text-muted-foreground mb-2 text-center">Status Breakdown</h3>
-            <ResponsiveContainer width="100%" height={120}>
+            <ResponsiveContainer width="100%" height={140}>
               <PieChart>
                 <Pie
                   data={statusChartData}
@@ -316,8 +321,8 @@ export default function SubscriptionsPage() {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  innerRadius={35}
-                  outerRadius={50}
+                  innerRadius={38}
+                  outerRadius={55}
                 >
                   {statusChartData.map(entry => (
                     <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#94a3b8"} />
@@ -326,7 +331,7 @@ export default function SubscriptionsPage() {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex items-center justify-center gap-4 mt-2">
+            <div className="flex items-center justify-center gap-4 mt-1">
               <div className="flex items-center gap-1.5">
                 <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#fbbf24" }} />
                 <span className="text-xs text-muted-foreground">Pending: {pendingCount}</span>
@@ -338,40 +343,45 @@ export default function SubscriptionsPage() {
             </div>
           </SectionCard>
 
-          {/* Committed Total */}
-          <SectionCard>
-            <h3 className="text-sm font-medium text-muted-foreground mb-1">Committed Total</h3>
-            <p className="text-3xl font-bold text-foreground">{fmt(totalCommitted)}</p>
-            <p className="text-sm text-muted-foreground mt-1">{subscriptions.length} subscriptions</p>
-          </SectionCard>
-
-          {/* Settlement Velocity */}
-          <SectionCard>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Settlement Velocity</h3>
-            <div className="w-full h-2.5 rounded-full bg-muted">
-              <div
-                className="h-2.5 rounded-full bg-emerald-500 transition-all"
-                style={{ width: `${settlementPct}%` }}
-              />
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              {settlementPct}% Complete (Target 90%)
-            </p>
-          </SectionCard>
-
-          {/* Average Allocation */}
-          <SectionCard>
-            <h3 className="text-sm font-medium text-muted-foreground mb-1">Average Allocation</h3>
-            <p className="text-sm text-foreground">Top 3 Investors Avg: <span className="font-semibold">{allocationStats.top3Avg}%</span></p>
-            <p className="text-sm text-foreground">Rest Avg: <span className="font-semibold">{allocationStats.restAvg}%</span></p>
-            <p className="text-xs text-muted-foreground mt-2">Recent Activity</p>
-            <div className="space-y-0.5 mt-1">
-              {recentActivity.map(sub => (
-                <p key={sub.subscriptionId} className="text-xs text-muted-foreground truncate">
-                  {sub.investorName || sub.investorId} &mdash; {fmt(Number(sub.committedAmount) || 0)}
-                </p>
-              ))}
-            </div>
+          {/* Cumulative Committed Capital — line chart */}
+          <SectionCard className="lg:col-span-2">
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Cumulative Committed Capital</h3>
+            {commitmentTimeline.length > 0 ? (
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={commitmentTimeline}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11 }}
+                    stroke="hsl(var(--muted-foreground))"
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    tickFormatter={(v: number) => `$${(v / 1_000_000).toFixed(1)}M`}
+                    tick={{ fontSize: 11 }}
+                    stroke="hsl(var(--muted-foreground))"
+                    tickLine={false}
+                    axisLine={false}
+                    width={55}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [fmt(value), "Committed"]}
+                    labelStyle={{ fontWeight: 600 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="committed"
+                    stroke="#4338ca"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#4338ca" }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground py-8 text-center">No timeline data available</p>
+            )}
           </SectionCard>
         </div>
       )}
