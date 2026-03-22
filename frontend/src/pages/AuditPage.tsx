@@ -35,7 +35,11 @@ import {
   CheckCircle,
   Circle,
   Loader2,
+  ScrollText,
+  FileSearch,
+  PackageCheck,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CopyButton } from "@/components/kadra/CopyButton";
 import { formatEventType } from "@/lib/format";
 
@@ -618,9 +622,34 @@ export default function AuditPage() {
         subtitle="Review the event log, verify document provenance, and generate compliance packages"
       />
 
-      <ExportSection fundId={fundId} />
-      <EventLogSection fundId={fundId} />
-      <DocumentProvenanceSection fundId={fundId} />
+      <Tabs defaultValue="event-log" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="event-log" className="flex items-center gap-2">
+            <ScrollText className="h-4 w-4" />
+            Event Log
+          </TabsTrigger>
+          <TabsTrigger value="provenance" className="flex items-center gap-2">
+            <FileSearch className="h-4 w-4" />
+            Document Provenance
+          </TabsTrigger>
+          <TabsTrigger value="export" className="flex items-center gap-2">
+            <PackageCheck className="h-4 w-4" />
+            Export
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="event-log">
+          <EventLogSection fundId={fundId} />
+        </TabsContent>
+
+        <TabsContent value="provenance">
+          <DocumentProvenanceSection fundId={fundId} />
+        </TabsContent>
+
+        <TabsContent value="export">
+          <ExportSection fundId={fundId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
