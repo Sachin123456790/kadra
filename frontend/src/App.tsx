@@ -26,6 +26,7 @@ import InvestorProfile from "./pages/InvestorProfile";
 import InvestorCapitalAccount from "./pages/InvestorCapitalAccount";
 import InvestorDocuments from "./pages/InvestorDocuments";
 import LandingPage from "./pages/LandingPage";
+import PrivacyAndControlPage from "./pages/PrivacyAndControlPage";
 import LoginPage from "./pages/LoginPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -53,6 +54,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={<LandingPage />} />
+            <Route path="/privacy" element={<PrivacyAndControlPage />} />
             <Route
               path="*"
               element={

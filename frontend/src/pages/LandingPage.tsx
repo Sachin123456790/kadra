@@ -2,13 +2,33 @@ import { Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
+  ArrowLeftRight,
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Coins,
   Database,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   FileText,
+  Landmark,
   Lock,
+  Mail,
+  Megaphone,
+  PieChart,
+  Receipt,
+  ShieldCheck,
+  Users,
   Check,
+  type LucideIcon,
 } from "lucide-react";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  ANGAINOR LANDING PAGE                                                     */
@@ -120,241 +140,191 @@ function Hero() {
 
 /* ── PROBLEM MOCKUP (central truth + 6 floating records) ──────────────── */
 
-const SOURCE_RECORDS = [
-  { label: "Admin system", sub: "Fund admin platform", x: 60, y: 120, anim: "ang-float-a" },
-  { label: "Counsel docs", sub: "LPA, side letters, amendments", x: 620, y: 120, anim: "ang-float-b" },
-  { label: "Spreadsheets", sub: "Cap tables and trackers", x: 40, y: 300, anim: "ang-float-c" },
-  { label: "Email approvals", sub: "Manual signoff chain", x: 640, y: 300, anim: "ang-float-d" },
-  { label: "Bank evidence", sub: "Wire confirmations and receipts", x: 60, y: 480, anim: "ang-float-b" },
-  { label: "LP materials", sub: "Notices, statements, reports", x: 620, y: 480, anim: "ang-float-a" },
+type SourceRecord = {
+  label: string;
+  sub: string;
+  icon: LucideIcon;
+  contributes: string; // which Temporary-truth tag this source feeds
+};
+
+const SOURCE_RECORDS: SourceRecord[] = [
+  { label: "Admin system", sub: "Fund admin platform", icon: Database, contributes: "ownership state" },
+  { label: "Counsel docs", sub: "LPA, side letters, amendments", icon: FileText, contributes: "transfer approvals" },
+  { label: "Spreadsheets", sub: "Cap tables and trackers", icon: FileSpreadsheet, contributes: "capital activity" },
+  { label: "Email approvals", sub: "Manual signoff chain", icon: Mail, contributes: "audit support" },
+  { label: "Bank evidence", sub: "Wire confirmations and receipts", icon: Receipt, contributes: "settlement status" },
+  { label: "LP materials", sub: "Notices, statements, reports", icon: Megaphone, contributes: "reporting inputs" },
+];
+
+const PROBLEM_TAGS = [
+  "ownership state",
+  "capital activity",
+  "transfer approvals",
+  "reporting inputs",
+  "settlement status",
+  "audit support",
 ];
 
 function ProblemMockup() {
+  const [api, setApi] = useState<CarouselApi>();
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (!api) return;
+    const onSelect = () => setActive(api.selectedScrollSnap());
+    onSelect();
+    api.on("select", onSelect);
+    return () => {
+      api.off("select", onSelect);
+    };
+  }, [api]);
+
+  useEffect(() => {
+    if (!api || paused) return;
+    const id = window.setInterval(() => {
+      api.scrollNext();
+    }, 3500);
+    return () => window.clearInterval(id);
+  }, [api, paused]);
+
+  const activeContributes = SOURCE_RECORDS[active]?.contributes;
+
   return (
-    <div className="relative mx-auto w-full max-w-5xl rounded-2xl border border-white/10 bg-black/40 overflow-hidden">
-      {/* Top meta */}
-      <div className="relative flex items-center justify-between px-5 pt-4 text-[10px] tracking-[0.18em] uppercase text-white/40">
-        <span>Visual intent</span>
-        <span className="hidden sm:inline">Current operating reality</span>
-      </div>
-      {/* SVG diagram */}
-      <div className="relative">
-        <svg
-          viewBox="0 0 900 640"
-          className="w-full h-auto ang-animated"
-          role="img"
-          aria-label="Six disconnected source systems are reconstructed into a temporary fund truth"
-        >
-          <defs>
-            <linearGradient id="ang-connector" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.1" />
-              <stop offset="50%" stopColor="#ffffff" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.1" />
-            </linearGradient>
-          </defs>
-          {/* Connector lines — curving toward center */}
-          {SOURCE_RECORDS.map((r, i) => {
-            const cx = 450;
-            const cy = 320;
-            const startX = r.x + 130;
-            const startY = r.y + 45;
-            const midX = (startX + cx) / 2;
-            const midY = (startY + cy) / 2 + (i % 2 === 0 ? -20 : 20);
-            return (
-              <path
-                key={i}
-                d={`M ${startX} ${startY} Q ${midX} ${midY} ${cx} ${cy}`}
-                fill="none"
-                stroke="url(#ang-connector)"
-                strokeWidth="1"
-                strokeDasharray="4 4"
-                style={{
-                  animation: `ang-dash 6s linear infinite`,
-                  animationDelay: `${i * 0.3}s`,
-                }}
-              />
-            );
-          })}
-          {/* Source record cards */}
-          {SOURCE_RECORDS.map((r, i) => (
-            <g
-              key={`card-${i}`}
-              style={{
-                animation: `${r.anim} ${7 + (i % 3)}s ease-in-out infinite`,
-                animationDelay: `${i * 0.2}s`,
-                transformOrigin: `${r.x + 130}px ${r.y + 40}px`,
-              }}
-            >
-              <rect
-                x={r.x}
-                y={r.y}
-                width={260}
-                height={80}
-                rx={10}
-                fill="#0a0a0a"
-                stroke="rgba(255,255,255,0.14)"
-                strokeWidth="1"
-              />
-              <circle cx={r.x + 18} cy={r.y + 22} r={3} fill="#ffffff" />
-              <text
-                x={r.x + 30}
-                y={r.y + 26}
-                fill="rgba(255,255,255,0.45)"
-                fontSize="9"
-                fontFamily="Inter, system-ui, sans-serif"
-                letterSpacing="1.8"
-              >
-                SOURCE RECORD
-              </text>
-              <text
-                x={r.x + 18}
-                y={r.y + 48}
-                fill="#ffffff"
-                fontSize="16"
-                fontWeight="600"
-                fontFamily="Inter, system-ui, sans-serif"
-              >
-                {r.label}
-              </text>
-              <text
-                x={r.x + 18}
-                y={r.y + 66}
-                fill="rgba(255,255,255,0.55)"
-                fontSize="12"
-                fontFamily="Inter, system-ui, sans-serif"
-              >
-                {r.sub}
-              </text>
-            </g>
-          ))}
-          {/* Coordination labels */}
-          <rect x={295} y={175} width={310} height={26} rx={13} fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" />
-          <text
-            x={450}
-            y={192}
-            textAnchor="middle"
-            fill="rgba(255,255,255,0.6)"
-            fontSize="11"
-            fontFamily="Inter, system-ui, sans-serif"
+    <div
+      className="relative mx-auto w-full max-w-6xl rounded-2xl border border-white/10 bg-black/40 overflow-hidden"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+    >
+      <div className="grid md:grid-cols-12 gap-0 items-stretch">
+        {/* ── Left: carousel of source records ──────────────────────── */}
+        <div className="md:col-span-7 relative border-b md:border-b-0 md:border-r border-white/10">
+          <div className="flex items-center gap-2 px-6 md:px-10 pt-8 md:pt-10 pb-4 text-[10px] tracking-[0.22em] uppercase text-white/40">
+            <span>Source systems</span>
+            <span className="h-px flex-1 bg-white/10" />
+            <span className="font-mono tabular-nums text-white/50">
+              {String(active + 1).padStart(2, "0")} / {String(SOURCE_RECORDS.length).padStart(2, "0")}
+            </span>
+          </div>
+          <Carousel
+            setApi={setApi}
+            opts={{ loop: true, align: "start" }}
+            className="w-full"
           >
-            Cross-system handoffs and parallel updates
-          </text>
-          <rect x={355} y={450} width={190} height={26} rx={13} fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)" />
-          <text
-            x={450}
-            y={467}
-            textAnchor="middle"
-            fill="rgba(255,255,255,0.6)"
-            fontSize="11"
-            fontFamily="Inter, system-ui, sans-serif"
-          >
-            Manual reconciliation layer
-          </text>
-          {/* Central "Temporary truth" card */}
-          <g>
-            <rect
-              x={325}
-              y={220}
-              width={250}
-              height={210}
-              rx={12}
-              fill="#000000"
-              stroke="rgba(255,255,255,0.28)"
-              strokeWidth="1"
-            />
-            <text
-              x={345}
-              y={246}
-              fill="rgba(255,255,255,0.45)"
-              fontSize="9"
-              letterSpacing="1.8"
-              fontFamily="Inter, system-ui, sans-serif"
-            >
-              CURRENT OPERATING
-            </text>
-            <text
-              x={345}
-              y={258}
-              fill="rgba(255,255,255,0.45)"
-              fontSize="9"
-              letterSpacing="1.8"
-              fontFamily="Inter, system-ui, sans-serif"
-            >
-              REALITY
-            </text>
-            {/* "Reconstructed" — de-pilled: small-caps text, no pill background */}
-            <text
-              x={555}
-              y={250}
-              textAnchor="end"
-              fill="rgba(255,255,255,0.55)"
-              fontSize="9"
-              letterSpacing="1.8"
-              fontFamily="Inter, system-ui, sans-serif"
-            >
-              RECONSTRUCTED
-            </text>
-            <text
-              x={345}
-              y={290}
-              fill="#ffffff"
-              fontSize="20"
-              fontWeight="500"
-              fontFamily="Fraunces, serif"
-            >
-              Temporary truth
-            </text>
-            <text x={345} y={312} fill="rgba(255,255,255,0.55)" fontSize="10.5" fontFamily="Inter, system-ui, sans-serif">
-              <tspan x={345} dy="0">The fund state is assembled on demand</tspan>
-              <tspan x={345} dy="13">from partial records rather than maintained</tspan>
-              <tspan x={345} dy="13">natively in one governed system.</tspan>
-            </text>
-            {/* Inner tag grid */}
-            {[
-              ["ownership state", "capital activity"],
-              ["transfer approvals", "reporting inputs"],
-              ["settlement status", "audit support"],
-            ].map((row, ri) =>
-              row.map((t, ci) => (
-                <g key={`tag-${ri}-${ci}`}>
-                  <rect
-                    x={345 + ci * 100}
-                    y={358 + ri * 22}
-                    width={92}
-                    height={18}
-                    rx={4}
-                    fill="rgba(255,255,255,0.04)"
-                    stroke="rgba(255,255,255,0.12)"
-                  />
-                  <text
-                    x={345 + ci * 100 + 46}
-                    y={371 + ri * 22}
-                    textAnchor="middle"
-                    fill="rgba(255,255,255,0.75)"
-                    fontSize="9.5"
-                    fontFamily="Inter, system-ui, sans-serif"
+            <CarouselContent className="-ml-0">
+              {SOURCE_RECORDS.map((r) => {
+                const Icon = r.icon;
+                return (
+                  <CarouselItem key={r.label} className="pl-0">
+                    <div className="relative px-6 md:px-10 pb-10 md:pb-12 min-h-[320px] md:min-h-[360px] flex flex-col justify-between">
+                      {/* Visual */}
+                      <div className="mt-2 mb-8 flex items-center justify-center">
+                        <div className="relative flex items-center justify-center h-32 md:h-36 w-32 md:w-36 rounded-2xl border border-white/10 bg-white/[0.02]">
+                          <Icon className="h-10 w-10 text-white/75" aria-hidden />
+                          <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black px-2 py-0.5 text-[9px] tracking-[0.2em] uppercase text-white/60">
+                            <span className="h-1 w-1 rounded-full bg-white/70" />
+                            Record
+                          </span>
+                        </div>
+                      </div>
+                      {/* Copy */}
+                      <div>
+                        <h4 className="font-serif font-normal text-3xl md:text-[2.5rem] leading-[1.05] text-white tracking-[-0.015em]">
+                          {r.label}
+                        </h4>
+                        <p className="mt-3 text-sm md:text-base text-white/55 max-w-md">
+                          {r.sub}
+                        </p>
+                        <div className="mt-6 flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-white/45">
+                          <span>Feeds</span>
+                          <span className="h-px w-5 bg-white/20" />
+                          <span className="text-white/80">{r.contributes}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CarouselItem>
+                );
+              })}
+            </CarouselContent>
+          </Carousel>
+          {/* Controls */}
+          <div className="flex items-center justify-between gap-4 px-6 md:px-10 pb-6">
+            <div className="flex items-center gap-1.5">
+              {SOURCE_RECORDS.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => api?.scrollTo(i)}
+                  aria-label={`Go to source ${i + 1}`}
+                  className={`h-1 rounded-full transition-all ${
+                    i === active ? "w-8 bg-white/85" : "w-3 bg-white/20 hover:bg-white/40"
+                  }`}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => api?.scrollPrev()}
+                aria-label="Previous source"
+                className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/35 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => api?.scrollNext()}
+                aria-label="Next source"
+                className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/35 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Right: static Temporary truth panel ───────────────────── */}
+        <div className="md:col-span-5 relative px-6 md:px-10 py-8 md:py-10 bg-gradient-to-br from-white/[0.03] to-transparent">
+          <div className="flex items-center gap-2 text-[10px] tracking-[0.22em] uppercase text-white/45 mb-5">
+            <span>Current operating reality</span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+          <h4 className="font-serif font-normal text-3xl md:text-[2.25rem] text-white leading-[1.05] tracking-[-0.015em]">
+            Temporary truth
+          </h4>
+          <p className="mt-4 text-sm text-white/55 leading-relaxed max-w-sm">
+            Fund state is reconstructed on demand from partial records — not maintained natively in one governed system.
+          </p>
+          <div className="mt-7">
+            <p className="text-[10px] tracking-[0.2em] uppercase text-white/35 mb-3">
+              What gets reconstructed
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {PROBLEM_TAGS.map((t) => {
+                const isActive = t === activeContributes;
+                return (
+                  <div
+                    key={t}
+                    aria-current={isActive ? "true" : undefined}
+                    className={`rounded-md border px-3 py-2 text-[12px] transition-colors duration-500 ${
+                      isActive
+                        ? "border-white/35 bg-white/[0.08] text-white"
+                        : "border-white/10 bg-white/[0.02] text-white/55"
+                    }`}
                   >
                     {t}
-                  </text>
-                </g>
-              ))
-            )}
-          </g>
-        </svg>
-      </div>
-      {/* Legend */}
-      <div className="relative flex flex-wrap items-center justify-between gap-3 px-5 pb-4 text-[10px] tracking-[0.14em] uppercase text-white/35">
-        <span>Visual intent</span>
-        <div className="flex items-center gap-4">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-px w-5 bg-white/50" /> Primary dependency
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-px w-5 border-t border-dashed border-white/40" /> Lateral handoff
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-white" /> Record source
-          </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="mt-7 inline-flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-white/40">
+            <span className="h-px w-6 bg-white/20" />
+            <span>Manual reconciliation</span>
+            <span className="h-px w-6 bg-white/20" />
+          </div>
         </div>
       </div>
     </div>
@@ -487,16 +457,155 @@ function WhatAngainorDoes() {
 
 /* ── WORKFLOW COVERAGE (Harvey-style cycling — single vertical list) ────── */
 
-const WORKFLOWS = [
-  "Fund formation and governing documents",
-  "Investor onboarding and subscriptions",
-  "Capital calls and settlement validation",
-  "Cap table and ownership maintenance",
-  "Transfers",
-  "Distributions and waterfall support",
-  "Reporting",
-  "Audit and exports",
+type Workflow = {
+  label: string;
+  caption: string;
+  icon: LucideIcon;
+  visual: "document" | "roster" | "wire" | "captable" | "transfer" | "waterfall" | "report" | "audit";
+};
+
+const WORKFLOWS: Workflow[] = [
+  { label: "Fund formation", caption: "Governing documents anchored on-chain.", icon: FileText, visual: "document" },
+  { label: "Onboarding", caption: "Identities verified, subscriptions recorded.", icon: Users, visual: "roster" },
+  { label: "Settlement", caption: "Capital calls matched to bank wires.", icon: Landmark, visual: "wire" },
+  { label: "Cap table", caption: "Ownership state, maintained natively.", icon: PieChart, visual: "captable" },
+  { label: "Transfers", caption: "Eligibility rules enforced deterministically.", icon: ArrowLeftRight, visual: "transfer" },
+  { label: "Distributions", caption: "Waterfall bound to the same record.", icon: Coins, visual: "waterfall" },
+  { label: "Reporting", caption: "LP-facing packages from a single source.", icon: BarChart3, visual: "report" },
+  { label: "Audit", caption: "Every field traces to a hash.", icon: ShieldCheck, visual: "audit" },
 ];
+
+function WorkflowVisual({ kind }: { kind: Workflow["visual"] }) {
+  const base = "w-full h-full text-white/70";
+  switch (kind) {
+    case "document":
+      return (
+        <svg viewBox="0 0 200 140" className={base} fill="none">
+          <rect x="46" y="14" width="108" height="112" rx="6" stroke="currentColor" strokeOpacity="0.35" />
+          <rect x="58" y="30" width="60" height="4" rx="2" fill="currentColor" fillOpacity="0.6" />
+          <rect x="58" y="44" width="84" height="2" rx="1" fill="currentColor" fillOpacity="0.3" />
+          <rect x="58" y="54" width="78" height="2" rx="1" fill="currentColor" fillOpacity="0.3" />
+          <rect x="58" y="64" width="72" height="2" rx="1" fill="currentColor" fillOpacity="0.3" />
+          <rect x="58" y="94" width="84" height="16" rx="3" stroke="currentColor" strokeOpacity="0.35" />
+          <text x="66" y="104" fontSize="7" fill="currentColor" fillOpacity="0.6" fontFamily="JetBrains Mono, monospace">0x8F3A…91C2</text>
+        </svg>
+      );
+    case "roster":
+      return (
+        <svg viewBox="0 0 200 140" className={base} fill="none">
+          {[0, 1, 2, 3].map((i) => (
+            <g key={i} transform={`translate(30 ${18 + i * 26})`}>
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeOpacity="0.4" />
+              <rect x="22" y="4" width="60" height="3" rx="1.5" fill="currentColor" fillOpacity="0.55" />
+              <rect x="22" y="11" width="38" height="2" rx="1" fill="currentColor" fillOpacity="0.25" />
+              <rect x="122" y="2" width="36" height="12" rx="6" stroke="currentColor" strokeOpacity="0.4" />
+              <text x="140" y="10" textAnchor="middle" fontSize="6" fill="currentColor" fillOpacity="0.7" fontFamily="Inter, sans-serif" letterSpacing="0.5">VERIFIED</text>
+            </g>
+          ))}
+        </svg>
+      );
+    case "wire":
+      return (
+        <svg viewBox="0 0 200 140" className={base} fill="none">
+          <rect x="14" y="36" width="72" height="68" rx="4" stroke="currentColor" strokeOpacity="0.35" />
+          <text x="24" y="50" fontSize="7" fill="currentColor" fillOpacity="0.5" fontFamily="Inter, sans-serif" letterSpacing="1">WIRE</text>
+          <rect x="24" y="58" width="52" height="3" rx="1.5" fill="currentColor" fillOpacity="0.55" />
+          <rect x="24" y="66" width="40" height="2" rx="1" fill="currentColor" fillOpacity="0.3" />
+          <rect x="114" y="36" width="72" height="68" rx="4" stroke="currentColor" strokeOpacity="0.35" />
+          <text x="124" y="50" fontSize="7" fill="currentColor" fillOpacity="0.5" fontFamily="Inter, sans-serif" letterSpacing="1">SUBSCRIPTION</text>
+          <rect x="124" y="58" width="52" height="3" rx="1.5" fill="currentColor" fillOpacity="0.55" />
+          <rect x="124" y="66" width="40" height="2" rx="1" fill="currentColor" fillOpacity="0.3" />
+          <path d="M 86 70 L 114 70" stroke="currentColor" strokeOpacity="0.55" strokeDasharray="3 3" />
+          <circle cx="100" cy="70" r="8" fill="#000" stroke="currentColor" strokeOpacity="0.6" />
+          <path d="M 96 70 l 3 3 l 5 -5" stroke="currentColor" strokeOpacity="0.85" strokeWidth="1.2" fill="none" />
+        </svg>
+      );
+    case "captable":
+      return (
+        <svg viewBox="0 0 200 140" className={base} fill="none">
+          {[
+            { y: 24, w: 118 },
+            { y: 42, w: 96 },
+            { y: 60, w: 82 },
+            { y: 78, w: 68 },
+            { y: 96, w: 54 },
+          ].map((r, i) => (
+            <g key={i}>
+              <rect x="30" y={r.y} width="14" height="10" rx="1.5" fill="currentColor" fillOpacity="0.5" />
+              <rect x="50" y={r.y} width={r.w} height="10" rx="1.5" stroke="currentColor" strokeOpacity="0.35" />
+              <rect x="50" y={r.y} width={r.w * 0.7} height="10" rx="1.5" fill="currentColor" fillOpacity="0.2" />
+            </g>
+          ))}
+        </svg>
+      );
+    case "transfer":
+      return (
+        <svg viewBox="0 0 200 140" className={base} fill="none">
+          <circle cx="42" cy="70" r="22" stroke="currentColor" strokeOpacity="0.4" />
+          <text x="42" y="67" textAnchor="middle" fontSize="7" fill="currentColor" fillOpacity="0.5" fontFamily="Inter, sans-serif" letterSpacing="1">LP · A</text>
+          <text x="42" y="77" textAnchor="middle" fontSize="6" fill="currentColor" fillOpacity="0.35" fontFamily="JetBrains Mono, monospace">0x42…C1</text>
+          <circle cx="158" cy="70" r="22" stroke="currentColor" strokeOpacity="0.4" />
+          <text x="158" y="67" textAnchor="middle" fontSize="7" fill="currentColor" fillOpacity="0.5" fontFamily="Inter, sans-serif" letterSpacing="1">LP · B</text>
+          <text x="158" y="77" textAnchor="middle" fontSize="6" fill="currentColor" fillOpacity="0.35" fontFamily="JetBrains Mono, monospace">0x91…F8</text>
+          <path d="M 66 64 L 134 64" stroke="currentColor" strokeOpacity="0.6" />
+          <path d="M 130 60 L 134 64 L 130 68" stroke="currentColor" strokeOpacity="0.85" fill="none" />
+          <path d="M 134 78 L 66 78" stroke="currentColor" strokeOpacity="0.3" strokeDasharray="2 3" />
+          <rect x="80" y="100" width="40" height="14" rx="7" stroke="currentColor" strokeOpacity="0.4" />
+          <text x="100" y="109" textAnchor="middle" fontSize="7" fill="currentColor" fillOpacity="0.7" fontFamily="Inter, sans-serif" letterSpacing="1">ELIGIBLE</text>
+        </svg>
+      );
+    case "waterfall":
+      return (
+        <svg viewBox="0 0 200 140" className={base} fill="none">
+          {[
+            { y: 20, label: "PREFERRED" },
+            { y: 44, label: "RETURN OF CAPITAL" },
+            { y: 68, label: "CATCH-UP" },
+            { y: 92, label: "PROMOTE" },
+          ].map((t, i) => (
+            <g key={i}>
+              <rect x="30" y={t.y} width="140" height="16" rx="3" stroke="currentColor" strokeOpacity="0.35" />
+              <rect x="30" y={t.y} width={140 - i * 30} height="16" rx="3" fill="currentColor" fillOpacity={0.22 - i * 0.04} />
+              <text x="38" y={t.y + 11} fontSize="7" fill="currentColor" fillOpacity="0.7" fontFamily="Inter, sans-serif" letterSpacing="1">{t.label}</text>
+            </g>
+          ))}
+        </svg>
+      );
+    case "report":
+      return (
+        <svg viewBox="0 0 200 140" className={base} fill="none">
+          <polyline points="24,104 52,82 78,90 104,58 134,66 164,36" stroke="currentColor" strokeOpacity="0.6" fill="none" />
+          {[
+            [24, 104], [52, 82], [78, 90], [104, 58], [134, 66], [164, 36],
+          ].map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r="2.5" fill="currentColor" fillOpacity="0.85" />
+          ))}
+          <line x1="24" y1="114" x2="176" y2="114" stroke="currentColor" strokeOpacity="0.25" />
+          {["Q1", "Q2", "Q3", "Q4"].map((q, i) => (
+            <text key={q} x={30 + i * 45} y="126" fontSize="7" fill="currentColor" fillOpacity="0.45" fontFamily="Inter, sans-serif" letterSpacing="1">{q}</text>
+          ))}
+        </svg>
+      );
+    case "audit":
+      return (
+        <svg viewBox="0 0 200 140" className={base} fill="none">
+          <rect x="16" y="28" width="52" height="20" rx="3" stroke="currentColor" strokeOpacity="0.35" />
+          <text x="42" y="41" textAnchor="middle" fontSize="7" fill="currentColor" fillOpacity="0.75" fontFamily="Inter, sans-serif" letterSpacing="1">EXPORT</text>
+          <rect x="74" y="28" width="52" height="20" rx="3" stroke="currentColor" strokeOpacity="0.35" />
+          <text x="100" y="41" textAnchor="middle" fontSize="7" fill="currentColor" fillOpacity="0.75" fontFamily="Inter, sans-serif" letterSpacing="1">LEDGER</text>
+          <rect x="132" y="28" width="52" height="20" rx="3" stroke="currentColor" strokeOpacity="0.35" />
+          <text x="158" y="41" textAnchor="middle" fontSize="7" fill="currentColor" fillOpacity="0.75" fontFamily="Inter, sans-serif" letterSpacing="1">SOURCE</text>
+          <path d="M 68 38 L 74 38" stroke="currentColor" strokeOpacity="0.6" />
+          <path d="M 126 38 L 132 38" stroke="currentColor" strokeOpacity="0.6" />
+          <rect x="50" y="70" width="100" height="18" rx="3" stroke="currentColor" strokeOpacity="0.4" />
+          <text x="100" y="82" textAnchor="middle" fontSize="7" fill="currentColor" fillOpacity="0.7" fontFamily="JetBrains Mono, monospace" letterSpacing="1">HASH VERIFIED</text>
+          <path d="M 100 48 L 100 70" stroke="currentColor" strokeOpacity="0.35" strokeDasharray="2 3" />
+          <circle cx="100" cy="108" r="8" stroke="currentColor" strokeOpacity="0.6" />
+          <path d="M 96 108 l 3 3 l 5 -5" stroke="currentColor" strokeOpacity="0.85" strokeWidth="1.2" fill="none" />
+        </svg>
+      );
+  }
+}
 
 function WorkflowCoverage() {
   const [active, setActive] = useState(0);
@@ -507,7 +616,7 @@ function WorkflowCoverage() {
       if (!pausedRef.current) {
         setActive((a) => (a + 1) % WORKFLOWS.length);
       }
-    }, 2800);
+    }, 3200);
     return () => window.clearInterval(id);
   }, []);
 
@@ -518,53 +627,108 @@ function WorkflowCoverage() {
     pausedRef.current = false;
   };
 
+  const current = WORKFLOWS[active];
+
   return (
-    <section className="relative py-24 md:py-32">
+    <section className="relative py-28 md:py-40">
       <div className="mx-auto max-w-7xl px-6 md:px-10">
-        <div className="flex items-baseline gap-4 mb-8">
-          <span className="font-mono text-5xl md:text-6xl text-white/25 tracking-[-0.02em] leading-none">
+        <div className="flex items-baseline gap-5 mb-20 md:mb-24">
+          <span className="font-mono text-5xl md:text-6xl text-white/20 tracking-[-0.02em] leading-none">
             08
           </span>
           <h3 className="font-serif font-light text-4xl md:text-5xl leading-[1.1] text-white tracking-[-0.015em]">
             One operating layer across the fund lifecycle.
           </h3>
         </div>
-        <ul
-          className="mt-8 space-y-2 md:space-y-3"
+        <div
+          className="grid md:grid-cols-12 gap-10 md:gap-16 items-stretch"
           onMouseEnter={pause}
           onMouseLeave={resume}
           onFocus={pause}
           onBlur={resume}
-          aria-live="polite"
         >
-          {WORKFLOWS.map((w, i) => {
-            const isActive = i === active;
-            return (
-              <li key={w}>
-                <button
-                  type="button"
-                  onClick={() => setActive(i)}
-                  className="w-full text-left flex items-baseline gap-5 py-2 focus:outline-none focus:ring-1 focus:ring-white/30 rounded-md"
-                >
-                  <span
-                    className={`font-mono text-xs tabular-nums transition-colors ${
-                      isActive ? "text-white/70" : "text-white/20"
+          {/* Left: visual panel */}
+          <div className="md:col-span-7 order-2 md:order-1 flex">
+            <div
+              className="relative w-full min-h-[360px] md:min-h-[480px] flex-1 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent overflow-hidden"
+              aria-live="polite"
+            >
+              {/* Stacked visuals — only active is visible */}
+              <div className="absolute inset-0 flex items-center justify-center p-10 md:p-16">
+                <div className="relative w-full h-full">
+                  {WORKFLOWS.map((w, i) => (
+                    <div
+                      key={w.label}
+                      className="absolute inset-0 transition-opacity duration-700 ease-out"
+                      style={{
+                        opacity: i === active ? 1 : 0,
+                        pointerEvents: i === active ? "auto" : "none",
+                      }}
+                      aria-hidden={i !== active}
+                    >
+                      <WorkflowVisual kind={w.visual} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Caption */}
+              <div className="absolute left-8 md:left-12 bottom-8 md:bottom-10 right-8 md:right-12">
+                <div className="flex items-center gap-3 text-[10px] tracking-[0.22em] uppercase text-white/40 mb-3">
+                  <span className="font-mono tabular-nums">{String(active + 1).padStart(2, "0")} / 08</span>
+                  <span className="h-px flex-1 bg-white/10" />
+                </div>
+                <p className="font-serif font-light text-2xl md:text-3xl text-white leading-[1.2] tracking-[-0.01em]">
+                  {current.caption}
+                </p>
+              </div>
+            </div>
+          </div>
+          {/* Right: short-label cards */}
+          <div className="md:col-span-5 order-1 md:order-2">
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
+              {WORKFLOWS.map((w, i) => {
+                const Icon = w.icon;
+                const isActive = i === active;
+                return (
+                  <button
+                    key={w.label}
+                    type="button"
+                    onClick={() => setActive(i)}
+                    aria-pressed={isActive}
+                    className={`group text-left rounded-xl border p-5 md:p-6 min-h-[110px] md:min-h-[120px] flex flex-col justify-between transition-all duration-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${
+                      isActive
+                        ? "border-white/30 bg-white/[0.05]"
+                        : "border-white/10 bg-white/[0.015] hover:border-white/20"
                     }`}
                   >
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span
-                    className={`font-serif font-light text-2xl md:text-4xl leading-[1.15] tracking-[-0.015em] transition-colors duration-500 ${
-                      isActive ? "text-white" : "text-white/25"
-                    }`}
-                  >
-                    {w}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                    <div className="flex items-center justify-between">
+                      <Icon
+                        className={`h-[18px] w-[18px] transition-colors ${
+                          isActive ? "text-white/85" : "text-white/35 group-hover:text-white/55"
+                        }`}
+                        aria-hidden
+                      />
+                      <span
+                        className={`font-mono text-[10px] tabular-nums tracking-wide transition-colors ${
+                          isActive ? "text-white/55" : "text-white/20"
+                        }`}
+                      >
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <span
+                      className={`text-[15px] md:text-base font-medium tracking-[-0.005em] transition-colors ${
+                        isActive ? "text-white" : "text-white/60 group-hover:text-white/80"
+                      }`}
+                    >
+                      {w.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -615,7 +779,7 @@ function AuditCompliance() {
         {/* 3-step horizontal path */}
         <div className="mt-16">
           <div className="relative rounded-2xl border border-white/10 bg-black/40 p-6 md:p-10 overflow-hidden">
-            <div className="relative grid md:grid-cols-3 gap-4 md:gap-0">
+            <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-4 md:gap-0 items-stretch">
               {/* Card 1 — Export Field */}
               <StepCard
                 index={0}
@@ -629,8 +793,7 @@ function AuditCompliance() {
                   { k: "As of", v: "2026-05-21" },
                 ]}
               />
-              {/* Connector */}
-              <Connector side="left" highlight={hover !== null} />
+              <StepConnector highlight={hover !== null} />
               {/* Card 2 — Ledger record */}
               <StepCard
                 index={1}
@@ -645,6 +808,7 @@ function AuditCompliance() {
                   { k: "Ref", v: "evt_7f21-amd", mono: true },
                 ]}
               />
+              <StepConnector highlight={hover !== null} />
               {/* Card 3 — Source doc */}
               <StepCard
                 index={2}
@@ -657,7 +821,6 @@ function AuditCompliance() {
                   { k: "Executed", v: "2026-05-20" },
                   { k: "Hash match", v: "verified" },
                 ]}
-                showArrow
               />
             </div>
             <div className="relative mt-6 text-[10px] tracking-[0.2em] uppercase text-white/35">
@@ -678,7 +841,6 @@ function StepCard({
   title,
   value,
   rows,
-  showArrow,
 }: {
   index: 0 | 1 | 2;
   active: 0 | 1 | 2 | null;
@@ -687,7 +849,6 @@ function StepCard({
   title: string;
   value: string;
   rows: { k: string; v: string; mono?: boolean; pulse?: boolean }[];
-  showArrow?: boolean;
 }) {
   const isActive = active === index;
   const icon = index === 0 ? <FileText className="h-3.5 w-3.5" /> : index === 1 ? <Database className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />;
@@ -730,40 +891,26 @@ function StepCard({
           </div>
         ))}
       </dl>
-      {showArrow && (
-        <div
-          className={`mt-4 inline-flex items-center gap-1.5 text-[11px] text-white/60 transition-opacity ${
-            isActive ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          View source
-          <ArrowRight className="h-3 w-3" />
-        </div>
-      )}
     </div>
   );
 }
 
-function Connector({ side, highlight }: { side: "left" | "right"; highlight: boolean }) {
-  // Visible only on desktop — absolutely positioned flourish
+function StepConnector({ highlight }: { highlight: boolean }) {
   return (
     <div
       aria-hidden
-      className={`hidden md:flex absolute top-1/2 -translate-y-1/2 items-center ${
-        side === "left" ? "left-1/3" : "right-1/3"
-      }`}
-      style={{ left: side === "left" ? "33.333%" : undefined, right: side === "right" ? "33.333%" : undefined }}
+      className="hidden md:flex items-center justify-center w-16 lg:w-20 self-center"
     >
-      <svg width="60" height="24" viewBox="0 0 60 24" fill="none">
+      <svg width="64" height="24" viewBox="0 0 64 24" fill="none" className="w-full">
         <path
-          d="M 0 12 L 54 12"
+          d="M 0 12 L 58 12"
           stroke={highlight ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.2)"}
           strokeWidth="1"
           strokeDasharray="4 4"
           style={{ animation: highlight ? "ang-dash 1.5s linear infinite" : "none" }}
         />
         <path
-          d={`M 52 6 L 58 12 L 52 18`}
+          d="M 56 6 L 62 12 L 56 18"
           stroke={highlight ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.3)"}
           strokeWidth="1"
           fill="none"
@@ -778,104 +925,24 @@ function Connector({ side, highlight }: { side: "left" | "right"; highlight: boo
 function PrivacyAndControl() {
   return (
     <section className="relative py-24 md:py-32 border-t border-white/10">
-      <div className="mx-auto max-w-7xl px-6 md:px-10">
-        <div className="grid md:grid-cols-12 gap-10 md:gap-12 items-start">
-          <div className="md:col-span-5 md:sticky md:top-24">
-            <p className="text-xs tracking-[0.22em] uppercase text-white/45 mb-4">
-              Privacy and control
-            </p>
-            <h3 className="font-serif font-light text-4xl md:text-5xl leading-[1.05] text-white tracking-[-0.02em]">
-              Selective visibility, <br /> not broad disclosure.
-            </h3>
-            <p className="mt-6 text-white/65 text-[15px] leading-relaxed">
-              Angainor is designed so the full fund record is not broadcast everywhere. Raw source
-              documents remain in controlled storage. What gets anchored is the hash, timestamp,
-              document reference, state transition, and ownership event needed for integrity and
-              provenance, not the full confidential file body.
-            </p>
-            <div className="mt-8 space-y-3">
-              {[
-                {
-                  t: "Role-based visibility",
-                  d: "GPs and administrators can access the operational record they need. LPs see only their own position, notices, documents, and capital-account context.",
-                },
-                {
-                  t: "Controlled document handling",
-                  d: "Full confidential source files remain in controlled storage rather than being exposed as open ledger content.",
-                },
-                {
-                  t: "Auditability without unnecessary exposure",
-                  d: "Traceability is preserved while disclosure stays tightly limited to what each role actually needs.",
-                },
-              ].map((p) => (
-                <div key={p.t} className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25">
-                      <Check className="h-2.5 w-2.5 text-white" />
-                    </span>
-                    <div>
-                      <h4 className="text-white text-sm font-medium">{p.t}</h4>
-                      <p className="text-white/55 text-sm mt-1 leading-relaxed">{p.d}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          {/* Right: 3 panels aligned to the 3 left-rail principles */}
-          <div className="md:col-span-7 space-y-4">
-            {/* Panel 1 — Role-based visibility: blurred Other participants */}
-            <MockPanel label="View" icon={<EyeOff className="h-3.5 w-3.5" />} title="Other participants" subtitle="No unnecessary disclosure of another LP's full records." dense>
-              <div className="relative p-3">
-                <div className="grid grid-cols-2 gap-2 blur-[3px] opacity-60 select-none pointer-events-none">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="h-8 rounded border border-white/10 bg-white/[0.02]" />
-                  ))}
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[10px] tracking-[0.22em] uppercase text-white/55 bg-black/60 border border-white/10 rounded-full px-3 py-1">
-                    Access denied outside role scope
-                  </span>
-                </div>
-              </div>
-            </MockPanel>
-
-            {/* Panel 2 — Controlled document handling */}
-            <MockPanel label="View" icon={<Lock className="h-3.5 w-3.5" />} title="Controlled storage" subtitle="Source files remain in managed document storage.">
-              <ul className="divide-y divide-white/8">
-                {[
-                  "Executed LPA.pdf",
-                  "Subscription package.zip",
-                  "Side letter.pdf",
-                  "Bank confirmation.pdf",
-                ].map((f) => (
-                  <li key={f} className="flex items-center justify-between px-4 py-2.5 text-sm text-white/80">
-                    <span className="flex items-center gap-2.5">
-                      <FileText className="h-3.5 w-3.5 text-white/45" />
-                      {f}
-                    </span>
-                    <span className="text-[10px] tracking-[0.18em] text-white/55 border border-white/15 rounded-full px-2 py-0.5">
-                      PRIVATE
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </MockPanel>
-
-            {/* Panel 3 — Auditability without unnecessary exposure */}
-            <MockPanel label="View" icon={<Database className="h-3.5 w-3.5" />} title="Anchored record" subtitle="Only the governed integrity layer is recorded and used operationally.">
-              <ul className="divide-y divide-white/8">
-                {["Hash", "Timestamp", "Document ref", "State transition", "Ownership event"].map((k) => (
-                  <li key={k} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                    <span className="text-white/80">{k}</span>
-                    <span className="text-[10px] tracking-[0.18em] text-white/55 border border-white/15 rounded-full px-2 py-0.5">
-                      ANCHORED
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </MockPanel>
-          </div>
+      <div className="mx-auto max-w-5xl px-6 md:px-10 text-center">
+        <p className="text-xs tracking-[0.22em] uppercase text-white/45 mb-5">
+          Privacy and control
+        </p>
+        <h3 className="font-serif font-light text-3xl md:text-5xl leading-[1.1] text-white tracking-[-0.02em]">
+          Selective visibility, not broad disclosure.
+        </h3>
+        <p className="mt-6 mx-auto max-w-2xl text-white/60 text-[15px] leading-relaxed">
+          Role-based access, controlled document handling, and auditability without unnecessary exposure.
+        </p>
+        <div className="mt-8">
+          <Link
+            to="/privacy"
+            className="inline-flex items-center gap-2 text-white/85 border border-white/20 hover:border-white/40 px-5 py-2.5 rounded-full text-sm font-medium transition-colors"
+          >
+            Read the full Privacy &amp; Control notice
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
       </div>
     </section>
@@ -960,7 +1027,10 @@ function ClosingAndFooter() {
           <div className="md:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-8 text-sm">
             <FooterGroup
               title="Product"
-              links={[{ t: "Workflows", h: "#what-angainor-does" }]}
+              links={[
+                { t: "Workflows", h: "#what-angainor-does" },
+                { t: "Privacy & Control", h: "/privacy", internal: true },
+              ]}
             />
             <FooterGroup
               title="Company"
@@ -1042,7 +1112,7 @@ export default function LandingPage() {
       <main>
         <Hero />
         <ProblemSection />
-        <WhatAngainorDoes />
+        {/* <WhatAngainorDoes />  // hidden by request */}
         <WorkflowCoverage />
         <AuditCompliance />
         <PrivacyAndControl />
