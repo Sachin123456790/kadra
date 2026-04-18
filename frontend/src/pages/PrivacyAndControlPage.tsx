@@ -1,6 +1,14 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Database,
+  EyeOff,
+  FileText,
+  Lock,
+} from "lucide-react";
 
 const DEMO_CTA =
   "mailto:founders@angainor.io?subject=Angainor%20%E2%80%94%20Demo%20Request";
@@ -105,6 +113,156 @@ function Section({
   );
 }
 
+function MockPanel({
+  label,
+  icon,
+  title,
+  subtitle,
+  children,
+  dense,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+  dense?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0a0a0a] overflow-hidden">
+      <div className="flex items-start justify-between px-4 pt-4">
+        <div>
+          <p className="text-[10px] tracking-[0.22em] uppercase text-white/40 mb-1 flex items-center gap-1.5">
+            {icon} {label}
+          </p>
+          <h4 className="text-white text-lg font-medium">{title}</h4>
+          <p className={`text-white/55 text-sm mt-1 ${dense ? "max-w-md" : ""}`}>{subtitle}</p>
+        </div>
+      </div>
+      <div className={dense ? "mt-3" : "mt-4"}>{children}</div>
+    </div>
+  );
+}
+
+function PrivacyShowcase() {
+  const principles = [
+    {
+      t: "Role-based visibility",
+      d: "GPs and administrators can access the operational record they need. LPs see only their own position, notices, documents, and capital-account context.",
+    },
+    {
+      t: "Controlled document handling",
+      d: "Full confidential source files remain in controlled storage rather than being exposed as open ledger content.",
+    },
+    {
+      t: "Auditability without unnecessary exposure",
+      d: "Traceability is preserved while disclosure stays tightly limited to what each role actually needs.",
+    },
+  ];
+  return (
+    <section className="relative py-20 md:py-28 border-b border-white/10">
+      <div className="mx-auto max-w-7xl px-6 md:px-10">
+        <div className="grid md:grid-cols-12 gap-10 md:gap-12 items-start">
+          {/* Left: sticky rail */}
+          <div className="md:col-span-5 md:sticky md:top-24">
+            <p className="text-xs tracking-[0.22em] uppercase text-white/45 mb-4">
+              How it works
+            </p>
+            <h2 className="font-serif font-light text-3xl md:text-4xl leading-[1.05] text-white tracking-[-0.02em]">
+              Three guarantees, designed into the system.
+            </h2>
+            <p className="mt-6 text-white/65 text-[15px] leading-relaxed">
+              Angainor is designed so the full fund record is not broadcast everywhere. Raw source documents remain in controlled storage. What gets anchored is the hash, timestamp, document reference, state transition, and ownership event needed for integrity and provenance — not the full confidential file body.
+            </p>
+            <div className="mt-8 space-y-3">
+              {principles.map((p) => (
+                <div key={p.t} className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25">
+                      <Check className="h-2.5 w-2.5 text-white" />
+                    </span>
+                    <div>
+                      <h4 className="text-white text-sm font-medium">{p.t}</h4>
+                      <p className="text-white/55 text-sm mt-1 leading-relaxed">{p.d}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Right: 3 mockup panels */}
+          <div className="md:col-span-7 space-y-4">
+            <MockPanel
+              label="View"
+              icon={<EyeOff className="h-3.5 w-3.5" />}
+              title="Other participants"
+              subtitle="No unnecessary disclosure of another LP's full records."
+              dense
+            >
+              <div className="relative p-3">
+                <div className="grid grid-cols-2 gap-2 blur-[3px] opacity-60 select-none pointer-events-none">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="h-8 rounded border border-white/10 bg-white/[0.02]" />
+                  ))}
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-[10px] tracking-[0.22em] uppercase text-white/55 bg-black/60 border border-white/10 rounded-full px-3 py-1">
+                    Access denied outside role scope
+                  </span>
+                </div>
+              </div>
+            </MockPanel>
+
+            <MockPanel
+              label="View"
+              icon={<Lock className="h-3.5 w-3.5" />}
+              title="Controlled storage"
+              subtitle="Source files remain in managed document storage."
+            >
+              <ul className="divide-y divide-white/8">
+                {[
+                  "Executed LPA.pdf",
+                  "Subscription package.zip",
+                  "Side letter.pdf",
+                  "Bank confirmation.pdf",
+                ].map((f) => (
+                  <li key={f} className="flex items-center justify-between px-4 py-2.5 text-sm text-white/80">
+                    <span className="flex items-center gap-2.5">
+                      <FileText className="h-3.5 w-3.5 text-white/45" />
+                      {f}
+                    </span>
+                    <span className="text-[10px] tracking-[0.18em] text-white/55 border border-white/15 rounded-full px-2 py-0.5">
+                      PRIVATE
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </MockPanel>
+
+            <MockPanel
+              label="View"
+              icon={<Database className="h-3.5 w-3.5" />}
+              title="Anchored record"
+              subtitle="Only the governed integrity layer is recorded and used operationally."
+            >
+              <ul className="divide-y divide-white/8">
+                {["Hash", "Timestamp", "Document ref", "State transition", "Ownership event"].map((k) => (
+                  <li key={k} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                    <span className="text-white/80">{k}</span>
+                    <span className="text-[10px] tracking-[0.18em] text-white/55 border border-white/15 rounded-full px-2 py-0.5">
+                      ANCHORED
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </MockPanel>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function DL({ rows }: { rows: [string, React.ReactNode][] }) {
   return (
     <dl className="rounded-xl border border-white/10 overflow-hidden">
@@ -166,6 +324,9 @@ export default function PrivacyAndControlPage() {
           </div>
         </div>
       </section>
+
+      {/* Showcase — original home-page split layout, moved here */}
+      <PrivacyShowcase />
 
       {/* Table of contents */}
       <section className="relative py-10 md:py-14">
