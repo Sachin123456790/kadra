@@ -45,6 +45,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import { HashDisplay } from "@/components/kadra/HashDisplay";
+import { cn } from "@/lib/utils";
+import { useHighlightRow } from "@/hooks/useHighlightRow";
 import type { Subscription } from "@/services/subscriptions.service";
 import type { Investor } from "@/services/investors.service";
 
@@ -86,6 +88,7 @@ type StatusFilter = "ALL" | "PENDING" | "SETTLED";
 
 export default function SubscriptionsPage() {
   const queryClient = useQueryClient();
+  const { highlightId, isPulsing } = useHighlightRow();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
@@ -283,7 +286,7 @@ export default function SubscriptionsPage() {
               setCreateAllocation("");
               setShowCreateModal(true);
             }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <Plus className="h-4 w-4 mr-2" />
             Create Subscription
@@ -404,7 +407,7 @@ export default function SubscriptionsPage() {
               onClick={() => setStatusFilter(tab)}
               className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                 statusFilter === tab
-                  ? "bg-indigo-600 text-white"
+                  ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-gray-200"
               }`}
             >
@@ -416,9 +419,9 @@ export default function SubscriptionsPage() {
         <select
           value={investorFilter}
           onChange={e => setInvestorFilter(e.target.value)}
-          className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground bg-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground bg-white focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
         >
-          <option value="">Investor</option>
+          <option value="">All LPs</option>
           {uniqueInvestors.map(inv => (
             <option key={inv.id} value={inv.id}>{inv.name}</option>
           ))}
@@ -433,7 +436,7 @@ export default function SubscriptionsPage() {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Filter data..."
-            className="pl-8 pr-3 py-1.5 text-sm border border-border rounded-md bg-white text-foreground placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="pl-8 pr-3 py-1.5 text-sm border border-border rounded-md bg-white text-foreground placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
 
@@ -472,6 +475,8 @@ export default function SubscriptionsPage() {
                     isExpanded={isExpanded}
                     walletAddress={walletAddress}
                     onToggle={() => toggleExpand(sub.subscriptionId)}
+                    isHighlighted={highlightId === sub.subscriptionId}
+                    isPulsing={isPulsing}
                   />
                 );
               })}
@@ -499,7 +504,7 @@ export default function SubscriptionsPage() {
                 id="lp-select"
                 value={createLpId}
                 onChange={e => setCreateLpId(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">Select an investor...</option>
                 {(investorsData ?? []).map((inv: Investor) => (
@@ -522,7 +527,7 @@ export default function SubscriptionsPage() {
                 value={createAmount}
                 onChange={e => setCreateAmount(e.target.value)}
                 placeholder="e.g. 2000000"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
 
@@ -539,7 +544,7 @@ export default function SubscriptionsPage() {
                 value={createAllocation}
                 onChange={e => setCreateAllocation(e.target.value)}
                 placeholder="e.g. 20"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
 
@@ -564,7 +569,7 @@ export default function SubscriptionsPage() {
             </Button>
             <Button
               disabled={!createLpId || !createAmount || !createAllocation || !latestLpa || createMutation.isPending}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
               onClick={() => createMutation.mutate()}
             >
               {createMutation.isPending ? "Creating..." : "Create Subscription"}
@@ -583,16 +588,23 @@ interface SubscriptionTableRowProps {
   isExpanded: boolean;
   walletAddress: string;
   onToggle: () => void;
+  isHighlighted?: boolean;
+  isPulsing?: boolean;
 }
 
-function SubscriptionTableRow({ sub, isExpanded, walletAddress, onToggle }: SubscriptionTableRowProps) {
+function SubscriptionTableRow({ sub, isExpanded, walletAddress, onToggle, isHighlighted, isPulsing }: SubscriptionTableRowProps) {
   const isPending = sub.status.toUpperCase() === "PENDING";
 
   return (
     <>
       <tr
+        data-highlight-id={sub.subscriptionId}
         onClick={onToggle}
-        className="border-b border-border cursor-pointer hover:bg-gray-50 transition-colors"
+        className={cn(
+          "border-b border-border cursor-pointer hover:bg-gray-50 transition-colors",
+          isHighlighted && "bg-indigo-50",
+          isHighlighted && isPulsing && "animate-pulse",
+        )}
       >
         <td className="px-4 py-3 text-muted-foreground">
           {isExpanded

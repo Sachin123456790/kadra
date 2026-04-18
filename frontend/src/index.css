@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 234 62% 26%;
+    --primary: 0 0% 9%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 14% 96%;
@@ -24,7 +24,7 @@
     --muted: 220 14% 96%;
     --muted-foreground: 220 9% 46%;
 
-    --accent: 234 62% 26%;
+    --accent: 0 0% 9%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
@@ -32,21 +32,21 @@
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 234 62% 26%;
+    --ring: 0 0% 9%;
 
     --radius: 0.5rem;
 
-    --topbar: 234 62% 18%;
+    --topbar: 0 0% 5%;
     --topbar-foreground: 0 0% 100%;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 220 9% 46%;
-    --sidebar-primary: 234 62% 26%;
+    --sidebar-primary: 0 0% 9%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 234 62% 95%;
-    --sidebar-accent-foreground: 234 62% 26%;
+    --sidebar-accent: 0 0% 95%;
+    --sidebar-accent-foreground: 0 0% 9%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 234 62% 26%;
+    --sidebar-ring: 0 0% 9%;
 
     --success: 142 72% 29%;
     --success-foreground: 0 0% 100%;
@@ -66,7 +66,7 @@
     --popover: 224 18% 13%;
     --popover-foreground: 210 20% 92%;
 
-    --primary: 225 60% 55%;
+    --primary: 0 0% 90%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 224 16% 18%;
@@ -75,7 +75,7 @@
     --muted: 224 16% 18%;
     --muted-foreground: 220 9% 56%;
 
-    --accent: 225 60% 55%;
+    --accent: 0 0% 90%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 55%;
@@ -83,19 +83,19 @@
 
     --border: 224 14% 20%;
     --input: 224 14% 20%;
-    --ring: 225 60% 55%;
+    --ring: 0 0% 90%;
 
-    --topbar: 224 22% 8%;
+    --topbar: 0 0% 5%;
     --topbar-foreground: 210 20% 92%;
 
     --sidebar-background: 224 20% 12%;
     --sidebar-foreground: 220 9% 56%;
-    --sidebar-primary: 225 60% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 225 50% 18%;
-    --sidebar-accent-foreground: 225 60% 70%;
+    --sidebar-primary: 0 0% 90%;
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 0 0% 18%;
+    --sidebar-accent-foreground: 0 0% 80%;
     --sidebar-border: 224 14% 20%;
-    --sidebar-ring: 225 60% 55%;
+    --sidebar-ring: 0 0% 90%;
 
     --success: 142 60% 45%;
     --success-foreground: 0 0% 100%;
@@ -147,12 +147,12 @@
   .dark .text-amber-700 { color: hsl(38 70% 55%) !important; }
   .dark .text-amber-800 { color: hsl(38 65% 60%) !important; }
 
-  /* Status pill overrides — indigo */
-  .dark .bg-indigo-50 { background-color: hsl(234 40% 14%) !important; }
-  .dark .bg-indigo-100 { background-color: hsl(234 35% 18%) !important; }
-  .dark .text-indigo-600 { color: hsl(234 70% 65%) !important; }
-  .dark .text-indigo-700 { color: hsl(234 65% 60%) !important; }
-  .dark .text-indigo-800 { color: hsl(234 60% 65%) !important; }
+  /* Status pill overrides — gray (formerly indigo) */
+  .dark .bg-indigo-50 { background-color: hsl(0 0% 14%) !important; }
+  .dark .bg-indigo-100 { background-color: hsl(0 0% 18%) !important; }
+  .dark .text-indigo-600 { color: hsl(0 0% 65%) !important; }
+  .dark .text-indigo-700 { color: hsl(0 0% 60%) !important; }
+  .dark .text-indigo-800 { color: hsl(0 0% 65%) !important; }
 
   /* Table/card surface overrides */
   .dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
@@ -186,13 +186,60 @@
   .dark .border-blue-200 { border-color: hsl(217 30% 22%) !important; }
   .dark .border-amber-200 { border-color: hsl(38 30% 22%) !important; }
 
-  /* Hover states for indigo buttons */
-  .dark .hover\:text-indigo-800:hover { color: hsl(234 60% 70%) !important; }
-  .dark .hover\:bg-indigo-700:hover { background-color: hsl(234 55% 40%) !important; }
+  /* Hover states for gray buttons (formerly indigo) */
+  .dark .hover\:text-indigo-800:hover { color: hsl(0 0% 70%) !important; }
+  .dark .hover\:bg-indigo-700:hover { background-color: hsl(0 0% 40%) !important; }
 }
 
 /* ── Subtle micro-interaction keyframes ── */
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Angainor landing page font utilities (scoped on LandingPage) ── */
+.ang-animated .font-serif,
+.ang-animated.font-serif { font-family: 'Fraunces', 'Times New Roman', serif; }
+.ang-animated .font-mono,
+.ang-animated.font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+/* ── Angainor landing page animations (dark theme, scoped) ── */
+@keyframes ang-float-a {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(6px, -8px); }
+}
+@keyframes ang-float-b {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-8px, 6px); }
+}
+@keyframes ang-float-c {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(4px, 10px); }
+}
+@keyframes ang-float-d {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-6px, -4px); }
+}
+@keyframes ang-dash {
+  to { stroke-dashoffset: -24; }
+}
+@keyframes ang-pulse-soft {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+@keyframes ang-draw {
+  from { stroke-dashoffset: 400; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes ang-cycle {
+  0%, 12% { opacity: 1; transform: translateY(0); filter: blur(0); }
+  20%, 100% { opacity: 0.18; transform: translateY(-4px); filter: blur(0.3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ang-animated,
+  .ang-animated * {
+    animation: none !important;
+    transition: none !important;
+  }
 }

@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { ErrorAlert } from "@/components/kadra/ErrorAlert";
 import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
+import { DerivedAmount } from "@/components/kadra/DerivedAmount";
+import type { DerivationStep } from "@/components/kadra/DerivedAmount";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getInvestorCapitalAccount } from "@/services/investor-portal.service";
 
@@ -21,19 +23,41 @@ const fmtDate = (d: string) =>
     day: "numeric",
   });
 
+interface DerivedRowConfig {
+  readonly label: string;
+  readonly formula?: string;
+  readonly steps: ReadonlyArray<DerivationStep>;
+  readonly result: number;
+  readonly asOf?: string;
+}
+
 function StatementRow({
   label,
   value,
   sublabel,
   isTotal = false,
   even = false,
+  derivation,
 }: {
   readonly label: string;
   readonly value: string;
   readonly sublabel?: string;
   readonly isTotal?: boolean;
   readonly even?: boolean;
+  readonly derivation?: DerivedRowConfig;
 }) {
+  const amountNode = (
+    <span
+      className={`text-sm tabular-nums ${
+        isTotal
+          ? "font-semibold text-foreground"
+          : "font-medium text-foreground"
+      }`}
+    >
+      {value}
+    </span>
+  );
+
   return (
     <div
       className={`flex items-center justify-between px-5 py-3.5 ${
@@ -50,11 +74,18 @@ function StatementRow({
           <span className="ml-2 text-xs text-muted-foreground">{sublabel}</span>
         )}
       </div>
-      <span
-        className={`text-sm tabular-nums ${isTotal ? "font-semibold text-foreground" : "font-medium text-foreground"}`}
-      >
-        {value}
-      </span>
+      {derivation ? (
+        <DerivedAmount
+          amount={amountNode}
+          label={derivation.label}
+          formula={derivation.formula}
+          steps={derivation.steps}
+          result={fmt(derivation.result)}
+          asOf={derivation.asOf}
+        />
+      ) : (
+        amountNode
+      )}
     </div>
   );
 }
@@ -62,7 +93,7 @@ function StatementRow({
 function EmptyCapitalAccount() {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <FileText className="h-12 w-12 text-indigo-300 mb-4" strokeWidth={1.5} />
+      <FileText className="h-12 w-12 text-muted-foreground mb-4" strokeWidth={1.5} />
       <p className="text-sm font-medium text-muted-foreground">
         No capital account data available yet
       </p>
@@ -104,6 +135,173 @@ export default function InvestorCapitalAccount() {
       />
     );
 
+  // Build derivations from the statement values. All derivations are
+  // client-side from the existing CapitalAccountStatement payload.
+  const initialContribution = account ? Number(account.initialContribution) : 0;
+  const openingBalance = account ? Number(account.openingBalance) : 0;
+  const capitalReturned = account ? Number(account.capitalReturned) : 0;
+  const accruedPreferredReturn = account
+    ? Number(account.accruedPreferredReturn)
+    : 0;
+  const residualAllocation = account ? Number(account.residualAllocation) : 0;
+  const distributionsReceived = account
+    ? Number((account as Record<string, unknown>).distributionsReceived ?? 0)
+    : 0;
+  const endingBalance = account ? Number(account.endingBalance) : 0;
+
+  const initialContributionDerivation: DerivedRowConfig | undefined = account
+    ? {
+        label: "Initial Contribution",
+        formula: "Settled subscription amount at fund close",
+        steps: [
+          {
+            label: "Subscription commitment (signed LPA)",
+            value: fmt(initialContribution),
+            sourceRef: {
+              kind: "subscription",
+              id: account.id,
+              route: "/subscriptions",
+              label: "View subscription",
+            },
+          },
+        ],
+        result: initialContribution,
+        asOf: account.asOfDate,
+      }
+    : undefined;
+
+  const openingBalanceDerivation: DerivedRowConfig | undefined = account
+    ? {
+        label: "Opening Balance",
+        formula: "Balance carried forward from last period",
+        steps: [
+          {
+            label: "Prior period ending balance",
+            value: fmt(openingBalance),
+          },
+        ],
+        result: openingBalance,
+        asOf: account.asOfDate,
+      }
+    : undefined;
+
+  const capitalReturnedDerivation: DerivedRowConfig | undefined = account
+    ? {
+        label: "Return of Capital",
+        formula: "Sum of all return-of-capital distributions to date",
+        steps: [
+          {
+            label: "Cumulative return-of-capital distributions",
+            value: fmt(capitalReturned),
+            sourceRef: {
+              kind: "distribution",
+              id: account.id,
+              route: "/investor/distributions",
+              label: "View distribution history",
+            },
+          },
+        ],
+        result: capitalReturned,
+        asOf: account.asOfDate,
+      }
+    : undefined;
+
+  const accruedPrefDerivation: DerivedRowConfig | undefined = account
+    ? {
+        label: "Preferred Return Accrued",
+        formula: "Committed capital × preferred rate × days / 365",
+        steps: [
+          {
+            label: "Contributed capital",
+            value: fmt(initialContribution),
+            sourceRef: {
+              kind: "subscription",
+              id: account.id,
+            },
+          },
+          {
+            label: "Preferred return tier (LPA)",
+            value: "8% p.a.",
+            formula: "× simple annual rate",
+          },
+          {
+            label: "Time-weighted accrual",
+            value: fmt(accruedPreferredReturn),
+            formula: "= cumulative running total",
+          },
+        ],
+        result: accruedPreferredReturn,
+        asOf: account.asOfDate,
+      }
+    : undefined;
+
+  const distributionsReceivedDerivation: DerivedRowConfig | undefined = account
+    ? {
+        label: "Distributions Received",
+        formula: "Sum of all distribution payments (gross)",
+        steps: [
+          {
+            label: "Cumulative gross distributions",
+            value: fmt(distributionsReceived),
+            sourceRef: {
+              kind: "distribution",
+              id: account.id,
+              route: "/investor/distributions",
+              label: "View history",
+            },
+          },
+        ],
+        result: distributionsReceived,
+        asOf: account.asOfDate,
+      }
+    : undefined;
+
+  const residualDerivation: DerivedRowConfig | undefined = account
+    ? {
+        label: "Residual Allocation",
+        formula: "Pro-rata share of profits above preferred return",
+        steps: [
+          {
+            label: "Carried interest tier share (80/20 LP/GP)",
+            value: fmt(residualAllocation),
+          },
+        ],
+        result: residualAllocation,
+        asOf: account.asOfDate,
+      }
+    : undefined;
+
+  // Ending balance: opening + contributions − capital returned + accrued pref + residual − distributions received
+  // Ending balance is delivered from backend; we explain it as: initial + accrued pref + residual − capital returned
+  const endingDerivation: DerivedRowConfig | undefined = account
+    ? {
+        label: "Closing Balance",
+        formula:
+          "Initial + Preferred Accrued + Residual − Capital Returned − Distributions Received",
+        steps: [
+          { label: "Initial contribution", value: fmt(initialContribution), formula: "+" },
+          {
+            label: "Preferred return accrued",
+            value: fmt(accruedPreferredReturn),
+            formula: "+",
+          },
+          { label: "Residual allocation", value: fmt(residualAllocation), formula: "+" },
+          {
+            label: "Return of capital received",
+            value: fmt(capitalReturned),
+            formula: "−",
+          },
+          {
+            label: "Distributions received",
+            value: fmt(distributionsReceived),
+            formula: "−",
+          },
+        ],
+        result: endingBalance,
+        asOf: account.asOfDate,
+      }
+    : undefined;
+
   return (
     <div>
       <PageHeader
@@ -137,43 +335,57 @@ export default function InvestorCapitalAccount() {
           {/* Statement Rows */}
           <div>
             <StatementRow
-              label="Opening Balance"
-              value={fmt(Number(account.openingBalance))}
-              sublabel={`as of ${fmtDate(account.asOfDate)}`}
+              label="Initial Contribution"
+              value={fmt(initialContribution)}
+              sublabel={account.asOfDate ? `Settled ${new Date(account.asOfDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : 'Initial settlement'}
               even={false}
+              derivation={initialContributionDerivation}
+            />
+            <StatementRow
+              label="Opening Balance"
+              value={fmt(openingBalance)}
+              sublabel={`as of ${fmtDate(account.asOfDate)}`}
+              even
+              derivation={openingBalanceDerivation}
             />
             <StatementRow
               label="Contributions"
-              value={fmt(Number(account.initialContribution))}
+              value={fmt(initialContribution)}
               sublabel="Initial contribution"
-              even
+              even={false}
+              derivation={initialContributionDerivation}
             />
             <StatementRow
               label="Return of Capital Received"
-              value={fmt(Number(account.capitalReturned))}
-              even={false}
+              value={fmt(capitalReturned)}
+              even
+              derivation={capitalReturnedDerivation}
             />
             <StatementRow
               label="Preferred Return Accrued"
-              value={fmt(Number(account.accruedPreferredReturn))}
+              value={fmt(accruedPreferredReturn)}
               sublabel="Running total"
-              even
+              even={false}
+              derivation={accruedPrefDerivation}
             />
             <StatementRow
               label="Distributions Received"
-              value={fmt(Number((account as Record<string, unknown>).distributionsReceived ?? 0))}
-              even={false}
+              value={fmt(distributionsReceived)}
+              even
+              derivation={distributionsReceivedDerivation}
             />
             <StatementRow
               label="Residual Allocation"
-              value={fmt(Number(account.residualAllocation))}
-              even
+              value={fmt(residualAllocation)}
+              even={false}
+              derivation={residualDerivation}
             />
             <StatementRow
               label="Closing Balance"
-              value={fmt(Number(account.endingBalance))}
+              value={fmt(endingBalance)}
               isTotal
-              even={false}
+              even
+              derivation={endingDerivation}
             />
           </div>
         </div>

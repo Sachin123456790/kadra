@@ -11,8 +11,52 @@ export interface AppNotification {
   id: string;
   message: string;
   timestamp: Date;
-  type: 'settlement' | 'subscription' | 'transfer' | 'mint' | 'general';
+  type: 'settlement' | 'subscription' | 'transfer' | 'transfer_notice' | 'mint' | 'general';
   read: boolean;
+  /** Deterministic in-app route to navigate to on click. */
+  targetRoute: string;
+  /** Optional ID of the related entity (subscription, transfer, etc.) for highlight/scroll. */
+  targetId?: string;
+}
+
+/**
+ * Build an in-app route for a notification given the current role.
+ * Falls back to the role's home if no specific destination applies.
+ */
+export function getNotificationRoute(
+  kind: AppNotification['type'],
+  role: 'admin' | 'investor',
+  targetId?: string,
+): string {
+  const highlight = targetId ? `?highlight=${encodeURIComponent(targetId)}` : '';
+  if (role === 'admin') {
+    switch (kind) {
+      case 'settlement':
+        return `/settlement${highlight}`;
+      case 'subscription':
+        return `/subscriptions${highlight}`;
+      case 'transfer':
+      case 'transfer_notice':
+        return `/transfers${highlight}`;
+      case 'mint':
+        return `/cap-table${highlight}`;
+      default:
+        return '/dashboard';
+    }
+  }
+  switch (kind) {
+    case 'settlement':
+      return `/investor/capital-account${highlight}`;
+    case 'subscription':
+      return `/investor${highlight}`;
+    case 'transfer':
+    case 'transfer_notice':
+      return `/investor/transfers${highlight}`;
+    case 'mint':
+      return `/investor/capital-account${highlight}`;
+    default:
+      return '/investor';
+  }
 }
 
 const STORAGE_KEY = 'kadra_read_notifications';
@@ -70,6 +114,7 @@ export function useNotifications() {
   const notifications = useMemo((): AppNotification[] => {
     const readIds = getReadIds();
     const items: AppNotification[] = [];
+    const role: 'admin' | 'investor' = isAdmin ? 'admin' : 'investor';
 
     // Build investor name lookup
     const investorNameMap = new Map<string, string>();
@@ -91,6 +136,8 @@ export function useNotifications() {
               timestamp: new Date(sub.settledAt),
               type: 'settlement',
               read: readIds.has(`settlement-${sub.subscriptionId}`),
+              targetId: sub.subscriptionId,
+              targetRoute: getNotificationRoute('settlement', role, sub.subscriptionId),
             });
           } else if (sub.status === 'PENDING') {
             items.push({
@@ -99,6 +146,8 @@ export function useNotifications() {
               timestamp: new Date(), // no createdAt in admin subscription response
               type: 'subscription',
               read: readIds.has(`subscription-${sub.subscriptionId}`),
+              targetId: sub.subscriptionId,
+              targetRoute: getNotificationRoute('subscription', role, sub.subscriptionId),
             });
           }
         }
@@ -106,26 +155,61 @@ export function useNotifications() {
 
       // Derive from ownership events
       if (ownershipEvents) {
+        // Build wallet-to-investor name lookup for enriched messages
+        const walletToName = new Map<string, string>();
+        if (investors) {
+          for (const inv of investors) {
+            if (inv.wallets) {
+              for (const w of inv.wallets) {
+                if (w.walletAddress) {
+                  walletToName.set(w.walletAddress.toLowerCase(), inv.legalName);
+                }
+              }
+            }
+          }
+        }
+
         for (const evt of ownershipEvents) {
           const ts = new Date(evt.eventTimestamp);
           if (evt.eventType === 'TRANSFER') {
-            const fromShort = `${evt.fromWalletAddress.slice(0, 6)}...${evt.fromWalletAddress.slice(-4)}`;
-            const toShort = `${evt.toWalletAddress.slice(0, 6)}...${evt.toWalletAddress.slice(-4)}`;
+            const fromAddr = evt.fromWalletAddress ?? '';
+            const toAddr = evt.toWalletAddress ?? '';
+            const fromName = fromAddr ? walletToName.get(fromAddr.toLowerCase()) : undefined;
+            const toName = toAddr ? walletToName.get(toAddr.toLowerCase()) : undefined;
+            const fromLabel = fromName ?? (fromAddr ? `${fromAddr.slice(0, 6)}...${fromAddr.slice(-4)}` : 'Unknown');
+            const toLabel = toName ?? (toAddr ? `${toAddr.slice(0, 6)}...${toAddr.slice(-4)}` : 'Unknown');
+            const amountPart = evt.tokenAmount != null ? ` (${evt.tokenAmount} KDRA)` : '';
+            const status = evt.status === 'BLOCKED' || evt.status === 'FAILED' ? 'blocked' : 'completed';
+            const transferType = status === 'blocked' ? 'transfer_notice' : 'transfer';
+            // TODO(notifications): OwnershipEvent exposes `eventId` but TransfersPage
+            // rows use `transferRequestId` as `data-highlight-id`. The backend
+            // DTO needs to surface `transferRequestId` before the highlight can
+            // resolve on admin transfer notifications. Until then, clicking the
+            // notification navigates to /transfers but the row scroll silently
+            // no-ops (useHighlightRow find-and-scroll terminates after 20
+            // attempts with no side effects).
             items.push({
               id: `transfer-${evt.eventId}`,
-              message: `Transfer ${fromShort} to ${toShort} completed`,
+              message: `Transfer from ${fromLabel} to ${toLabel}${amountPart} ${status}`,
               timestamp: ts,
-              type: 'transfer',
+              type: transferType,
               read: readIds.has(`transfer-${evt.eventId}`),
+              targetId: evt.eventId,
+              targetRoute: getNotificationRoute(transferType, role, evt.eventId),
             });
           } else if (evt.eventType === 'MINT') {
-            const toShort = `${evt.toWalletAddress.slice(0, 6)}...${evt.toWalletAddress.slice(-4)}`;
+            const mintAddr = evt.toWalletAddress ?? '';
+            const toName = mintAddr ? walletToName.get(mintAddr.toLowerCase()) : undefined;
+            const toLabel = toName ?? (mintAddr ? `${mintAddr.slice(0, 6)}...${mintAddr.slice(-4)}` : 'Unknown');
+            const amountPart = evt.tokenAmount != null ? ` (${evt.tokenAmount} KDRA)` : '';
             items.push({
               id: `mint-${evt.eventId}`,
-              message: `Tokens minted to wallet ${toShort}`,
+              message: `Tokens minted to ${toLabel}${amountPart}`,
               timestamp: ts,
               type: 'mint',
               read: readIds.has(`mint-${evt.eventId}`),
+              targetId: evt.eventId,
+              targetRoute: getNotificationRoute('mint', role, evt.eventId),
             });
           }
         }
@@ -141,6 +225,8 @@ export function useNotifications() {
               timestamp: new Date(sub.settledAt),
               type: 'settlement',
               read: readIds.has(`my-settlement-${sub.id}`),
+              targetId: sub.id,
+              targetRoute: getNotificationRoute('settlement', role, sub.id),
             });
           }
           items.push({
@@ -149,6 +235,8 @@ export function useNotifications() {
             timestamp: new Date(sub.createdAt),
             type: 'subscription',
             read: readIds.has(`my-sub-${sub.id}`),
+            targetId: sub.id,
+            targetRoute: getNotificationRoute('subscription', role, sub.id),
           });
         }
       }
@@ -163,6 +251,8 @@ export function useNotifications() {
             timestamp: new Date(tx.createdAt),
             type: 'transfer',
             read: readIds.has(`my-transfer-${tx.id}`),
+            targetId: tx.id,
+            targetRoute: getNotificationRoute('transfer', role, tx.id),
           });
         }
       }

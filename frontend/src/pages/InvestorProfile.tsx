@@ -21,7 +21,37 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Wallet, CheckCircle, AlertCircle, Copy, ExternalLink, Shield, FileText } from "lucide-react";
+import { Wallet, CheckCircle, AlertCircle, Copy, ExternalLink, Shield, FileText, Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+const SOURCE_OF_INCOME_TOOLTIP =
+  "Source of income identifies the origin of the capital you are investing. This is collected for regulatory compliance (AML/KYC) \u2014 funds must verify that contributed capital comes from legitimate sources such as employment, business operations, investment returns, inheritance, or the sale of assets. Your answer is shared only with the fund administrator for compliance review.";
+
+function SourceOfIncomeLabel() {
+  return (
+    <div className="flex items-center gap-1.5 mb-1">
+      <p className="text-xs text-gray-600">Source of Income</p>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label="About Source of Income"
+            className="inline-flex items-center justify-center rounded-full text-gray-500 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          >
+            <Info className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs break-words whitespace-normal leading-relaxed">
+          <p className="text-xs">{SOURCE_OF_INCOME_TOOLTIP}</p>
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
 
 const chainName = (id: number) => {
   const chains: Record<number, string> = {
@@ -178,7 +208,7 @@ function TaxInformationSection({ profile, fundName }: { profile: { legalName: st
             <select
               value={taxYear}
               onChange={(e) => setTaxYear(Number(e.target.value))}
-              className="px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-card"
+              className="px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-ring focus:border-primary bg-card"
             >
               {yearOptions.map((y) => (
                 <option key={y} value={y}>{y}</option>
@@ -236,12 +266,16 @@ function TaxInformationSection({ profile, fundName }: { profile: { legalName: st
                 <p className="text-xs text-muted-foreground mb-1">Total Distributions Received</p>
                 <p className="text-sm font-semibold text-foreground">{fmt(Number(taxReport.totalDistributions))}</p>
               </div>
+              <div>
+                <SourceOfIncomeLabel />
+                <p className="text-sm font-medium text-gray-900">Not provided</p>
+              </div>
             </div>
 
             <div>
               <button
                 onClick={handleExport}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium"
               >
                 Export Tax Data
               </button>
@@ -269,7 +303,7 @@ function WalletSection({
   const linkWalletButton = (
     <button
       onClick={onOpenModal}
-      className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+      className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
     >
       <Wallet className="h-4 w-4" />
       Link Wallet
@@ -314,7 +348,7 @@ function WalletSection({
                       <div className="flex items-center gap-2">
                         <StatusBadge status={w.walletStatus} />
                         {w.isPrimary && (
-                          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
                             Primary
                           </span>
                         )}
@@ -540,8 +574,8 @@ export default function InvestorProfile() {
                       {p.icon ? (
                         <img src={p.icon} alt={p.name} className="h-8 w-8 rounded-md" />
                       ) : (
-                        <div className="h-8 w-8 rounded-md bg-indigo-50 flex items-center justify-center">
-                          <Wallet className="h-4 w-4 text-indigo-600" />
+                        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center">
+                          <Wallet className="h-4 w-4 text-foreground" />
                         </div>
                       )}
                       <div>
@@ -562,7 +596,7 @@ export default function InvestorProfile() {
                         href="https://metamask.io/download/"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                       >
                         Get MetaMask <ExternalLink className="h-3 w-3" />
                       </a>
@@ -570,7 +604,7 @@ export default function InvestorProfile() {
                         href="https://phantom.app/download"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                       >
                         Get Phantom <ExternalLink className="h-3 w-3" />
                       </a>
@@ -583,7 +617,7 @@ export default function InvestorProfile() {
             {/* Step: Connecting */}
             {step === "connecting" && (
               <div className="flex flex-col items-center py-6">
-                <div className="h-10 w-10 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin mb-4" />
+                <div className="h-10 w-10 rounded-full border-2 border-primary border-t-transparent animate-spin mb-4" />
                 <p className="text-sm text-muted-foreground">Waiting for wallet approval...</p>
               </div>
             )}
@@ -605,7 +639,7 @@ export default function InvestorProfile() {
                 </TechnicalDetails>
                 <button
                   onClick={handleSign}
-                  className="w-full rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+                  className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
                 >
                   Sign Verification Message
                 </button>
@@ -618,7 +652,7 @@ export default function InvestorProfile() {
             {/* Step: Verifying */}
             {step === "verifying" && (
               <div className="flex flex-col items-center py-6">
-                <div className="h-10 w-10 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin mb-4" />
+                <div className="h-10 w-10 rounded-full border-2 border-primary border-t-transparent animate-spin mb-4" />
                 <p className="text-sm text-muted-foreground">Verifying ownership...</p>
               </div>
             )}
@@ -635,7 +669,7 @@ export default function InvestorProfile() {
                 </p>
                 <button
                   onClick={closeModal}
-                  className="rounded-md bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+                  className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
                 >
                   Done
                 </button>
@@ -654,7 +688,7 @@ export default function InvestorProfile() {
                 </p>
                 <button
                   onClick={() => { setStep("choose"); setModalError(null); wallet.disconnect(); }}
-                  className="rounded-md bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+                  className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
                 >
                   Try Again
                 </button>

@@ -2,39 +2,38 @@ import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import { formatEventType } from "@/lib/format";
 import type { ActivityEvent } from "@/services/fund.service";
 
-type BadgeColor = "indigo" | "green" | "amber" | "red" | "blue" | "gray";
+type BadgeColor = "gray" | "green" | "amber" | "red" | "blue";
 
 const EVENT_COLOR_MAP: Record<string, BadgeColor> = {
-  LPA_UPLOADED: "indigo",
+  LPA_UPLOADED: "gray",
   SUBSCRIPTION_CREATED: "blue",
   SETTLEMENT_CONFIRMED: "green",
   TOKEN_MINTED: "green",
   TOKEN_DEPLOYED: "green",
   TRANSFER_REQUESTED: "amber",
-  TRANSFER_EXECUTED: "indigo",
+  TRANSFER_EXECUTED: "gray",
   TRANSFER_FAILED: "red",
   CAPITAL_CALL_ISSUED: "amber",
   CAPITAL_CALL_STATUS_UPDATED: "blue",
   CAPITAL_CALL_RESPONSE_RECORDED: "blue",
   DISTRIBUTION_COMPLETED: "blue",
-  NOTICE_GENERATED: "indigo",
+  NOTICE_GENERATED: "gray",
   NOTICE_SENT: "blue",
-  DOCUMENT_UPLOADED: "indigo",
+  DOCUMENT_UPLOADED: "gray",
   DOCUMENT_ANCHORED: "green",
   INVESTOR_CREATED: "blue",
   INVESTOR_VERIFIED: "green",
   ELIGIBILITY_GRANTED: "green",
   ELIGIBILITY_REVOKED: "red",
-  WALLET_LINKED: "indigo",
+  WALLET_LINKED: "gray",
 };
 
 const BADGE_STYLES: Record<BadgeColor, string> = {
-  indigo: "bg-indigo-50 text-indigo-700",
+  gray: "bg-gray-100 text-gray-700",
   green: "bg-green-50 text-green-700",
   amber: "bg-amber-50 text-amber-700",
   red: "bg-red-50 text-red-700",
   blue: "bg-blue-50 text-blue-700",
-  gray: "bg-gray-100 text-gray-600",
 };
 
 /* ── Relative time formatting ── */
@@ -187,7 +186,7 @@ export function ActivityFeed({
         <div className="mt-4 border-t border-border pt-3 text-center">
           <a
             href={viewAllLink}
-            className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            className="text-sm font-medium text-foreground hover:text-foreground"
           >
             View All
           </a>

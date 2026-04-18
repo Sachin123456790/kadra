@@ -19,6 +19,7 @@ import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
 import { ExplorerLink } from "@/components/kadra/ExplorerLink";
 import { HashDisplay } from "@/components/kadra/HashDisplay";
 import { CopyButton } from "@/components/kadra/CopyButton";
+import { DerivedAmount } from "@/components/kadra/DerivedAmount";
 import { formatCompact } from "@/lib/format";
 
 const OWNERSHIP_COLORS = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#2563eb', '#c026d3'] as const;
@@ -71,11 +72,14 @@ function CapTableRowItem({
   row,
   isExpanded,
   onToggle,
+  totalSettledTokens,
 }: {
   readonly row: EnrichedCapTableRow;
   readonly isExpanded: boolean;
   readonly onToggle: () => void;
+  readonly totalSettledTokens: number;
 }) {
+  const settledTokens = parseFloat(row.settledTokenBalance);
   return (
     <>
       <tr
@@ -90,13 +94,81 @@ function CapTableRowItem({
           )}
         </td>
         <td className="px-4 py-3 font-medium text-foreground">{row.investorName ?? "—"}</td>
-        <td className="px-4 py-3 text-foreground">
-          <span className="inline-flex items-center">
-            <span className="inline-block h-2 w-2 rounded-full bg-primary mr-1.5" />
-            {row.ownershipPct.toFixed(2)}%
-          </span>
+        <td
+          className="px-4 py-3 text-foreground"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DerivedAmount
+            amount={
+              <span className="inline-flex items-center">
+                <span className="inline-block h-2 w-2 rounded-full bg-primary mr-1.5" />
+                {row.ownershipPct.toFixed(2)}%
+              </span>
+            }
+            label={`Ownership — ${row.investorName ?? "Investor"}`}
+            formula="investor token balance ÷ total settled token supply × 100"
+            steps={[
+              {
+                label: "Investor settled units",
+                value: settledTokens.toLocaleString("en-US"),
+                sourceRef: {
+                  kind: "wallet",
+                  id: row.walletAddress,
+                  label: `${row.walletAddress.slice(0, 6)}…${row.walletAddress.slice(-4)}`,
+                },
+              },
+              {
+                label: "Total settled supply (fund)",
+                value: totalSettledTokens.toLocaleString("en-US"),
+                formula: "÷",
+              },
+              {
+                label: "Ratio × 100",
+                value: `${row.ownershipPct.toFixed(4)}%`,
+                formula: "= ownership",
+              },
+            ]}
+            result={`${row.ownershipPct.toFixed(2)}%`}
+          />
         </td>
-        <td className="px-4 py-3 text-foreground">{fmtCurrency(row.capitalContributed)}</td>
+        <td
+          className="px-4 py-3 text-foreground"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {row.capitalContributed > 0 ? (
+            <DerivedAmount
+              amount={fmtCurrency(row.capitalContributed)}
+              label="Capital Contributed"
+              formula="Subscription committed amount (signed LPA)"
+              steps={[
+                {
+                  label: "Committed via subscription",
+                  value: fmtCurrency(row.capitalContributed),
+                  sourceRef: {
+                    kind: "subscription",
+                    id: row.investorId,
+                    route: "/subscriptions",
+                    label: "View subscription",
+                  },
+                },
+                {
+                  label: "Settlement status",
+                  value: row.settledAt ? "Settled" : "Pending",
+                  formula: row.settledAt ? `on ${fmtDate(row.settledAt)}` : undefined,
+                },
+              ]}
+              result={fmtCurrency(row.capitalContributed)}
+              asOf={row.settledAt ?? undefined}
+              sourceDocumentRef={
+                row.governingHashHex
+                  ? { id: row.governingHashHex, name: "Governing LPA" }
+                  : undefined
+              }
+            />
+          ) : (
+            fmtCurrency(row.capitalContributed)
+          )}
+        </td>
         <td className="px-4 py-3 text-muted-foreground">{fmtDate(row.settledAt)}</td>
       </tr>
       {isExpanded && (
@@ -227,7 +299,7 @@ function ExportCapTableButton({ fundId }: { readonly fundId: string }) {
     <button
       onClick={handleExport}
       disabled={exporting}
-      className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 transition-all duration-150 active:scale-[0.98] motion-reduce:transform-none"
+      className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 transition-all duration-150 active:scale-[0.98] motion-reduce:transform-none"
       type="button"
     >
       <Download className="h-4 w-4" />
@@ -335,6 +407,7 @@ export default function CapTablePage() {
                     row={row}
                     isExpanded={expandedId === rowId}
                     onToggle={() => setExpandedId(expandedId === rowId ? null : rowId)}
+                    totalSettledTokens={totalSettled}
                   />
                 );
               })}

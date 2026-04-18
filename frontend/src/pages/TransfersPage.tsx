@@ -18,6 +18,7 @@ import { HashDisplay } from "@/components/kadra/HashDisplay";
 import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useHighlightRow } from "@/hooks/useHighlightRow";
 
 // ── Constants ────────────────────────────────────────────
 
@@ -163,8 +164,12 @@ function TransferRulesCard({
 
 function TransferHistoryTable({
   transfers,
+  highlightId,
+  isPulsing,
 }: {
   readonly transfers: UnifiedTransfer[];
+  readonly highlightId: string | null;
+  readonly isPulsing: boolean;
 }) {
   if (transfers.length === 0) {
     return (
@@ -204,12 +209,17 @@ function TransferHistoryTable({
           </tr>
         </thead>
         <tbody>
-          {transfers.map((t) => (
+          {transfers.map((t) => {
+            const isHighlighted = highlightId === t.id;
+            return (
             <tr
               key={t.id}
+              data-highlight-id={t.id}
               className={cn(
                 "border-b border-border",
                 t.isFailed && "bg-red-50",
+                isHighlighted && "bg-indigo-50",
+                isHighlighted && isPulsing && "animate-pulse",
               )}
             >
               <td className="px-4 py-3 text-foreground">
@@ -256,10 +266,116 @@ function TransferHistoryTable({
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+// ── Transfer Notices Section ────────────────────────────────
+
+interface TransferNotice {
+  id: string;
+  dateTime: string;
+  lpName: string;
+  transferType: "Completed" | "Blocked" | "Initiated";
+  amount: number;
+  counterparty: string;
+  status: string;
+}
+
+function deriveNotices(transfers: UnifiedTransfer[]): TransferNotice[] {
+  return transfers.map((t) => {
+    let transferType: TransferNotice["transferType"] = "Initiated";
+    if (t.onChainResult === "Executed") {
+      transferType = "Completed";
+    } else if (t.isFailed) {
+      transferType = "Blocked";
+    }
+
+    return {
+      id: t.id,
+      dateTime: t.timestamp,
+      lpName: t.fromLpName || t.fromWallet.slice(0, 10) + "...",
+      transferType,
+      amount: t.amount,
+      counterparty: t.toLpName || t.toWallet.slice(0, 10) + "...",
+      status: t.onChainResult === "Executed" ? "Settled" : t.isFailed ? "Rejected" : "Pending",
+    };
+  });
+}
+
+const TRANSFER_TYPE_BADGE_CLASSES: Record<TransferNotice["transferType"], string> = {
+  Completed: "bg-green-100 text-green-800",
+  Blocked: "bg-red-100 text-red-800",
+  Initiated: "bg-blue-100 text-blue-800",
+};
+
+function TransferNoticesSection({
+  transfers,
+}: {
+  readonly transfers: UnifiedTransfer[];
+}) {
+  const notices = deriveNotices(transfers);
+
+  if (notices.length === 0) return null;
+
+  return (
+    <SectionCard title={`Transfer Notices (${notices.length})`} className="mb-6">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Date/Time</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">LP Name</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Transfer Type</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Amount</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Counterparty</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground" />
+            </tr>
+          </thead>
+          <tbody>
+            {notices.map((notice) => (
+              <tr key={notice.id} className="border-b border-border">
+                <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                  {new Date(notice.dateTime).toLocaleString()}
+                </td>
+                <td className="px-4 py-3 font-medium text-foreground">{notice.lpName}</td>
+                <td className="px-4 py-3">
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      TRANSFER_TYPE_BADGE_CLASSES[notice.transferType],
+                    )}
+                  >
+                    {notice.transferType}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-foreground">{fmt(notice.amount)}</td>
+                <td className="px-4 py-3 text-foreground">{notice.counterparty}</td>
+                <td className="px-4 py-3 text-muted-foreground">{notice.status}</td>
+                <td className="px-4 py-3">
+                  <a
+                    href="#transfer-history"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const historySection = document.querySelector('[data-section="transfer-history"]');
+                      historySection?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="text-xs font-medium text-primary hover:text-foreground transition-colors"
+                  >
+                    View Record
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -267,6 +383,7 @@ function TransferHistoryTable({
 
 export default function TransfersPage() {
   const fundId = DEFAULT_FUND_CODE;
+  const { highlightId, isPulsing } = useHighlightRow();
 
   const {
     data: failedData,
@@ -359,9 +476,13 @@ export default function TransfersPage() {
         lpaHash={lpaHash}
       />
 
-      <SectionCard title={`Transfer History (${transfers.length})`}>
-        <TransferHistoryTable transfers={transfers} />
-      </SectionCard>
+      <TransferNoticesSection transfers={transfers} />
+
+      <div data-section="transfer-history">
+        <SectionCard title={`Transfer History (${transfers.length})`}>
+          <TransferHistoryTable transfers={transfers} highlightId={highlightId} isPulsing={isPulsing} />
+        </SectionCard>
+      </div>
     </div>
   );
 }

@@ -566,6 +566,56 @@ export class InvestorPortalService {
   }
 
   /**
+   * Verify that an investor has access to a given document.
+   * Access is granted if the document is:
+   *  - Linked directly to this investor (wire confirmations, notices, etc.)
+   *  - The governing document of a subscription the investor holds
+   * Returns true if access is granted; throws NotFoundError otherwise (to avoid
+   * leaking document existence to unauthorized callers).
+   */
+  async assertInvestorCanAccessDocument(
+    investorId: string,
+    fundId: string,
+    documentId: string,
+  ): Promise<void> {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      select: {
+        id: true,
+        fundId: true,
+        linkedEntityType: true,
+        linkedEntityId: true,
+        deletedAt: true,
+      },
+    });
+    if (!doc || doc.deletedAt || doc.fundId !== fundId) {
+      throw new NotFoundError('Document', documentId);
+    }
+
+    // Directly linked to this investor
+    if (
+      doc.linkedEntityType === 'INVESTOR' &&
+      doc.linkedEntityId === investorId
+    ) {
+      return;
+    }
+
+    // Governing document on one of this investor's subscriptions
+    const sub = await this.prisma.subscription.findFirst({
+      where: {
+        fundId,
+        investorId,
+        governingDocumentId: documentId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (sub) return;
+
+    throw new NotFoundError('Document', documentId);
+  }
+
+  /**
    * Activity feed for this investor in a fund.
    */
   async getMyActivityFeed(investorId: string, fundId: string, limit: number) {

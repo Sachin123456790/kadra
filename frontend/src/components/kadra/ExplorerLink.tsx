@@ -92,7 +92,7 @@ export function ExplorerLink({
         href={getExplorerUrl(value, type)}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-indigo-600 hover:text-indigo-800 inline-flex"
+        className="text-foreground hover:text-foreground inline-flex"
         title={`View on Etherscan`}
       >
         <ExternalLink className="h-3.5 w-3.5" />
@@ -104,7 +104,7 @@ export function ExplorerLink({
           href={getExplorerUrl(value, type)}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-indigo-600 hover:text-indigo-800"
+          className="text-xs text-foreground hover:text-foreground"
         >
           {label}
         </a>

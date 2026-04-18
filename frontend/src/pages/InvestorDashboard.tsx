@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { FileText } from "lucide-react";
 import { PageHeader } from "@/components/kadra/PageHeader";
 import { MetricCard } from "@/components/kadra/MetricCard";
 import { SectionCard } from "@/components/kadra/SectionCard";
@@ -146,6 +148,26 @@ export default function InvestorDashboardPage() {
         />
       </div>
 
+      {/* GP Reports Notification */}
+      {/* TODO: Replace with dynamic GP report data from API */}
+      <div className="rounded-lg border border-border bg-card p-4 flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+            <FileText className="h-5 w-5 text-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">New GP Report Available</p>
+            <p className="text-xs text-muted-foreground">Q1 2027 Quarterly Investor Report — uploaded Mar 31, 2027</p>
+          </div>
+        </div>
+        <Link
+          to="/investor/documents?tab=gp-reports"
+          className="text-sm font-medium text-primary hover:underline"
+        >
+          View Reports
+        </Link>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Panel 1: Portfolio Summary */}
         <SectionCard title="Portfolio Summary">
@@ -169,7 +191,7 @@ export default function InvestorDashboardPage() {
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden max-w-[120px]">
                     <div
-                      className="h-full rounded-full bg-indigo-600"
+                      className="h-full rounded-full bg-primary"
                       style={{ width: `${Math.min(ownershipPct, 100)}%` }}
                     />
                   </div>

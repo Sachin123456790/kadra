@@ -15,6 +15,8 @@ import { useWallet } from "@/hooks/useWallet";
 import type { InvestorTransferRequest } from "@/services/investor-portal.service";
 import { TableSkeleton } from "@/components/kadra/Skeleton";
 import { Shield, Search, AlertCircle, CheckCircle } from "lucide-react";
+import { useHighlightRow } from "@/hooks/useHighlightRow";
+import { cn } from "@/lib/utils";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n);
@@ -250,7 +252,7 @@ function InitiateTransferSection({
                     value={recipientEmail}
                     onChange={(e) => handleRecipientSearch(e.target.value)}
                     placeholder="Search by email..."
-                    className="w-full pl-9 pr-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full pl-9 pr-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-ring focus:border-primary"
                     disabled={transferStep !== "idle"}
                   />
                 </div>
@@ -285,7 +287,7 @@ function InitiateTransferSection({
                   value={tokenAmount}
                   onChange={(e) => setTokenAmount(e.target.value)}
                   placeholder="e.g. 500"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-ring focus:border-primary"
                   disabled={transferStep !== "idle"}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -322,7 +324,7 @@ function InitiateTransferSection({
           <button
             onClick={() => transferMutation.mutate()}
             disabled={!isReady || (recipientResult !== null && !recipientResult.eligible)}
-            className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Transfer
           </button>
@@ -338,10 +340,14 @@ function TransferHistorySection({
   transfers,
   investorWalletAddress,
   walletNameMap,
+  highlightId,
+  isPulsing,
 }: {
   transfers: InvestorTransferRequest[];
   investorWalletAddress: string | null;
   walletNameMap: Record<string, string>;
+  highlightId: string | null;
+  isPulsing: boolean;
 }) {
   const getDirection = (t: InvestorTransferRequest): "Sent" | "Received" => {
     if (!investorWalletAddress) return "Sent";
@@ -396,7 +402,13 @@ function TransferHistorySection({
                 return (
                   <tr
                     key={t.id}
-                    className={`border-b border-border ${blocked ? "bg-red-50" : ""}`}
+                    data-highlight-id={t.id}
+                    className={cn(
+                      "border-b border-border",
+                      blocked && "bg-red-50",
+                      highlightId === t.id && "bg-indigo-50",
+                      highlightId === t.id && isPulsing && "animate-pulse",
+                    )}
                   >
                     <td className="px-4 py-3 text-foreground">
                       {new Date(t.createdAt).toLocaleDateString()}
@@ -455,6 +467,7 @@ function TransferHistorySection({
 
 export default function InvestorTransfersPage() {
   const fundId = DEFAULT_FUND_CODE;
+  const { highlightId, isPulsing } = useHighlightRow();
 
   const { data: transfers, isLoading: transfersLoading, error: transfersError } = useQuery({
     queryKey: QUERY_KEYS.investorTransfers(fundId),
@@ -522,6 +535,8 @@ export default function InvestorTransfersPage() {
           transfers={transfers ?? []}
           investorWalletAddress={investorWalletAddress}
           walletNameMap={walletNameMap}
+          highlightId={highlightId}
+          isPulsing={isPulsing}
         />
       </div>
     </div>

@@ -413,6 +413,45 @@ export class DocumentsService {
     };
   }
 
+  /**
+   * Read document content (raw bytes) for viewing/downloading.
+   * Returns buffer + metadata. Callers are responsible for access control.
+   */
+  async getDocumentContent(documentId: string): Promise<{
+    buffer: Buffer;
+    mimeType: string;
+    filename: string;
+    fundId: string;
+    linkedEntityType: string | null;
+    linkedEntityId: string | null;
+  }> {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      select: {
+        id: true,
+        storageKey: true,
+        mimeType: true,
+        originalFilename: true,
+        fundId: true,
+        linkedEntityType: true,
+        linkedEntityId: true,
+        deletedAt: true,
+      },
+    });
+    if (!doc || doc.deletedAt) {
+      throw new NotFoundError('Document', documentId);
+    }
+    const buffer = await this.storage.read(doc.storageKey);
+    return {
+      buffer,
+      mimeType: doc.mimeType,
+      filename: doc.originalFilename,
+      fundId: doc.fundId,
+      linkedEntityType: doc.linkedEntityType,
+      linkedEntityId: doc.linkedEntityId,
+    };
+  }
+
   async getParseStatus(documentId: string) {
     const doc = await this.prisma.document.findUnique({
       where: { id: documentId },

@@ -279,7 +279,7 @@ function SimulationSection({
               setShouldRun(false);
             }}
             placeholder="e.g. 3000000"
-            className="block w-full rounded-md border border-gray-300 bg-card px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="block w-full rounded-md border border-gray-300 bg-card px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
         <div>
@@ -297,7 +297,7 @@ function SimulationSection({
               setShouldRun(false);
             }}
             placeholder="e.g. 5"
-            className="block w-full rounded-md border border-gray-300 bg-card px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="block w-full rounded-md border border-gray-300 bg-card px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
       </div>
@@ -305,7 +305,7 @@ function SimulationSection({
       <button
         onClick={handleRunSimulation}
         disabled={!exitProceeds || previewLoading}
-        className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 transition-colors"
+        className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 transition-colors"
         type="button"
       >
         {previewLoading ? "Calculating..." : "Run Simulation"}
@@ -472,6 +472,41 @@ function CapitalAccountDetail({ account }: { readonly account: CapitalAccountSum
   );
 }
 
+function CapitalAccountRow({
+  account,
+  isExpanded,
+  onToggle,
+}: {
+  readonly account: CapitalAccountSummary;
+  readonly isExpanded: boolean;
+  readonly onToggle: () => void;
+}) {
+  return (
+    <>
+      <tr
+        className="border-b border-border cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={onToggle}
+      >
+        {capitalAccountColumns.map((col) => (
+          <td key={col.key} className="px-4 py-3">
+            {col.render ? col.render(account) : String((account as Record<string, unknown>)[col.key] ?? '')}
+          </td>
+        ))}
+        <td className="px-4 py-3 text-gray-400">
+          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </td>
+      </tr>
+      {isExpanded && (
+        <tr className="border-b border-border">
+          <td colSpan={capitalAccountColumns.length + 1}>
+            <CapitalAccountDetail account={account} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 function CapitalAccountsSection({ fundId }: { readonly fundId: string }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -489,23 +524,6 @@ function CapitalAccountsSection({ fundId }: { readonly fundId: string }) {
     setExpandedId((prev) => (prev === row.id ? null : row.id));
   }, []);
 
-  const columnsWithExpand: Column<CapitalAccountSummary>[] = useMemo(
-    () => [
-      ...capitalAccountColumns,
-      {
-        key: "_expand",
-        header: "",
-        render: (r: CapitalAccountSummary) => (
-          <span className="text-gray-400">
-            {expandedId === r.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </span>
-        ),
-        className: "w-10",
-      },
-    ],
-    [expandedId],
-  );
-
   return (
     <SectionCard title="Capital Accounts">
       {isLoading ? (
@@ -522,19 +540,35 @@ function CapitalAccountsSection({ fundId }: { readonly fundId: string }) {
           message="Capital accounts will appear here after settlement is complete."
         />
       ) : (
-        <div>
-          <DataTable
-            columns={columnsWithExpand}
-            data={accounts}
-            onRowClick={handleRowClick}
-            selectedId={expandedId ?? undefined}
-            getRowId={(r) => r.id}
-          />
-          {expandedId && accounts.find((a) => a.id === expandedId) && (
-            <CapitalAccountDetail
-              account={accounts.find((a) => a.id === expandedId)!}
-            />
-          )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                {capitalAccountColumns.map((col) => (
+                  <th
+                    key={col.key}
+                    className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
+                  >
+                    {col.header}
+                  </th>
+                ))}
+                <th className="px-4 py-3 w-10" />
+              </tr>
+            </thead>
+            <tbody>
+              {accounts.map((account) => {
+                const isExpanded = expandedId === account.id;
+                return (
+                  <CapitalAccountRow
+                    key={account.id}
+                    account={account}
+                    isExpanded={isExpanded}
+                    onToggle={() => handleRowClick(account)}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </SectionCard>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/kadra/PageHeader';
 import { SectionCard } from '@/components/kadra/SectionCard';
 import { EmptyState } from '@/components/kadra/EmptyState';
@@ -13,6 +14,7 @@ const typeIcons: Record<AppNotification['type'], typeof Bell> = {
   settlement: Landmark,
   subscription: FileText,
   transfer: ArrowLeftRight,
+  transfer_notice: ArrowLeftRight,
   mint: Coins,
   general: Bell,
 };
@@ -21,6 +23,7 @@ const typeColors: Record<AppNotification['type'], string> = {
   settlement: 'bg-green-100 text-green-700',
   subscription: 'bg-blue-100 text-blue-700',
   transfer: 'bg-purple-100 text-purple-700',
+  transfer_notice: 'bg-purple-100 text-purple-700',
   mint: 'bg-amber-100 text-amber-700',
   general: 'bg-gray-100 text-gray-700',
 };
@@ -28,8 +31,14 @@ const typeColors: Record<AppNotification['type'], string> = {
 type FilterType = 'all' | AppNotification['type'];
 
 export default function NotificationsPage() {
+  const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [filter, setFilter] = useState<FilterType>('all');
+
+  const handleOpen = (notificationId: string, targetRoute: string) => {
+    markAsRead(notificationId);
+    navigate(targetRoute);
+  };
 
   const filtered = filter === 'all'
     ? notifications
@@ -97,9 +106,10 @@ export default function NotificationsPage() {
             return (
               <button
                 key={notification.id}
-                onClick={() => markAsRead(notification.id)}
+                onClick={() => handleOpen(notification.id, notification.targetRoute)}
                 className={cn(
-                  'w-full flex items-start gap-4 px-6 py-4 text-left hover:bg-muted/50 transition-colors',
+                  'w-full flex items-start gap-4 px-6 py-4 text-left transition-colors cursor-pointer',
+                  'hover:bg-indigo-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-inset',
                   !notification.read && 'bg-primary/5',
                 )}
               >

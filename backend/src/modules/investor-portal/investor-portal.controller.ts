@@ -5,9 +5,11 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { InvestorPortalService } from './investor-portal.service';
+import { DocumentsService } from '../documents/documents.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -24,6 +26,7 @@ export class InvestorPortalController {
   constructor(
     private readonly portalService: InvestorPortalService,
     private readonly prisma: PrismaService,
+    private readonly documentsService: DocumentsService,
   ) {}
 
   @Get('me/dashboard')
@@ -175,6 +178,43 @@ export class InvestorPortalController {
         count: data.length,
       },
     };
+  }
+
+  @Get('me/documents/:documentId/content')
+  async getMyDocumentContent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId') documentId: string,
+    @Query('fundId') fundIdOrCode: string | undefined,
+    @Res() res: any,
+  ) {
+    const investor = await this.portalService.resolveInvestor(user.email);
+    const fundId = await resolveFundId(
+      this.prisma,
+      fundIdOrCode || DEFAULT_FUND_CODE,
+    );
+    await this.portalService.assertInvestorCanAccessDocument(
+      investor.id,
+      fundId,
+      documentId,
+    );
+    const file = await this.documentsService.getDocumentContent(documentId);
+    const encodedName = encodeURIComponent(file.filename);
+    const mime = file.mimeType || 'application/octet-stream';
+    const disposition = `inline; filename="${file.filename.replace(/"/g, '')}"; filename*=UTF-8''${encodedName}`;
+
+    if (typeof res.header === 'function' && typeof res.send === 'function') {
+      res.header('Content-Type', mime);
+      res.header('Content-Disposition', disposition);
+      res.header('Content-Length', String(file.buffer.length));
+      res.header('X-Content-Type-Options', 'nosniff');
+      return res.send(file.buffer);
+    }
+
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', disposition);
+    res.setHeader('Content-Length', String(file.buffer.length));
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.end(file.buffer);
   }
 
   @Get('me/activity-feed')

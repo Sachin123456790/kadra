@@ -263,7 +263,7 @@ export default function FundOverviewPage() {
               {governingDocHash ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="cursor-help border-b border-dashed border-gray-400 text-indigo-600">
+                    <span className="cursor-help border-b border-dashed border-gray-400 text-primary">
                       1.0
                     </span>
                   </TooltipTrigger>
@@ -307,7 +307,7 @@ export default function FundOverviewPage() {
           action={
             <a
               href={ROUTES.AUDIT}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+              className="text-sm font-medium text-primary hover:text-foreground"
             >
               View All
             </a>
@@ -328,7 +328,7 @@ export default function FundOverviewPage() {
           <div className="border-t border-border pt-3 mt-3 text-center">
             <a
               href={ROUTES.AUDIT}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+              className="text-sm font-medium text-primary hover:text-foreground"
             >
               View All Events
             </a>
@@ -342,7 +342,7 @@ export default function FundOverviewPage() {
               label="Committed"
               value={metrics.committedCapital}
               max={fundSize}
-              color="bg-indigo-600"
+              color="bg-primary"
             />
             <ProgressBar
               label="Called"

@@ -5,6 +5,7 @@ import {
   Put,
   Param,
   Req,
+  Res,
   UseGuards,
   Body,
 } from '@nestjs/common';
@@ -86,6 +87,33 @@ export class DocumentsController {
       data: result,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
     };
+  }
+
+  @Get('admin/documents/:documentId/content')
+  async getDocumentContent(
+    @Param('documentId') documentId: string,
+    @Res() res: any,
+  ) {
+    const file = await this.documentsService.getDocumentContent(documentId);
+    const encodedName = encodeURIComponent(file.filename);
+    const mime = file.mimeType || 'application/octet-stream';
+    const disposition = `inline; filename="${file.filename.replace(/"/g, '')}"; filename*=UTF-8''${encodedName}`;
+
+    // Fastify reply
+    if (typeof res.header === 'function' && typeof res.send === 'function') {
+      res.header('Content-Type', mime);
+      res.header('Content-Disposition', disposition);
+      res.header('Content-Length', String(file.buffer.length));
+      res.header('X-Content-Type-Options', 'nosniff');
+      return res.send(file.buffer);
+    }
+
+    // Express response
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', disposition);
+    res.setHeader('Content-Length', String(file.buffer.length));
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.end(file.buffer);
   }
 
   @Get('admin/documents/:documentId/parse-status')

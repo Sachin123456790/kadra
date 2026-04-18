@@ -9,12 +9,8 @@ import { EmptyState } from "@/components/kadra/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMyDistributions, getInvestorWaterfallBreakdown } from "@/services";
 import type { InvestorDistributionLineItem, WaterfallBreakdown } from "@/services/investor-portal.service";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { DerivedAmount } from "@/components/kadra/DerivedAmount";
+import type { DerivationStep } from "@/components/kadra/DerivedAmount";
 import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
 import { Info } from "lucide-react";
 
@@ -40,23 +36,37 @@ const WATERFALL_TIERS: WaterfallTier[] = [
   { tier: 4, name: "Carried Interest", description: "Remaining profits split 80/20", lpShare: "80%", gpShare: "20%" },
 ];
 
-// ── Tooltip number display ──────────────────────────────────
+// ── Derived amount shortcut ──────────────────────────────────
 
-function TooltipNumber({ value, breakdown }: { value: string; breakdown: string }) {
+interface DerivedDistValueProps {
+  readonly value: string;
+  readonly label: string;
+  readonly formula: string;
+  readonly steps: ReadonlyArray<DerivationStep>;
+  readonly runId?: string;
+  readonly asOf?: string;
+}
+
+function DerivedDistValue({ value, label, formula, steps, runId, asOf }: DerivedDistValueProps) {
   const numValue = Number(value);
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="cursor-help border-b border-dotted border-gray-400">
-            {fmt(numValue)}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
-          <p className="text-xs">{breakdown}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <DerivedAmount
+      amount={fmt(numValue)}
+      label={label}
+      formula={formula}
+      steps={steps}
+      result={fmt(numValue)}
+      asOf={asOf}
+      sourceDocumentRef={
+        runId
+          ? {
+              id: runId,
+              name: "Distribution run",
+              route: "/distribution",
+            }
+          : undefined
+      }
+    />
   );
 }
 
@@ -90,7 +100,7 @@ function WaterfallBreakdownSection({
           <select
             value={selectedRunId ?? selectedItem?.run.id ?? ""}
             onChange={(e) => onSelectRun(e.target.value)}
-            className="w-full max-w-xs px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-card"
+            className="w-full max-w-xs px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-ring focus:border-primary bg-card"
           >
             {distributions.map((d) => (
               <option key={d.run.id} value={d.run.id}>
@@ -109,7 +119,7 @@ function WaterfallBreakdownSection({
             className="border border-border rounded-lg p-4 bg-muted"
           >
             <div className="flex items-center gap-2 mb-2">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-foreground text-xs font-semibold">
                 {tier.tier}
               </span>
               <h4 className="text-sm font-semibold text-foreground">{tier.name}</h4>
@@ -148,45 +158,130 @@ function WaterfallBreakdownSection({
             <div>
               <p className="text-xs text-muted-foreground mb-1">Return of Capital</p>
               <p className="text-sm font-medium text-foreground">
-                <TooltipNumber
+                <DerivedDistValue
                   value={selectedItem.returnOfCapitalAmount}
-                  breakdown={`Tier 1: 100% to LP. Your share based on ${selectedItem.ownershipPctUsed ?? 0}% ownership.`}
+                  label="Return of Capital (Tier 1)"
+                  formula="Distribution × LP share × ownership %"
+                  steps={[
+                    { label: "Tier 1 allocation", value: "100% to LP", formula: "no GP share" },
+                    {
+                      label: "Your ownership of fund",
+                      value: `${selectedItem.ownershipPctUsed ?? 0}%`,
+                    },
+                    {
+                      label: "Your return-of-capital slice",
+                      value: fmt(Number(selectedItem.returnOfCapitalAmount)),
+                    },
+                  ]}
+                  runId={selectedItem.run.id}
+                  asOf={selectedItem.run.asOfTimestamp}
                 />
               </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Preferred Return</p>
               <p className="text-sm font-medium text-foreground">
-                <TooltipNumber
+                <DerivedDistValue
                   value={selectedItem.prefAmount}
-                  breakdown={`Tier 2: ${prefRate} simple annual preferred return on contributed capital.`}
+                  label="Preferred Return (Tier 2)"
+                  formula="Contributed capital × preferred rate × time"
+                  steps={[
+                    { label: "Preferred rate (LPA)", value: prefRate, formula: "simple annual" },
+                    {
+                      label: "Your ownership",
+                      value: `${selectedItem.ownershipPctUsed ?? 0}%`,
+                    },
+                    {
+                      label: "Your preferred return slice",
+                      value: fmt(Number(selectedItem.prefAmount)),
+                    },
+                  ]}
+                  runId={selectedItem.run.id}
+                  asOf={selectedItem.run.asOfTimestamp}
                 />
               </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">GP Promote</p>
               <p className="text-sm font-medium text-foreground">
-                <TooltipNumber
+                <DerivedDistValue
                   value={selectedItem.promoteAmount}
-                  breakdown="Tier 3-4: GP catch-up and carried interest (20% GP share of profits above pref)."
+                  label="GP Promote (Tier 3–4)"
+                  formula="GP catch-up + carried interest on profits above pref"
+                  steps={[
+                    { label: "Tier 3 — GP catch-up", value: "100% to GP until 20% of profits" },
+                    { label: "Tier 4 — Carried interest", value: "80/20 LP/GP split" },
+                    {
+                      label: "Promote attributable to your slice",
+                      value: fmt(Number(selectedItem.promoteAmount)),
+                    },
+                  ]}
+                  runId={selectedItem.run.id}
+                  asOf={selectedItem.run.asOfTimestamp}
                 />
               </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Gross Amount</p>
               <p className="text-sm font-medium text-foreground">
-                <TooltipNumber
+                <DerivedDistValue
                   value={selectedItem.grossAmount}
-                  breakdown="Total gross distribution before any withholding or adjustments."
+                  label="Gross Distribution"
+                  formula="Return of Capital + Preferred Return + Residual (before withholding)"
+                  steps={[
+                    {
+                      label: "Return of capital",
+                      value: fmt(Number(selectedItem.returnOfCapitalAmount)),
+                      formula: "+",
+                    },
+                    {
+                      label: "Preferred return",
+                      value: fmt(Number(selectedItem.prefAmount)),
+                      formula: "+",
+                    },
+                    {
+                      label: "Residual (net − pref − RoC)",
+                      value: fmt(
+                        Math.max(
+                          0,
+                          Number(selectedItem.netAmount) -
+                            Number(selectedItem.returnOfCapitalAmount) -
+                            Number(selectedItem.prefAmount),
+                        ),
+                      ),
+                      formula: "+",
+                    },
+                  ]}
+                  runId={selectedItem.run.id}
+                  asOf={selectedItem.run.asOfTimestamp}
                 />
               </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Net Amount</p>
               <p className="text-lg font-semibold text-foreground">
-                <TooltipNumber
+                <DerivedDistValue
                   value={selectedItem.netAmount}
-                  breakdown={`Net amount received: Gross (${fmt(Number(selectedItem.grossAmount))}) minus any withholding.`}
+                  label="Net Distribution"
+                  formula="Gross − withholding/adjustments"
+                  steps={[
+                    {
+                      label: "Gross distribution",
+                      value: fmt(Number(selectedItem.grossAmount)),
+                      formula: "−",
+                    },
+                    {
+                      label: "Withholding / adjustments",
+                      value: fmt(
+                        Math.max(
+                          0,
+                          Number(selectedItem.grossAmount) - Number(selectedItem.netAmount),
+                        ),
+                      ),
+                    },
+                  ]}
+                  runId={selectedItem.run.id}
+                  asOf={selectedItem.run.asOfTimestamp}
                 />
               </p>
             </div>

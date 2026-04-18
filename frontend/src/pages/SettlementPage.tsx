@@ -767,7 +767,9 @@ function SettlementHistoryOnly({ fundId }: { readonly fundId: string }) {
           <thead>
             <tr className="border-b border-border">
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">LP Name</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Called Amount</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Committed Amount</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Settled Amount</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Allocation</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Three-Way Match</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
@@ -779,6 +781,10 @@ function SettlementHistoryOnly({ fundId }: { readonly fundId: string }) {
             {settledSubs.map((sub) => (
               <tr key={sub.subscriptionId} className="border-b border-border">
                 <td className="px-4 py-3 font-medium text-foreground">{sub.investorName || sub.investorId}</td>
+                {/* TODO: Replace with calledAmount from capital calls cross-reference */}
+                <td className="px-4 py-3 text-foreground">${Number(sub.committedAmount).toLocaleString()}</td>
+                <td className="px-4 py-3 text-foreground">${Number(sub.committedAmount).toLocaleString()}</td>
+                {/* TODO: Replace with actual settledAmount from settlement records */}
                 <td className="px-4 py-3 text-foreground">${Number(sub.committedAmount).toLocaleString()}</td>
                 <td className="px-4 py-3 text-foreground">{Number(sub.allocationPct)}%</td>
                 <td className="px-4 py-3">

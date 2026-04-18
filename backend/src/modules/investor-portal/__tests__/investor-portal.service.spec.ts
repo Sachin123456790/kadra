@@ -9,9 +9,11 @@ const mockPrisma = () => ({
   },
   subscription: {
     findMany: jest.fn(),
+    findFirst: jest.fn(),
   },
   document: {
     findMany: jest.fn(),
+    findUnique: jest.fn(),
   },
   wallet: {
     findMany: jest.fn(),
@@ -226,6 +228,76 @@ describe('InvestorPortalService', () => {
       expect(result.waterfallConfig).not.toBeNull();
       expect(result.distributionRun).toBeNull();
       expect(result.lineItem).toBeNull();
+    });
+  });
+
+  describe('assertInvestorCanAccessDocument', () => {
+    const documentId = 'doc-xyz';
+
+    it('allows access to documents directly linked to the investor', async () => {
+      prisma.document.findUnique.mockResolvedValue({
+        id: documentId,
+        fundId,
+        linkedEntityType: 'INVESTOR',
+        linkedEntityId: investorId,
+        deletedAt: null,
+      });
+
+      await expect(
+        service.assertInvestorCanAccessDocument(investorId, fundId, documentId),
+      ).resolves.toBeUndefined();
+    });
+
+    it('allows access to governing documents of investor subscriptions', async () => {
+      prisma.document.findUnique.mockResolvedValue({
+        id: documentId,
+        fundId,
+        linkedEntityType: null,
+        linkedEntityId: null,
+        deletedAt: null,
+      });
+      prisma.subscription.findFirst.mockResolvedValue({ id: 'sub-1' });
+
+      await expect(
+        service.assertInvestorCanAccessDocument(investorId, fundId, documentId),
+      ).resolves.toBeUndefined();
+    });
+
+    it('throws when document does not exist', async () => {
+      prisma.document.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.assertInvestorCanAccessDocument(investorId, fundId, documentId),
+      ).rejects.toThrow();
+    });
+
+    it('throws when document belongs to a different fund', async () => {
+      prisma.document.findUnique.mockResolvedValue({
+        id: documentId,
+        fundId: 'other-fund',
+        linkedEntityType: 'INVESTOR',
+        linkedEntityId: investorId,
+        deletedAt: null,
+      });
+
+      await expect(
+        service.assertInvestorCanAccessDocument(investorId, fundId, documentId),
+      ).rejects.toThrow();
+    });
+
+    it('throws when document is linked to a different investor with no matching subscription', async () => {
+      prisma.document.findUnique.mockResolvedValue({
+        id: documentId,
+        fundId,
+        linkedEntityType: 'INVESTOR',
+        linkedEntityId: 'other-investor',
+        deletedAt: null,
+      });
+      prisma.subscription.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.assertInvestorCanAccessDocument(investorId, fundId, documentId),
+      ).rejects.toThrow();
     });
   });
 });

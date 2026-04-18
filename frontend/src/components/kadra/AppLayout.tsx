@@ -69,14 +69,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
     : "KA";
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col">
       {/* Top Bar */}
       <header className="h-14 bg-topbar flex items-center justify-between px-4 shrink-0 z-30">
         <div className="flex items-center gap-3">
           <button className="lg:hidden text-topbar-foreground" onClick={() => setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <Link to={homeRoute} className="text-lg font-bold text-topbar-foreground tracking-tight">Angainor</Link>
+          <Link to={homeRoute} className="flex items-center">
+            <img src="/logo-combomark-white.svg" alt="Angainor" className="h-6" />
+          </Link>
           {isAdmin && fundData && (
             <div className="hidden sm:flex items-center gap-2 ml-2 pl-2 border-l border-topbar-foreground/20">
               <span className="text-sm font-medium text-topbar-foreground/80">{fundData.fundName}</span>
@@ -132,8 +134,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 recentNotifications.map((n) => (
                   <DropdownMenuItem
                     key={n.id}
-                    className="flex flex-col items-start gap-1 py-2.5 cursor-pointer"
-                    onClick={() => markAsRead(n.id)}
+                    className="flex flex-col items-start gap-1 py-2.5 cursor-pointer focus:bg-indigo-50"
+                    onClick={() => {
+                      markAsRead(n.id);
+                      navigate(n.targetRoute);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        markAsRead(n.id);
+                        navigate(n.targetRoute);
+                      }
+                    }}
                   >
                     <div className="flex items-start gap-2 w-full">
                       {!n.read && <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />}
@@ -232,13 +244,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          {/* Sidebar footer */}
-          <div className="p-3 border-t border-sidebar-border">
-            <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
-              <div className="h-1.5 w-1.5 rounded-full bg-success" />
-              System Online
-            </div>
-          </div>
         </aside>
 
         {/* Overlay */}

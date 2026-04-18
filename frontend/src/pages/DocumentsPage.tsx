@@ -57,7 +57,6 @@ import {
   Search,
   Copy,
   Bell,
-  Download,
   ShieldCheck,
   ChevronDown,
   ChevronRight,
@@ -69,7 +68,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
-import { API_BASE_URL } from "@/config/constants";
+import { DocumentViewerModal } from "@/components/kadra/DocumentViewerModal";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -158,7 +157,9 @@ const DOCUMENT_TYPE_OPTIONS = [
 
 // ── Governing Documents table columns ────────────────────────
 
-const governingDocColumns: Column<FundDocument>[] = [
+const buildGoverningDocColumns = (
+  onView: (doc: FundDocument) => void,
+): Column<FundDocument>[] => [
   {
     key: "originalFilename",
     header: "Document Name",
@@ -238,19 +239,19 @@ const governingDocColumns: Column<FundDocument>[] = [
     render: (row) => <StatusBadge status={mapParseStatus(row.parseStatus)} />,
   },
   {
-    key: "download",
+    key: "actions",
     header: "",
     render: (row) => (
       <button
         onClick={(e) => {
           e.stopPropagation();
-          window.open(`${API_BASE_URL}/documents/${row.documentId}/download`, "_blank");
+          onView(row);
         }}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
-        title={`Download ${row.originalFilename}`}
+        title={`View ${row.originalFilename}`}
       >
-        <Download className="h-3.5 w-3.5" />
-        Download
+        <Eye className="h-3.5 w-3.5" />
+        View
       </button>
     ),
   },
@@ -351,6 +352,83 @@ function NoticeTableWithFilter({
   );
 }
 
+// ── Reporting Section ────────────────────────────────────────
+
+// TODO: Replace MOCK_REPORTS with real API call to GET /admin/funds/:fundId/reporting-documents
+const MOCK_REPORTS = [
+  { id: '1', name: 'Q1 2027 Quarterly LP Report', type: 'Quarterly Report', uploadDate: '2027-03-31', recipients: 'All LPs', uploadedBy: 'Fund Admin' },
+  { id: '2', name: 'Annual Investor Update 2026', type: 'Annual Report', uploadDate: '2027-01-15', recipients: 'All LPs', uploadedBy: 'Fund Admin' },
+];
+
+function ReportingSection() {
+  return (
+    <SectionCard
+      title="LP Reporting Packages"
+      action={
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button disabled variant="outline" size="sm" className="gap-1.5">
+                  <Upload className="h-4 w-4" />
+                  Upload Report
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Coming soon</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      }
+    >
+      {MOCK_REPORTS.length === 0 ? (
+        <EmptyState
+          title="No reporting packages"
+          message="LP reporting packages will appear here once uploaded."
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Document Name</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Upload Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Recipients</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Uploaded By</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">View</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_REPORTS.map((report) => (
+                <tr key={report.id} className="border-b border-border">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-foreground">{report.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{report.type}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{new Date(report.uploadDate).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{report.recipients}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{report.uploadedBy}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-muted transition-colors"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
 // ── Main component ──────────────────────────────────────────
 
 export default function DocumentsPage() {
@@ -368,6 +446,11 @@ export default function DocumentsPage() {
   const [fieldEdits, setFieldEdits] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [uploadDocType, setUploadDocType] = useState<string>("Master LPA");
+  const [viewerDoc, setViewerDoc] = useState<{ id: string; filename: string } | null>(null);
+
+  const governingDocColumns = buildGoverningDocColumns((doc) =>
+    setViewerDoc({ id: doc.documentId, filename: doc.originalFilename }),
+  );
 
   // ── Queries ────────────────────────────────────────────────
 
@@ -731,6 +814,10 @@ export default function DocumentsPage() {
             <Bell className="h-4 w-4" />
             Generated Notices
           </TabsTrigger>
+          <TabsTrigger value="reporting" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Reporting
+          </TabsTrigger>
           <TabsTrigger value="upload" className="flex items-center gap-2">
             <Upload className="h-4 w-4" />
             Document Upload
@@ -742,7 +829,7 @@ export default function DocumentsPage() {
           <SectionCard title="Uploaded Documents" className="mb-6">
             {docsLoading && (
               <div className="flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 Loading documents...
               </div>
             )}
@@ -975,7 +1062,7 @@ export default function DocumentsPage() {
                                         [field.fieldId]: e.target.value,
                                       }))
                                     }
-                                    className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                                   />
                                 )}
                               </td>
@@ -1036,7 +1123,7 @@ export default function DocumentsPage() {
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Enter additional notes, observations, or instructions..."
                     rows={3}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </SectionCard>
               )}
@@ -1149,7 +1236,7 @@ export default function DocumentsPage() {
                         <div className="flex justify-end">
                           <Button
                             onClick={openApproveModal}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
                           >
                             <Eye className="h-4 w-4 mr-2" />
                             Review & Create Subscriptions
@@ -1169,7 +1256,7 @@ export default function DocumentsPage() {
           <SectionCard title="Generated Notices">
             {noticesLoading && (
               <div className="flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 Loading notices...
               </div>
             )}
@@ -1188,7 +1275,12 @@ export default function DocumentsPage() {
           </SectionCard>
         </TabsContent>
 
-        {/* Tab 3: Document Upload */}
+        {/* Tab 3: Reporting */}
+        <TabsContent value="reporting">
+          <ReportingSection />
+        </TabsContent>
+
+        {/* Tab 4: Document Upload */}
         <TabsContent value="upload">
           <SectionCard title="Upload Document" className="mb-6">
             {/* Document type selector */}
@@ -1200,7 +1292,7 @@ export default function DocumentsPage() {
                 id="doc-type-select"
                 value={uploadDocType}
                 onChange={(e) => setUploadDocType(e.target.value)}
-                className="w-full sm:w-64 rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full sm:w-64 rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {DOCUMENT_TYPE_OPTIONS.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -1218,7 +1310,7 @@ export default function DocumentsPage() {
                 flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-10 cursor-pointer transition-colors
                 ${
                   isDragOver
-                    ? "border-indigo-500 bg-indigo-50/50"
+                    ? "border-primary bg-muted/50"
                     : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
                 }
               `}
@@ -1244,7 +1336,7 @@ export default function DocumentsPage() {
 
             {uploadMutation.isPending && (
               <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 Uploading and processing document...
               </div>
             )}
@@ -1322,7 +1414,7 @@ export default function DocumentsPage() {
                         onChange={(e) =>
                           updateDraft(idx, "allocationPct", parseFloat(e.target.value) || 0)
                         }
-                        className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -1334,7 +1426,7 @@ export default function DocumentsPage() {
                         onChange={(e) =>
                           updateDraft(idx, "committedAmount", parseFloat(e.target.value) || 0)
                         }
-                        className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -1364,7 +1456,7 @@ export default function DocumentsPage() {
             <div className="relative flex-1">
               <button
                 onClick={() => setShowAddDropdown(!showAddDropdown)}
-                className="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-muted-foreground hover:border-indigo-400 hover:text-indigo-600 transition-colors w-full"
+                className="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-muted-foreground hover:border-gray-400 hover:text-foreground transition-colors w-full"
               >
                 <Plus className="h-4 w-4" />
                 Add Investor
@@ -1412,7 +1504,7 @@ export default function DocumentsPage() {
                             <button
                               key={inv.investorId}
                               onClick={() => addInvestorToDrafts(inv)}
-                              className="flex items-center justify-between w-full px-3 py-2 text-sm text-left hover:bg-indigo-50 transition-colors"
+                              className="flex items-center justify-between w-full px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
                             >
                               <div>
                                 <span className="font-medium text-foreground">{inv.legalName}</span>
@@ -1503,7 +1595,7 @@ export default function DocumentsPage() {
                   subscriptionDrafts.reduce((sum, d) => sum + d.allocationPct, 0) - 100,
                 ) > 0.01
               }
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               {approveMutation.isPending ? (
                 <div className="flex items-center gap-2">
@@ -1517,6 +1609,18 @@ export default function DocumentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Document Viewer Modal */}
+      {viewerDoc && (
+        <DocumentViewerModal
+          open={viewerDoc !== null}
+          onOpenChange={(open) => {
+            if (!open) setViewerDoc(null);
+          }}
+          contentPath={`/admin/documents/${viewerDoc.id}/content`}
+          filename={viewerDoc.filename}
+        />
+      )}
     </div>
   );
 }
