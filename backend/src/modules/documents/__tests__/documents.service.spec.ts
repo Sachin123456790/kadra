@@ -73,7 +73,7 @@ describe('DocumentsService', () => {
     parse: jest.fn().mockResolvedValue([
       {
         fieldName: 'fund_name',
-        fieldValueText: 'Kadra Demo Fund I',
+        fieldValueText: 'Angainor Demo Fund I',
         confidence: 0.98,
         sourcePage: 1,
       },
@@ -230,7 +230,6 @@ describe('DocumentsService', () => {
       expect(result.parseStatus).toBe('COMPLETED');
       expect(result.hashStatus).toBe('ANCHORED');
       expect(result.extractionSummary.fieldsExtracted).toBe(3);
-      expect(result.extractionSummary.lowConfidenceFields).toBe(1); // 0.85 < 0.9
     });
 
     it('should throw NotFoundError for non-existent document', async () => {

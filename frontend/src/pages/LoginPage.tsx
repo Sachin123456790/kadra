@@ -108,9 +108,14 @@ export default function LoginPage() {
 
       login(response.data.accessToken, response.data.user, response.data.refreshToken);
       const userRole = response.data.user.role;
-      const destination = (fromState && isSafeRedirect(fromState, userRole))
-        ? fromState
-        : getDefaultRoute(userRole);
+      // Fresh investor signups go straight into the onboarding wizard so they
+      // hit a guided flow instead of an empty dashboard.
+      const destination =
+        mode === "signup" && userRole === "investor"
+          ? "/investor/onboarding"
+          : (fromState && isSafeRedirect(fromState, userRole))
+            ? fromState
+            : getDefaultRoute(userRole);
       navigate(destination, { replace: true });
     } catch (err) {
       if (err instanceof ApiRequestError) {

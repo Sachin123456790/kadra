@@ -9,7 +9,7 @@ Replaced stub implementations that always returned 0 with real viem-based chain 
 ## How It Works Now
 
 ### ingestChainEvents()
-- Uses `publicClient.getContractEvents()` to fetch real Transfer events from KadraToken
+- Uses `publicClient.getContractEvents()` to fetch real Transfer events from AngainorToken
 - Scans from the last processed block to current block
 - Creates `tokenPositionEvent` records for each Transfer event found
 - Returns actual count of ingested events

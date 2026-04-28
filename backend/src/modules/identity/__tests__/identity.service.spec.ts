@@ -5,7 +5,12 @@ import { NotFoundError, ConflictError } from '../../../common/errors';
 
 const mockPrisma = () => ({
   fund: { findUnique: jest.fn() },
-  investor: { findMany: jest.fn(), findUnique: jest.fn() },
+  investor: {
+    create: jest.fn(),
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+  },
   wallet: { findUnique: jest.fn() },
   investorFundEligibility: {
     findFirst: jest.fn(),
@@ -27,6 +32,37 @@ describe('IdentityService', () => {
       prisma as unknown as PrismaService,
       mockEventLog,
     );
+  });
+
+  describe('createInvestor', () => {
+    it('defaults new investors to UNKNOWN verification', async () => {
+      const createdAt = new Date('2026-01-01T00:00:00Z');
+      prisma.investor.create.mockResolvedValue({
+        id: 'inv-1',
+        legalName: 'New Investor LLC',
+        email: 'new@example.com',
+        verificationStatus: 'UNKNOWN',
+        verifiedAt: null,
+        metadata: {},
+        createdAt,
+      });
+
+      const result = await service.createInvestor({
+        legalName: 'New Investor LLC',
+        email: 'new@example.com',
+      });
+
+      expect(prisma.investor.create).toHaveBeenCalledWith({
+        data: {
+          legalName: 'New Investor LLC',
+          email: 'new@example.com',
+          verificationStatus: 'UNKNOWN',
+          verifiedAt: null,
+          metadata: {},
+        },
+      });
+      expect(result.verificationStatus).toBe('UNKNOWN');
+    });
   });
 
   describe('listInvestors', () => {
@@ -115,11 +151,13 @@ describe('IdentityService', () => {
     const fundId = 'fund-1';
     const input = { investorId: 'inv-1', walletId: 'w-1', status: 'ELIGIBLE' };
 
-    it('grants eligibility for verified investor (create path)', async () => {
+    it('grants eligibility for KYC and accredited investor (create path)', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
       prisma.investor.findUnique.mockResolvedValue({
         id: 'inv-1',
-        verificationStatus: 'VERIFIED',
+        verificationStatus: 'UNKNOWN',
+        kycStatus: 'APPROVED',
+        accreditationStatus: 'APPROVED',
       });
       prisma.wallet.findUnique.mockResolvedValue({
         id: 'w-1',
@@ -143,7 +181,9 @@ describe('IdentityService', () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
       prisma.investor.findUnique.mockResolvedValue({
         id: 'inv-1',
-        verificationStatus: 'VERIFIED',
+        verificationStatus: 'UNKNOWN',
+        kycStatus: 'APPROVED',
+        accreditationStatus: 'APPROVED',
       });
       prisma.wallet.findUnique.mockResolvedValue({
         id: 'w-1',
@@ -170,18 +210,20 @@ describe('IdentityService', () => {
       expect(prisma.investorFundEligibility.update).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects unverified investor', async () => {
+    it('rejects investor without approved KYC and accreditation', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
       prisma.investor.findUnique.mockResolvedValue({
         id: 'inv-1',
-        verificationStatus: 'UNKNOWN',
+        verificationStatus: 'VERIFIED',
+        kycStatus: 'PENDING',
+        accreditationStatus: 'PENDING',
       });
 
       await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(
         ConflictError,
       );
       await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(
-        'Investor must be VERIFIED',
+        'Investor must have approved KYC and accreditation',
       );
     });
 
@@ -189,7 +231,9 @@ describe('IdentityService', () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
       prisma.investor.findUnique.mockResolvedValue({
         id: 'inv-1',
-        verificationStatus: 'VERIFIED',
+        verificationStatus: 'UNKNOWN',
+        kycStatus: 'APPROVED',
+        accreditationStatus: 'APPROVED',
       });
       prisma.wallet.findUnique.mockResolvedValue({
         id: 'w-1',
@@ -223,7 +267,9 @@ describe('IdentityService', () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
       prisma.investor.findUnique.mockResolvedValue({
         id: 'inv-1',
-        verificationStatus: 'VERIFIED',
+        verificationStatus: 'UNKNOWN',
+        kycStatus: 'APPROVED',
+        accreditationStatus: 'APPROVED',
       });
       prisma.wallet.findUnique.mockResolvedValue(null);
       await expect(service.upsertEligibility(fundId, input)).rejects.toThrow(

@@ -6,7 +6,7 @@ const { hashDocument, hashFile } = require("../lib/document-hasher");
 
 describe("DocumentHasher", function () {
   it("Should produce a deterministic hash for the same content", function () {
-    const content = Buffer.from("Kadra Fund I - Limited Partnership Agreement");
+    const content = Buffer.from("Angainor Fund I - Limited Partnership Agreement");
     const result1 = hashDocument(content);
     const result2 = hashDocument(content);
 
@@ -53,8 +53,8 @@ describe("DocumentHasher", function () {
     let tmpFile;
 
     beforeEach(function () {
-      tmpFile = path.join(os.tmpdir(), "kadra-test-doc-" + Date.now() + ".txt");
-      fs.writeFileSync(tmpFile, "Kadra LPA content for hashing test");
+      tmpFile = path.join(os.tmpdir(), "angainor-test-doc-" + Date.now() + ".txt");
+      fs.writeFileSync(tmpFile, "Angainor LPA content for hashing test");
     });
 
     afterEach(function () {
@@ -71,7 +71,7 @@ describe("DocumentHasher", function () {
     });
 
     it("Should match hashDocument when given the same content", function () {
-      const content = Buffer.from("Kadra LPA content for hashing test");
+      const content = Buffer.from("Angainor LPA content for hashing test");
       const fromBuffer = hashDocument(content);
       const fromFile = hashFile(tmpFile);
       expect(fromFile.hash).to.equal(fromBuffer.hash);

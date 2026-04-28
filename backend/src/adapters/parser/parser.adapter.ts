@@ -2,7 +2,6 @@ export interface ExtractedField {
   fieldName: string;
   fieldValueText?: string;
   fieldValueNumeric?: number;
-  confidence: number;
   sourcePage?: number;
 }
 

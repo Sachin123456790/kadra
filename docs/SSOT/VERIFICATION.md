@@ -1,10 +1,10 @@
-# Kadra SSOT for deployed app verification
+# Angainor SSOT for deployed app verification
 
 ## 1. Product identity and core claim
 
-Kadra is **not** a generic crypto dashboard. It is an operating system for private real-estate fund administration. Its value is that executed legal agreements, investor permissioning, settlement evidence, on-chain ownership, transfer restrictions, distributions, and auditability all become one connected system instead of being split across PDFs, spreadsheets, emails, and manual back-office review.  
+Angainor is **not** a generic crypto dashboard. It is an operating system for private real-estate fund administration. Its value is that executed legal agreements, investor permissioning, settlement evidence, on-chain ownership, transfer restrictions, distributions, and auditability all become one connected system instead of being split across PDFs, spreadsheets, emails, and manual back-office review.  
 
-The strongest claim Kadra must prove is:
+The strongest claim Angainor must prove is:
 
 **A fund can upload its governing legal document, create structured subscription intent for investors, validate settlement, mint ownership only after settlement, enforce fund-specific transfer restrictions on-chain, and expose cap table, history, distributions, and audit exports through a clean institutional dashboard.**  
 
@@ -54,7 +54,7 @@ For Claude Code verification, the deployed app must satisfy these top-level trut
 
 ### 3.1 Legal document first
 
-The system begins with a **Master LPA** or governing legal document uploaded into the dashboard. Kadra must parse the document, extract relevant governing clauses, compute a **SHA-256 hash**, timestamp it, and register it as the governing agreement for the fund. The original document stays off-chain; the cryptographic reference and structured metadata become canonical system references.  
+The system begins with a **Master LPA** or governing legal document uploaded into the dashboard. Angainor must parse the document, extract relevant governing clauses, compute a **SHA-256 hash**, timestamp it, and register it as the governing agreement for the fund. The original document stays off-chain; the cryptographic reference and structured metadata become canonical system references.  
 
 ### 3.2 Ownership intent is not ownership
 
@@ -95,7 +95,7 @@ A fund entity must exist and hold:
 * waterfall configuration version
 * linked token contract address once deployed/activated
 
-The demo spec names the example fund as **Kadra Demo Fund I** and requires that the fund, the rules, and the investors can exist before ownership exists. 
+The demo spec names the example fund as **Angainor Demo Fund I** and requires that the fund, the rules, and the investors can exist before ownership exists. 
 
 ### 4.2 Governing document
 
@@ -346,7 +346,7 @@ The main dashboard must show:
 
 The spec’s opening state for the demo is:
 
-* Fund name: Kadra Demo Fund I
+* Fund name: Angainor Demo Fund I
 * Ownership allocated: 0%
 * Active LPs: 0
 * Cap table: empty
@@ -585,7 +585,7 @@ This must be testable in the deployed app because it is explicitly included as a
 6. Ownership ledger remains unchanged except for failed-attempt evidence if tracked.
 7. Dashboard can surface the blocked attempt.
 
-The exact example error in the spec is “Transfer blocked: recipient is not an approved Limited Partner for Kadra Demo Fund I.” 
+The exact example error in the spec is “Transfer blocked: recipient is not an approved Limited Partner for Angainor Demo Fund I.” 
 
 ## 9.6 Legal transfer flow
 
@@ -701,5 +701,5 @@ Claude Code should treat the implementation as correct only if the following are
 
 ## 13. One-paragraph SSOT summary
 
-**Kadra, in its deployed form, is a Vercel-hosted React + Vite application backed by Supabase and the Sepolia testnet that ingests a Master LPA, computes and stores its SHA-256 provenance record, maps verified investors to fund-specific eligible wallets, creates Pending subscription records, validates payment evidence through a 3-way match, mints ERC-3643-based ownership only after settlement succeeds, enforces transfer restrictions on-chain so unapproved recipients are blocked deterministically, mirrors ownership and evidence into a canonical off-chain ledger with capital accounts and waterfall logic, and exposes all of this through a clean institutional dashboard with cap tables, histories, settlement states, distributions, and audit-ready exports.** This preserves the exact business behavior described in the PDFs while adapting the infrastructure from local demo tooling to Vercel, Supabase, and testnet deployment.   
+**Angainor, in its deployed form, is a Vercel-hosted React + Vite application backed by Supabase and the Sepolia testnet that ingests a Master LPA, computes and stores its SHA-256 provenance record, maps verified investors to fund-specific eligible wallets, creates Pending subscription records, validates payment evidence through a 3-way match, mints ERC-3643-based ownership only after settlement succeeds, enforces transfer restrictions on-chain so unapproved recipients are blocked deterministically, mirrors ownership and evidence into a canonical off-chain ledger with capital accounts and waterfall logic, and exposes all of this through a clean institutional dashboard with cap tables, histories, settlement states, distributions, and audit-ready exports.** This preserves the exact business behavior described in the PDFs while adapting the infrastructure from local demo tooling to Vercel, Supabase, and testnet deployment.   
 

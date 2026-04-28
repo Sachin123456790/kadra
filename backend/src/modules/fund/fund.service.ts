@@ -20,7 +20,6 @@ export class FundService {
         legalForm: input.legalForm ?? 'LP',
         jurisdictionCode: input.jurisdictionCode ?? null,
         baseCurrency: input.baseCurrency ?? 'USD',
-        status: 'ACTIVE',
         metadata: {},
       },
     });
@@ -82,10 +81,12 @@ export class FundService {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);
 
-    const [lpCount, eligibleWalletCount, pendingSubs, settledSubs, contract] =
+    const [eligibleInvestors, eligibleWalletCount, pendingSubs, settledSubs, contract] =
       await Promise.all([
-        this.prisma.investor.count({
-          where: { verificationStatus: 'VERIFIED', deletedAt: null },
+        this.prisma.investorFundEligibility.findMany({
+          where: { fundId, eligibilityStatus: 'ELIGIBLE', deletedAt: null },
+          distinct: ['investorId'],
+          select: { investorId: true },
         }),
         this.prisma.investorFundEligibility.count({
           where: { fundId, eligibilityStatus: 'ELIGIBLE', deletedAt: null },
@@ -116,7 +117,13 @@ export class FundService {
       fundId: fund.id,
       fundName: fund.name,
       status: fund.status,
-      lpCount,
+      legalForm:
+        fund.legalForm === 'LP'
+          ? 'Limited Partnership'
+          : fund.legalForm === 'LLC'
+            ? 'LLC'
+            : fund.legalForm,
+      lpCount: eligibleInvestors.length,
       eligibleWalletCount,
       pendingSubscriptions: pendingSubs,
       settledSubscriptions: settledSubs,

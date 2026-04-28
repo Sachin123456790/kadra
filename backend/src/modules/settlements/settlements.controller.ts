@@ -2,13 +2,13 @@ import { Controller, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { SettlementsService } from './settlements.service';
 import { UploadPaymentEvidenceDto, OverrideSettlementDto } from './settlements.dto';
 import { randomUUID } from 'crypto';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/auth/roles.decorator';
 import { ADMIN_ROLES } from '../../common/auth/auth.types';
 
 @Controller('admin/subscriptions')
-@UseGuards(SupabaseAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(...ADMIN_ROLES)
 export class SettlementsController {
   constructor(private readonly settlementsService: SettlementsService) {}
@@ -66,7 +66,7 @@ export class SettlementsController {
 }
 
 @Controller('admin/settlements')
-@UseGuards(SupabaseAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(...ADMIN_ROLES)
 export class SettlementOverrideController {
   constructor(private readonly settlementsService: SettlementsService) {}

@@ -1,6 +1,6 @@
-# Kadra Frontend
+# Angainor Frontend
 
-Institutional-grade dashboard for the Kadra real estate fund platform.
+Institutional-grade dashboard for the Angainor real estate fund platform.
 
 ## Tech Stack
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { PageHeader } from '@/components/kadra/PageHeader';
-import { SectionCard } from '@/components/kadra/SectionCard';
+import { PageHeader } from '@/components/angainor/PageHeader';
+import { SectionCard } from '@/components/angainor/SectionCard';
 import {
   ChevronDown, ChevronUp, BookOpen, Shield, Users, Landmark,
   PieChart, ArrowLeftRight, FileText, Mail, ExternalLink,

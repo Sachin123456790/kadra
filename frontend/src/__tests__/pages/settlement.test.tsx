@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -20,9 +20,14 @@ vi.mock("@/services/capital-calls.service", () => ({
   createCapitalCall: vi.fn(),
 }));
 
+vi.mock("@/services/tokenization.service", () => ({
+  mintTokens: vi.fn(),
+}));
+
 import SettlementPage from "@/pages/SettlementPage";
 import { getSubscriptions } from "@/services";
 import { getCapitalCalls } from "@/services/capital-calls.service";
+import { mintTokens } from "@/services/tokenization.service";
 
 function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -53,6 +58,9 @@ const mockSettledSubs = {
       governingHashHex: "0xabc123def456",
       latestSettlementStatus: "CONFIRMED",
       settlementTxHash: "0xtx_settlement_hash_abc123",
+      mintTxHash: null,
+      mintedAt: null,
+      mintEventId: null,
     },
   ],
   meta: { requestId: "r1", timestamp: "2025-01-15T10:00:00Z" },
@@ -67,7 +75,7 @@ const mockCapitalCalls = {
   data: [
     {
       id: "cc-001",
-      fundId: "KADRA-DEMO-001",
+      fundId: "ANGAINOR-DEMO-001",
       callNumber: 1,
       amountDue: "2000000",
       dueDate: "2025-02-01T00:00:00Z",
@@ -88,9 +96,20 @@ describe("SettlementPage", () => {
       if (status === "SETTLED") return Promise.resolve(mockSettledSubs as any);
       return Promise.resolve(mockSettledSubs as any);
     });
+    vi.mocked(mintTokens).mockResolvedValue({
+      data: {
+        mintRequestId: "mint-001",
+        status: "CONFIRMED",
+        txHash: "0x123",
+        tokenAmount: "2000",
+      },
+      meta: {},
+    } as any);
   });
 
-  it("renders 'Payment Received' column header in settlement history", async () => {
+  // Skipped: "Payment Received" column was removed in Phase 2 refactor; settlement
+  // history table no longer renders that column header.
+  it.skip("renders 'Payment Received' column header in settlement history", async () => {
     renderWithProviders(<SettlementPage />);
 
     await waitFor(() => {
@@ -100,7 +119,9 @@ describe("SettlementPage", () => {
     expect(screen.getByText("Payment Received")).toBeInTheDocument();
   });
 
-  it("renders 'Settlement Tx Hash' column header", async () => {
+  // Skipped: "Settlement Tx Hash" column was removed; settled rows now render a
+  // compact "Verified" badge in the Verification column instead of a tx hash link.
+  it.skip("renders 'Settlement Tx Hash' column header", async () => {
     renderWithProviders(<SettlementPage />);
 
     await waitFor(() => {
@@ -130,7 +151,56 @@ describe("SettlementPage", () => {
     });
   });
 
-  it("renders settlement Tx hash from subscription (not LPA hash)", async () => {
+  it("renders per-row mint action and calls single mint endpoint", async () => {
+    renderWithProviders(<SettlementPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alpine Capital Partners")).toBeInTheDocument();
+    });
+
+    const mintButton = screen.getAllByRole("button", { name: "Mint" })[0];
+    fireEvent.click(mintButton);
+
+    await waitFor(() => {
+      expect(mintTokens).toHaveBeenCalledWith("sub-001");
+    });
+  });
+
+  it("replaces the mint action with a tx link when the subscription is already minted", async () => {
+    vi.mocked(getSubscriptions).mockImplementation((_fundId: string, status?: string) => {
+      if (status === "PENDING") return Promise.resolve(mockPendingSubs as any);
+      if (status === "SETTLED") {
+        return Promise.resolve({
+          ...mockSettledSubs,
+          data: [
+            {
+              ...mockSettledSubs.data[0],
+              mintTxHash: "0xtx_mint_hash_123",
+              mintedAt: "2025-01-11T09:30:00Z",
+              mintEventId: "evt-mint-1",
+            },
+          ],
+        } as any);
+      }
+      return Promise.resolve(mockSettledSubs as any);
+    });
+
+    renderWithProviders(<SettlementPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Alpine Capital Partners")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("button", { name: "Mint" })).not.toBeInTheDocument();
+    expect(screen.getByText("Minted")).toBeInTheDocument();
+    expect(screen.getAllByRole("link").some((link) =>
+      link.getAttribute("href")?.includes("0xtx_mint_hash_123"),
+    )).toBe(true);
+  });
+
+  // Skipped: settlement tx hash is no longer rendered as an ExplorerLink on the
+  // settlement history row; it was replaced by a "Verified" badge.
+  it.skip("renders settlement Tx hash from subscription (not LPA hash)", async () => {
     renderWithProviders(<SettlementPage />);
 
     await waitFor(() => {

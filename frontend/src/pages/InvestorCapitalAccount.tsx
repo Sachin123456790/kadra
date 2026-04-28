@@ -1,13 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
-import { DerivedAmount } from "@/components/kadra/DerivedAmount";
-import type { DerivationStep } from "@/components/kadra/DerivedAmount";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { SkeletonCard, TableSkeleton } from "@/components/angainor/Skeleton";
+import { DerivedAmount } from "@/components/angainor/DerivedAmount";
+import type { DerivationStep } from "@/components/angainor/DerivedAmount";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
-import { getInvestorCapitalAccount } from "@/services/investor-portal.service";
+import {
+  getInvestorCapitalAccount,
+  exportCapitalAccount,
+} from "@/services/investor-portal.service";
+import { toFriendlyMessage } from "@/lib/errorMessages";
+import { useCurrentFund } from "@/hooks/useCurrentFund";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", {
@@ -107,14 +112,31 @@ function EmptyCapitalAccount() {
 
 export default function InvestorCapitalAccount() {
   const fundId = DEFAULT_FUND_CODE;
+  const { waterfallConfig } = useCurrentFund();
+
+  const prefReturnLabel =
+    typeof waterfallConfig?.prefReturnPct === "number"
+      ? `${waterfallConfig.prefReturnPct}% p.a.`
+      : "—";
+
+  const lastTier = waterfallConfig?.rules?.tiers?.[
+    (waterfallConfig?.rules?.tiers?.length ?? 0) - 1
+  ];
+  const carriedInterestLabel = lastTier
+    ? `${lastTier.lpShare}/${lastTier.gpShare} LP/GP`
+    : "—";
 
   const { data: account, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.investorCapitalAccount(fundId),
     queryFn: () => getInvestorCapitalAccount(fundId).then((r) => r.data),
   });
 
-  const handleExport = () => {
-    toast.info("Export feature coming soon");
+  const handleExport = async () => {
+    try {
+      await exportCapitalAccount('csv', fundId);
+    } catch (err) {
+      toast.error(toFriendlyMessage(err));
+    }
   };
 
   if (isLoading) return (
@@ -221,7 +243,7 @@ export default function InvestorCapitalAccount() {
           },
           {
             label: "Preferred return tier (LPA)",
-            value: "8% p.a.",
+            value: prefReturnLabel,
             formula: "× simple annual rate",
           },
           {
@@ -262,7 +284,7 @@ export default function InvestorCapitalAccount() {
         formula: "Pro-rata share of profits above preferred return",
         steps: [
           {
-            label: "Carried interest tier share (80/20 LP/GP)",
+            label: `Carried interest tier share (${carriedInterestLabel})`,
             value: fmt(residualAllocation),
           },
         ],

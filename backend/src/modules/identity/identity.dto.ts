@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsEmail, IsIn, IsInt, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsBoolean,
+} from 'class-validator';
 
 export class CreateInvestorDto {
   @IsString()
@@ -32,4 +39,25 @@ export class LinkWalletDto {
   @IsOptional()
   @IsBoolean()
   isPrimary?: boolean;
+}
+
+export class UpdateVerificationDto {
+  @IsOptional()
+  @IsString()
+  @IsIn(['UNKNOWN', 'VERIFIED', 'REVOKED'])
+  verificationStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['PENDING', 'APPROVED', 'REJECTED'])
+  kycStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['PENDING', 'APPROVED', 'REJECTED'])
+  accreditationStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }

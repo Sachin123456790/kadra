@@ -15,7 +15,7 @@
 | 1d | Cross-fund test (NotFoundError, not ForbiddenError) | PASS | spec:274-286; service line 591 returns `NotFoundError` |
 | 1e | Linked-to-other-investor test (NotFoundError) | PASS | spec:288-301; service line 615 `NotFoundError` |
 | 2 | MIME: Content-Type, Content-Disposition inline, RFC 5987 encoded filename, nosniff | PASS | `documents.controller.ts:98-116`, `investor-portal.controller.ts:201-217` — `filename="..."; filename*=UTF-8''<encoded>`, X-Content-Type-Options: nosniff set on BOTH Fastify and Express branches |
-| 3 | Fastify + Express dual-adapter | PARTIAL | Kadra prod uses Fastify only (`main.ts` imports `FastifyAdapter`); the Express branch in both controllers is dead code in production. Minor: acceptable for testability but adds maintenance cost. |
+| 3 | Fastify + Express dual-adapter | PARTIAL | Angainor prod uses Fastify only (`main.ts` imports `FastifyAdapter`); the Express branch in both controllers is dead code in production. Minor: acceptable for testability but adds maintenance cost. |
 | 4a | Blob URL revoked on close AND unmount | PASS | `DocumentViewerModal.tsx:80-94` — two separate useEffects: one watches `open` flag, one cleans up on unmount |
 | 4b | Auth header from client config | PASS | `DocumentViewerModal.tsx:46-48` — reads `AUTH_TOKEN_KEY` from `@/config/constants`, sends as Bearer |
 | 5a | Admin View button primary, opens modal | PASS | `DocumentsPage.tsx:248-254, 419, 1614-1623` |
@@ -70,7 +70,7 @@ _(none)_
 ### LOW
 1. **Filename header CR/LF hardening** (`documents.controller.ts:100`, `investor-portal.controller.ts:203`): Fallback `filename="..."` only strips `"`. If an attacker upload stored `\r\n` in `originalFilename`, technically valid HTTP framing depends on the server splitting/escaping header values. Fastify's header serializer already rejects CRLF, so exploitability is bounded, but belt-and-suspenders suggests `.replace(/[\r\n"]/g, '')`.
 2. **PDF iframe has no sandbox** (`DocumentViewerModal.tsx:171`): Relies on browser PDF viewer's own sandbox. Add `sandbox="allow-same-origin"` to be explicit. (Cannot use empty sandbox on PDFs — would break native viewer.)
-3. **Dead Express branch** in both controllers. Kadra runs Fastify exclusively in prod. Minor maintenance overhead.
+3. **Dead Express branch** in both controllers. Angainor runs Fastify exclusively in prod. Minor maintenance overhead.
 4. **No rate limiting**. Platform-wide gap — not new in this feature — but the content endpoint streams files, so abuse potential is higher (bandwidth + storage-backend load).
 
 ### Cosmetic

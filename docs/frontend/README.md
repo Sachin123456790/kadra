@@ -1,6 +1,6 @@
-# Kadra Frontend
+# Angainor Frontend
 
-Institutional-grade dashboard for the Kadra real estate fund platform.
+Institutional-grade dashboard for the Angainor real estate fund platform.
 
 ## Tech Stack
 
@@ -37,7 +37,7 @@ frontend/src/
     use-mobile.tsx          # Mobile breakpoint detection
     use-toast.ts            # Toast notification hook
   components/
-    kadra/
+    angainor/
       AppLayout.tsx         # Shell: top bar + sidebar + main content
       AuthProvider.tsx       # Auth state (localStorage), 401 auto-logout
       AuthGuard.tsx          # Route guard + withAuth() HOC
@@ -48,7 +48,7 @@ frontend/src/
       StatusBadge.tsx        # Status chip (Verified, Pending, etc.)
       ErrorAlert.tsx         # Error display component
       EmptyState.tsx         # Empty data placeholder
-      KadraTabs.tsx          # Tab navigation component
+      AngainorTabs.tsx          # Tab navigation component
     ui/                     # shadcn/ui primitives (40+ components)
   pages/
     LoginPage.tsx           # Demo login (accepts any credentials)

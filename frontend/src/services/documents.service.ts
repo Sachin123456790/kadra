@@ -47,6 +47,8 @@ export interface FundDocument {
   byteSize: number;
   parseStatus: string;
   uploadedBy: string | null;
+  linkedEntityType: string | null;
+  linkedEntityId: string | null;
   hash: {
     hashHex: string;
     algorithm: string;
@@ -64,7 +66,6 @@ export interface ExtractedField {
   fieldValueText: string | null;
   fieldValueNumeric: number | null;
   fieldValueJson: unknown;
-  confidence: number;
   sourcePage: number | null;
   extractionRunRef: string;
   createdAt: string;
@@ -118,6 +119,53 @@ export function updateExtractedFields(
     `/admin/documents/${documentId}/extracted-fields`,
     { fieldUpdates },
   );
+}
+
+// ── GP Reporting Documents (admin) ─────────────────────────
+
+export interface ReportingDocument {
+  documentId: string;
+  title: string;
+  period: string | null;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+  uploadedAt: string;
+  uploadedBy: string | null;
+}
+
+export function getAdminReportingDocuments(fundId: string) {
+  return get<ReportingDocument[]>(`/admin/funds/${fundId}/reporting-documents`);
+}
+
+export function uploadReportingDocument(
+  fundId: string,
+  file: File,
+  title: string,
+  period: string,
+) {
+  // Use native fetch to include multipart fields alongside the file
+  return (async () => {
+    const { API_BASE_URL, AUTH_TOKEN_KEY } = await import('@/config/constants');
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', title);
+    formData.append('period', period);
+    const res = await fetch(
+      `${API_BASE_URL}/admin/funds/${fundId}/reporting-documents`,
+      {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      },
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Upload failed (${res.status}): ${text}`);
+    }
+    return res.json() as Promise<{ data: ReportingDocument }>;
+  })();
 }
 
 export function approveDocument(

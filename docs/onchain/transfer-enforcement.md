@@ -1,12 +1,12 @@
 # Transfer Restriction Model
 
-This document describes how Kadra enforces transfer restrictions on its ERC-20 security token, following the ERC-3643 pattern of on-chain identity-gated transfers.
+This document describes how Angainor enforces transfer restrictions on its ERC-20 security token, following the ERC-3643 pattern of on-chain identity-gated transfers.
 
 ---
 
 ## Overview
 
-The `KadraToken` contract overrides the internal `_update()` function inherited from OpenZeppelin's ERC-20 implementation. This hook is called on every token movement -- mints, transfers, and burns. For regular transfers (where both sender and recipient are non-zero addresses), the contract queries the `IdentityRegistry` to verify that both parties are approved Limited Partners.
+The `AngainorToken` contract overrides the internal `_update()` function inherited from OpenZeppelin's ERC-20 implementation. This hook is called on every token movement -- mints, transfers, and burns. For regular transfers (where both sender and recipient are non-zero addresses), the contract queries the `IdentityRegistry` to verify that both parties are approved Limited Partners.
 
 This is deterministic enforcement: the rules execute before the transfer can succeed, not after. There is no pending state, no manual approval queue, and no way to bypass the check.
 
@@ -14,7 +14,7 @@ This is deterministic enforcement: the rules execute before the transfer can suc
 
 ## On-Chain Enforcement Logic
 
-### KadraToken._update() Override
+### AngainorToken._update() Override
 
 ```solidity
 function _update(address from, address to, uint256 value) internal override {
@@ -96,7 +96,7 @@ Before submitting a transfer to the chain, the backend performs an off-chain pre
 2. Query IdentityRegistry.isEligibleLP(recipient)
    --> If false: PRECHECK_FAILED, reason: "recipient not eligible LP"
 
-3. Query KadraToken.balanceOf(sender)
+3. Query AngainorToken.balanceOf(sender)
    --> If balance < amount: PRECHECK_FAILED, reason: "insufficient balance"
 
 4. All checks pass: submit transfer to chain
@@ -144,9 +144,9 @@ identityRegistry.removeInvestor(investorAddress);
 
 ## Comparison to ERC-3643
 
-Kadra's transfer restriction model follows the spirit of ERC-3643 (Security Token Standard) but with a simplified implementation:
+Angainor's transfer restriction model follows the spirit of ERC-3643 (Security Token Standard) but with a simplified implementation:
 
-| Feature | ERC-3643 | Kadra Implementation |
+| Feature | ERC-3643 | Angainor Implementation |
 |---|---|---|
 | Identity registry | ONCHAINID (claim-based) | Simple `isVerified` + `isEligible` mapping |
 | Transfer compliance | Modular compliance contract | Single `_update()` override |
@@ -161,7 +161,7 @@ The simplified approach is appropriate for the current fund administration use c
 
 ## Test Coverage
 
-Transfer enforcement is tested in the E2E test suite (`test/e2e-kadra.test.js`):
+Transfer enforcement is tested in the E2E test suite (`test/e2e-angainor.test.js`):
 
 | Test | Description |
 |---|---|
@@ -169,4 +169,4 @@ Transfer enforcement is tested in the E2E test suite (`test/e2e-kadra.test.js`):
 | Section I: Illegal Transfer to Non-LP | Verifies transfer from LP to non-LP outsider reverts with `"recipient is not an approved Limited Partner"`. |
 | Section I: Transfer from Non-LP | Verifies transfer from non-LP (who received tokens via mint) to LP reverts with `"sender is not an approved Limited Partner"`. |
 
-Additional unit tests in `test/kadra-token.test.js` cover edge cases for the token contract's transfer restriction logic.
+Additional unit tests in `test/angainor-token.test.js` cover edge cases for the token contract's transfer restriction logic.

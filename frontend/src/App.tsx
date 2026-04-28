@@ -3,13 +3,14 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/components/kadra/AuthProvider";
-import { ThemeProvider } from "@/components/kadra/ThemeProvider";
-import { AuthGuard } from "@/components/kadra/AuthGuard";
-import { RoleGuard } from "@/components/kadra/RoleGuard";
-import { AppLayout } from "@/components/kadra/AppLayout";
+import { AuthProvider } from "@/components/angainor/AuthProvider";
+import { ThemeProvider } from "@/components/angainor/ThemeProvider";
+import { AuthGuard } from "@/components/angainor/AuthGuard";
+import { RoleGuard } from "@/components/angainor/RoleGuard";
+import { AppLayout } from "@/components/angainor/AppLayout";
 import FundOverview from "./pages/FundOverview";
 import InvestorsPage from "./pages/InvestorsPage";
+import InvestorOnboardingDetailPage from "./pages/InvestorOnboardingDetailPage";
 import SubscriptionsPage from "./pages/SubscriptionsPage";
 import SettlementPage from "./pages/SettlementPage";
 import TransfersPage from "./pages/TransfersPage";
@@ -17,6 +18,7 @@ import CapTablePage from "./pages/CapTablePage";
 import DistributionPage from "./pages/DistributionPage";
 import AuditPage from "./pages/AuditPage";
 import DocumentsPage from "./pages/DocumentsPage";
+import AdminJobsPage from "./pages/AdminJobsPage";
 import InvestorDashboard from "./pages/InvestorDashboard";
 import InvestorSubscriptions from "./pages/InvestorSubscriptions";
 import InvestorCapTable from "./pages/InvestorCapTable";
@@ -25,6 +27,7 @@ import InvestorTransfers from "./pages/InvestorTransfers";
 import InvestorProfile from "./pages/InvestorProfile";
 import InvestorCapitalAccount from "./pages/InvestorCapitalAccount";
 import InvestorDocuments from "./pages/InvestorDocuments";
+import InvestorOnboardingPage from "./pages/InvestorOnboardingPage";
 import LandingPage from "./pages/LandingPage";
 import PrivacyAndControlPage from "./pages/PrivacyAndControlPage";
 import LoginPage from "./pages/LoginPage";
@@ -64,6 +67,7 @@ const App = () => (
                       {/* Admin routes */}
                       <Route path="/dashboard" element={<RoleGuard allow="admin"><FundOverview /></RoleGuard>} />
                       <Route path="/investors" element={<RoleGuard allow="admin"><InvestorsPage /></RoleGuard>} />
+                      <Route path="/investors/:investorId/onboarding" element={<RoleGuard allow="admin"><InvestorOnboardingDetailPage /></RoleGuard>} />
                       <Route path="/subscriptions" element={<RoleGuard allow="admin"><SubscriptionsPage /></RoleGuard>} />
                       <Route path="/settlement" element={<RoleGuard allow="admin"><SettlementPage /></RoleGuard>} />
                       <Route path="/transfers" element={<RoleGuard allow="admin"><TransfersPage /></RoleGuard>} />
@@ -71,12 +75,14 @@ const App = () => (
                       <Route path="/distribution" element={<RoleGuard allow="admin"><DistributionPage /></RoleGuard>} />
                       <Route path="/documents" element={<RoleGuard allow="admin"><DocumentsPage /></RoleGuard>} />
                       <Route path="/audit" element={<RoleGuard allow="admin"><AuditPage /></RoleGuard>} />
+                      <Route path="/admin/jobs" element={<RoleGuard allow="admin"><AdminJobsPage /></RoleGuard>} />
                       {/* Shared routes (admin + investor) */}
                       <Route path="/notifications" element={<NotificationsPage />} />
                       <Route path="/profile" element={<ProfilePage />} />
                       <Route path="/help" element={<HelpSupportPage />} />
                       {/* Investor routes */}
                       <Route path="/investor" element={<RoleGuard allow="investor"><InvestorDashboard /></RoleGuard>} />
+                      <Route path="/investor/onboarding" element={<RoleGuard allow="investor"><InvestorOnboardingPage /></RoleGuard>} />
                       <Route path="/investor/capital-account" element={<RoleGuard allow="investor"><InvestorCapitalAccount /></RoleGuard>} />
                       <Route path="/investor/documents" element={<RoleGuard allow="investor"><InvestorDocuments /></RoleGuard>} />
                       <Route path="/investor/subscriptions" element={<RoleGuard allow="investor"><InvestorSubscriptions /></RoleGuard>} />

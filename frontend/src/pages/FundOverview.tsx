@@ -1,15 +1,15 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { MetricCard } from "@/components/kadra/MetricCard";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
-import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
-import { StatusBadge } from "@/components/kadra/StatusBadge";
-import { ExplorerLink } from "@/components/kadra/ExplorerLink";
-import { ActivityFeed } from "@/components/kadra/ActivityFeed";
-import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { MetricCard } from "@/components/angainor/MetricCard";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
+import { SkeletonCard, TableSkeleton } from "@/components/angainor/Skeleton";
+import { StatusBadge } from "@/components/angainor/StatusBadge";
+import { ExplorerLink } from "@/components/angainor/ExplorerLink";
+import { ActivityFeed } from "@/components/angainor/ActivityFeed";
+import { TechnicalDetails } from "@/components/angainor/TechnicalDetails";
 import {
   Tooltip,
   TooltipContent,
@@ -20,12 +20,7 @@ import { getFundOverview, getActivityFeed, getDocuments } from "@/services";
 import { getCapitalCalls } from "@/services/capital-calls.service";
 import { getCapitalAccounts } from "@/services/ownership.service";
 import { formatCompact, formatEventType } from "@/lib/format";
-
-const IDENTITY_REGISTRY_ADDRESS = "0x55822888507cac67bE5C11516e00C4597E7c78fb";
-
-// Demo fund target size ($5M). Used as the denominator for the Committed progress bar
-// so it does not trivially show 100% by comparing committed capital against itself.
-const DEMO_FUND_TARGET_SIZE = 5_000_000;
+import { useAppConfig } from "@/hooks/useAppConfig";
 
 /* ── Formatters ── */
 
@@ -84,6 +79,7 @@ function InfoRow({
 
 export default function FundOverviewPage() {
   const fundId = DEFAULT_FUND_CODE;
+  const { data: appConfig } = useAppConfig();
 
   /* ── Queries ── */
 
@@ -179,7 +175,11 @@ export default function FundOverviewPage() {
     );
 
   const isDeployed = fundData.tokenContract?.deploymentStatus === "DEPLOYED";
-  const fundSize = DEMO_FUND_TARGET_SIZE;
+  const fundSize = appConfig?.defaults.targetSize ?? 5_000_000;
+  const identityRegistryAddress = appConfig?.contracts.identityRegistry ?? null;
+  const tokenSymbol = appConfig?.defaults.tokenSymbol ?? "KDRA";
+  const totalSupply = appConfig?.defaults.totalSupply ?? 10_000;
+  const legalFormLabel = fundData.legalForm ?? "Limited Partnership";
   const isFullyCommitted = metrics.committedCapital >= fundSize && fundSize > 0;
 
   // Find the governing document (Master LPA) hash for waterfall version link
@@ -249,7 +249,7 @@ export default function FundOverviewPage() {
         <SectionCard title="Fund Status">
           <dl className="space-y-3">
             <InfoRow label="Fund Name">{fundData.fundName}</InfoRow>
-            <InfoRow label="Legal Form">Limited Partnership</InfoRow>
+            <InfoRow label="Legal Form">{legalFormLabel}</InfoRow>
             <InfoRow label="Status">
               <StatusBadge status={fundData.status === "ACTIVE" ? "Passed" : fundData.status} />
             </InfoRow>
@@ -292,10 +292,11 @@ export default function FundOverviewPage() {
                 )}
               </InfoRow>
               <InfoRow label="Identity Registry">
-                <ExplorerLink
-                  value={IDENTITY_REGISTRY_ADDRESS}
-                  type="address"
-                />
+                {identityRegistryAddress ? (
+                  <ExplorerLink value={identityRegistryAddress} type="address" />
+                ) : (
+                  <span className="text-gray-400">Not configured</span>
+                )}
               </InfoRow>
             </dl>
           </TechnicalDetails>
@@ -381,7 +382,7 @@ export default function FundOverviewPage() {
         <SectionCard title="Fund Administration">
           <dl className="space-y-3">
             <InfoRow label="Fund Name">{fundData.fundName}</InfoRow>
-            <InfoRow label="Legal Form">Limited Partnership</InfoRow>
+            <InfoRow label="Legal Form">{legalFormLabel}</InfoRow>
             <InfoRow label="System Status">
               <StatusBadge status={isDeployed ? "Completed" : "Pending"} />
             </InfoRow>
@@ -405,16 +406,17 @@ export default function FundOverviewPage() {
                 )}
               </InfoRow>
               <InfoRow label="Identity Registry">
-                <ExplorerLink
-                  value={IDENTITY_REGISTRY_ADDRESS}
-                  type="address"
-                />
+                {identityRegistryAddress ? (
+                  <ExplorerLink value={identityRegistryAddress} type="address" />
+                ) : (
+                  <span className="text-gray-400">Not configured</span>
+                )}
               </InfoRow>
               <InfoRow label="Total Units Issued">
-                {isDeployed ? "10,000 KDRA" : "N/A"}
+                {isDeployed ? `${totalSupply.toLocaleString()} ${tokenSymbol}` : "N/A"}
               </InfoRow>
               <InfoRow label="Units Outstanding">
-                {isDeployed ? "10,000 KDRA" : "N/A"}
+                {isDeployed ? `${totalSupply.toLocaleString()} ${tokenSymbol}` : "N/A"}
               </InfoRow>
               <InfoRow label="Last Recorded Event">
                 {lastOnChainEvent ? (

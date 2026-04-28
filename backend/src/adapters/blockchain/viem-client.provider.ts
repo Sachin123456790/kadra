@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   createPublicClient,
   createWalletClient,
+  fallback,
   http,
   type PublicClient,
   type WalletClient,
@@ -11,9 +12,15 @@ import {
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 
+const PUBLIC_SEPOLIA_RPC_URLS = [
+  'https://rpc.sepolia.org',
+  'https://ethereum-sepolia-rpc.publicnode.com',
+  'https://sepolia.drpc.org',
+] as const;
+const RPC_TIMEOUT_MS = 8_000;
+
 @Injectable()
 export class ViemClientProvider {
-  private readonly rpcUrl: string;
   private readonly chain: Chain;
   private readonly deployerAccount: PrivateKeyAccount;
 
@@ -25,7 +32,8 @@ export class ViemClientProvider {
   >;
 
   constructor() {
-    this.rpcUrl = process.env.CHAIN_RPC_URL || 'https://rpc.sepolia.org';
+    // Demo environment: use multiple public Sepolia RPCs so a single
+    // slow endpoint does not block minting.
     this.chain = sepolia;
 
     const deployerKey = process.env.DEPLOYER_PRIVATE_KEY;
@@ -37,15 +45,19 @@ export class ViemClientProvider {
 
     this.deployerAccount = privateKeyToAccount(deployerKey as `0x${string}`);
 
+    const transport = fallback(
+      PUBLIC_SEPOLIA_RPC_URLS.map((url) => http(url, { timeout: RPC_TIMEOUT_MS })),
+    );
+
     this.publicClient = createPublicClient({
       chain: this.chain,
-      transport: http(this.rpcUrl),
+      transport,
     }) as PublicClient<Transport, Chain>;
 
     this.deployerWalletClient = createWalletClient({
       account: this.deployerAccount,
       chain: this.chain,
-      transport: http(this.rpcUrl),
+      transport,
     }) as WalletClient<Transport, Chain, PrivateKeyAccount>;
   }
 

@@ -14,7 +14,7 @@ describe("SettlementValidator", function () {
       walletAddress: "0x1111111111111111111111111111111111111111",
       allocationPercent: 20,
       lpaHash: LPA_HASH,
-      fundName: "Kadra Fund I",
+      fundName: "Angainor Fund I",
       capitalCommitted: 500000,
     });
   });

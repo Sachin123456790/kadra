@@ -14,6 +14,17 @@ export interface Subscription {
   governingHashHex: string | null;
   latestSettlementStatus: string | null;
   settlementTxHash: string | null;
+  mintTxHash: string | null;
+  mintedAt: string | null;
+  mintEventId: string | null;
+  latestSettlement?: {
+    id: string;
+    status: string;
+    validation: {
+      checks: Array<{ name: string; passed: boolean | null }>;
+      failureReasonCode: string | null;
+    };
+  } | null;
 }
 
 export interface CreateSubscriptionItem {

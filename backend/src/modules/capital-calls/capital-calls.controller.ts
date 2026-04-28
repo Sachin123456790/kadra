@@ -9,13 +9,13 @@ import {
 } from '@nestjs/common';
 import { CapitalCallsService } from './capital-calls.service';
 import { randomUUID } from 'crypto';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/auth/roles.decorator';
 import { ADMIN_ROLES } from '../../common/auth/auth.types';
 
 @Controller('admin/funds')
-@UseGuards(SupabaseAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(...ADMIN_ROLES)
 export class CapitalCallsFundController {
   constructor(private readonly capitalCallsService: CapitalCallsService) {}
@@ -50,7 +50,7 @@ export class CapitalCallsFundController {
 }
 
 @Controller('admin/capital-calls')
-@UseGuards(SupabaseAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(...ADMIN_ROLES)
 export class CapitalCallsController {
   constructor(private readonly capitalCallsService: CapitalCallsService) {}

@@ -1,6 +1,6 @@
-# Kadra MVP Deployment Guide
+# Angainor MVP Deployment Guide
 
-This document covers deploying the Kadra backend (NestJS + Fastify) to Vercel, provisioning Supabase, configuring cron jobs, and deploying the frontend.
+This document covers deploying the Angainor backend (NestJS + Fastify) to Vercel, provisioning Supabase, configuring cron jobs, and deploying the frontend.
 
 ---
 
@@ -53,7 +53,7 @@ Set these in the Vercel dashboard under Settings > Environment Variables.
 | `BASE_SEPOLIA_RPC_URL` | Base Sepolia RPC endpoint | `https://sepolia.base.org` |
 | `CHAIN_ID` | Target chain ID | `84532` |
 | `CHAIN_SIGNER_PRIVATE_KEY` | Demo signer private key (testnet only) | `0x...` |
-| `TOKEN_CONTRACT_ADDRESS` | Deployed KadraToken address on Base Sepolia | `0x...` |
+| `TOKEN_CONTRACT_ADDRESS` | Deployed AngainorToken address on Base Sepolia | `0x...` |
 | `IDENTITY_REGISTRY_ADDRESS` | Deployed IdentityRegistry address | `0x...` |
 | `DOCUMENT_REGISTRY_ADDRESS` | Deployed DocumentRegistry address (optional) | `0x...` |
 | `SUPABASE_URL` | Supabase project URL | `https://[REF].supabase.co` |
@@ -102,7 +102,7 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 -- Job runner: every 2 minutes, drain queued jobs
 SELECT cron.schedule(
-  'kadra-job-runner',
+  'angainor-job-runner',
   '*/2 * * * *',
   $$
   SELECT net.http_post(
@@ -118,7 +118,7 @@ SELECT cron.schedule(
 
 -- Chain event ingestion: every minute
 SELECT cron.schedule(
-  'kadra-chain-ingest',
+  'angainor-chain-ingest',
   '* * * * *',
   $$
   SELECT net.http_post(
@@ -134,7 +134,7 @@ SELECT cron.schedule(
 
 -- Transaction sync: every minute
 SELECT cron.schedule(
-  'kadra-tx-sync',
+  'angainor-tx-sync',
   '* * * * *',
   $$
   SELECT net.http_post(

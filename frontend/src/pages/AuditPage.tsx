@@ -23,14 +23,14 @@ import type {
 import { verifyDocument } from "@/services/documents.service";
 import { getCapitalAccounts } from "@/services/ownership.service";
 import { getNotices } from "@/services/notices.service";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { DataTable, Column } from "@/components/kadra/DataTable";
-import { StatusBadge } from "@/components/kadra/StatusBadge";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
-import { TableSkeleton } from "@/components/kadra/Skeleton";
-import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { DataTable, Column } from "@/components/angainor/DataTable";
+import { StatusBadge } from "@/components/angainor/StatusBadge";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
+import { TableSkeleton } from "@/components/angainor/Skeleton";
+import { ExplorerLink } from "@/components/angainor/ExplorerLink";
 import {
   CheckCircle,
   Circle,
@@ -40,7 +40,7 @@ import {
   PackageCheck,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CopyButton } from "@/components/kadra/CopyButton";
+import { CopyButton } from "@/components/angainor/CopyButton";
 import { formatEventType } from "@/lib/format";
 
 // ── Helpers ──────────────────────────────────────────────

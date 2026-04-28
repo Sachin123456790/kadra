@@ -1,4 +1,4 @@
-# Kadra Backend -- Development Guide
+# Angainor Backend -- Development Guide
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ Create a `.env` file (or copy from the example if available):
 
 ```bash
 # .env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/kadra_dev
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/angainor_dev
 PORT=3000
 ```
 
@@ -44,7 +44,7 @@ The API will be available at `http://localhost:3000/api/v1/health`.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `DATABASE_URL` | Yes | `postgresql://postgres:postgres@localhost:5432/kadra_dev` | PostgreSQL connection string |
+| `DATABASE_URL` | Yes | `postgresql://postgres:postgres@localhost:5432/angainor_dev` | PostgreSQL connection string |
 | `PORT` | No | `3000` | HTTP listen port |
 
 The `PrismaService` falls back to the default connection string if `DATABASE_URL` is not set. In production, always set it explicitly.

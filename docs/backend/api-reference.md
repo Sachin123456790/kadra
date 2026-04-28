@@ -1,4 +1,4 @@
-# Kadra Backend -- API Endpoint Reference
+# Angainor Backend -- API Endpoint Reference
 
 All endpoints are prefixed with `/api/v1` (set in `src/main.ts` via `app.setGlobalPrefix`).
 
@@ -29,7 +29,7 @@ Error responses use:
 | Method | Path | Description | Source |
 |---|---|---|---|
 | GET | `/api/v1/health` | Health check. Returns `{ status: "ok", timestamp }`. | `src/health.controller.ts` |
-| GET | `/api/v1/version` | Version info. Returns `{ version: "0.1.0", name: "kadra-api" }`. | `src/health.controller.ts` |
+| GET | `/api/v1/version` | Version info. Returns `{ version: "0.1.0", name: "angainor-api" }`. | `src/health.controller.ts` |
 
 ---
 

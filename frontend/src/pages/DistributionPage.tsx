@@ -12,14 +12,14 @@ import { getDocuments } from '@/services/documents.service';
 import type { DistributionLineItem } from '@/services/distribution.service';
 import type { CapitalAccountSummary } from '@/services/ownership.service';
 import type { WaterfallConfig } from '@/services/fund.service';
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { MetricCard } from "@/components/kadra/MetricCard";
-import { DataTable, Column } from "@/components/kadra/DataTable";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
-import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
-import { HashDisplay } from "@/components/kadra/HashDisplay";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { MetricCard } from "@/components/angainor/MetricCard";
+import { DataTable, Column } from "@/components/angainor/DataTable";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
+import { SkeletonCard, TableSkeleton } from "@/components/angainor/Skeleton";
+import { HashDisplay } from "@/components/angainor/HashDisplay";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -42,14 +42,7 @@ function buildTierDisplay(config: WaterfallConfig): TierInfo[] {
       gpShare: tier.gpShare,
     }));
   }
-
-  // Fallback default tiers
-  return [
-    { name: "Return of Capital", description: "100% to LPs", lpShare: 100, gpShare: 0 },
-    { name: "Preferred Return", description: `${config.prefReturnPct ?? 8}% simple annual, 100% to LPs`, lpShare: 100, gpShare: 0 },
-    { name: "GP Catch-up", description: "100% to GP", lpShare: 0, gpShare: 100 },
-    { name: "Carried Interest", description: `${100 - (config.gpPromotePct ?? 20)}% LPs / ${config.gpPromotePct ?? 20}% GP`, lpShare: 100 - (config.gpPromotePct ?? 20), gpShare: config.gpPromotePct ?? 20 },
-  ];
+  return [];
 }
 
 function WaterfallConfigSection({ config, lpaHash }: { readonly config: WaterfallConfig; readonly lpaHash: string | null }) {
@@ -80,11 +73,11 @@ function WaterfallConfigSection({ config, lpaHash }: { readonly config: Waterfal
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-border">
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Calculation Basis</p>
-            <p className="mt-1 text-sm text-foreground">{config.calculationBasis ?? "IRR"}</p>
+            <p className="mt-1 text-sm text-foreground">{config.calculationBasis || "—"}</p>
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Waterfall Version</p>
-            <p className="mt-1 text-sm text-foreground">{config.version ?? "1.0"}</p>
+            <p className="mt-1 text-sm text-foreground">{config.version || "—"}</p>
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Distribution Frequency</p>
@@ -93,6 +86,7 @@ function WaterfallConfigSection({ config, lpaHash }: { readonly config: Waterfal
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</p>
             <p className="mt-1">
+              {/* TODO: Waterfall config has no status field yet; hardcoded until schema adds it. */}
               <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 border border-green-200">
                 <Lock className="h-3 w-3" />
                 Locked

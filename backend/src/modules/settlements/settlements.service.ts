@@ -1,8 +1,97 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError, ConflictError } from '../../common/errors';
 import { EventLogService } from '../../common/event-log.service';
 import { TokenizationService } from '../tokenization/tokenization.service';
+import type { DocumentStorageAdapter } from '../../adapters/storage/storage.adapter';
+import { STORAGE_ADAPTER } from '../../adapters/storage/storage.adapter';
+
+const MIN_WIRE_PDF_BYTES = 1024;
+
+interface WireMatchResult {
+  amountMatch: boolean;
+  referenceMatch: boolean;
+  investorMatch: boolean;
+  notes?: string;
+}
+
+async function geminiMatchWire(
+  buffer: Buffer,
+  expected: {
+    amount: string;
+    currency: string;
+    reference: string;
+    investorName: string;
+    investorEmail: string;
+  },
+): Promise<WireMatchResult | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  const model = process.env.GEMINI_MODEL ?? 'gemini-1.5-flash';
+
+  const prompt = [
+    'You are a settlement verification engine for a private fund admin platform.',
+    'You receive a wire confirmation PDF and a set of expected transaction details.',
+    'Return strict JSON only — no markdown, no commentary.',
+    '',
+    'Expected transaction:',
+    `- Amount: ${expected.amount} ${expected.currency}`,
+    `- Reference / subscription ref: ${expected.reference}`,
+    `- Investor legal name: ${expected.investorName}`,
+    `- Investor email (optional fallback identifier): ${expected.investorEmail}`,
+    '',
+    'For each field, decide whether the PDF actually contains the expected value (or an unambiguous equivalent — e.g. "$1,000,000.00" matches 1000000).',
+    'A blank, empty, or unrelated PDF must produce all-false.',
+    '',
+    'Return JSON of shape:',
+    '{"amountMatch":boolean,"referenceMatch":boolean,"investorMatch":boolean,"notes":"short rationale"}',
+  ].join('\n');
+
+  const body = {
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { text: prompt },
+          {
+            inline_data: {
+              mime_type: 'application/pdf',
+              data: buffer.toString('base64'),
+            },
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0,
+      responseMimeType: 'application/json',
+    },
+  };
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) return null;
+    const parsed = JSON.parse(text) as Partial<WireMatchResult>;
+    return {
+      amountMatch: parsed.amountMatch === true,
+      referenceMatch: parsed.referenceMatch === true,
+      investorMatch: parsed.investorMatch === true,
+      notes: typeof parsed.notes === 'string' ? parsed.notes : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
 
 @Injectable()
 export class SettlementsService {
@@ -10,6 +99,7 @@ export class SettlementsService {
     private readonly prisma: PrismaService,
     private readonly eventLog: EventLogService,
     private readonly tokenizationService: TokenizationService,
+    @Inject(STORAGE_ADAPTER) private readonly storage: DocumentStorageAdapter,
   ) {}
 
   async requestValidation(
@@ -69,29 +159,70 @@ export class SettlementsService {
       data: { status: 'VERIFYING' },
     });
 
-    const checkAmountMatch =
-      parseFloat(input.declaredAmount) ===
-      parseFloat(subscription.committedAmount.toString());
-    const checkReferenceMatch =
-      input.declaredReference === subscription.subscriptionRef;
+    const expectedAmount = parseFloat(subscription.committedAmount.toString());
+    const expectedRef = subscription.subscriptionRef ?? '';
 
-    // Investor match: verify payment document is linked to the subscription's investor
+    // Load and inspect the uploaded wire confirmation PDF. A blank or empty
+    // PDF must never pass — checks remain false unless the document body
+    // actually contains the expected values.
     const paymentDoc = await this.prisma.document.findUnique({
       where: { id: input.paymentDocumentId },
     });
-    let checkInvestorMatch = false;
+    const investor = await this.prisma.investor.findUnique({
+      where: { id: subscription.investorId },
+    });
+
+    let pdfBuffer: Buffer | null = null;
+    let pdfBytes = 0;
     if (paymentDoc) {
-      if (
-        paymentDoc.linkedEntityType === 'INVESTOR' &&
-        paymentDoc.linkedEntityId != null
-      ) {
-        // Direct link: payment doc references a specific investor
-        checkInvestorMatch =
-          paymentDoc.linkedEntityId === subscription.investorId;
-      } else {
-        // Fallback: verify payment doc belongs to the same fund as the subscription
-        checkInvestorMatch = paymentDoc.fundId === subscription.fundId;
+      try {
+        pdfBuffer = await this.storage.read(paymentDoc.storageKey);
+        pdfBytes = pdfBuffer.length;
+      } catch {
+        pdfBuffer = null;
       }
+    }
+
+    const pdfPresent = pdfBuffer != null && pdfBytes >= MIN_WIRE_PDF_BYTES;
+
+    // Ask Gemini to compare the PDF body against the expected transaction
+    // details. If Gemini is unavailable or the PDF is too small to be a
+    // legitimate wire confirmation, all content checks remain false.
+    let geminiResult: WireMatchResult | null = null;
+    if (pdfPresent && pdfBuffer) {
+      geminiResult = await geminiMatchWire(pdfBuffer, {
+        amount: expectedAmount.toString(),
+        currency: subscription.currency ?? 'USD',
+        reference: expectedRef,
+        investorName: investor?.legalName ?? '',
+        investorEmail: investor?.email ?? '',
+      });
+    }
+
+    const declaredAmountMatchesSubscription =
+      parseFloat(input.declaredAmount) === expectedAmount;
+    const declaredRefMatchesSubscription =
+      input.declaredReference === expectedRef && expectedRef.length > 0;
+
+    const checkAmountMatch =
+      pdfPresent &&
+      geminiResult?.amountMatch === true &&
+      declaredAmountMatchesSubscription;
+
+    const checkReferenceMatch =
+      pdfPresent &&
+      geminiResult?.referenceMatch === true &&
+      declaredRefMatchesSubscription;
+
+    let checkInvestorMatch = false;
+    if (pdfPresent && paymentDoc && geminiResult?.investorMatch === true) {
+      const linkedToInvestor =
+        paymentDoc.linkedEntityType === 'INVESTOR' &&
+        paymentDoc.linkedEntityId === subscription.investorId;
+      const linkedToFund =
+        paymentDoc.fundId === subscription.fundId &&
+        paymentDoc.linkedEntityType !== 'INVESTOR';
+      checkInvestorMatch = linkedToInvestor || linkedToFund;
     }
 
     // Hash match: verify subscription's governing document hash record exists
@@ -117,7 +248,10 @@ export class SettlementsService {
       checkNoDoubleSettlement;
 
     let failureReasonCode: string | null = null;
-    if (!checkAmountMatch) failureReasonCode = 'AMOUNT_MISMATCH';
+    if (!pdfPresent) failureReasonCode = 'WIRE_PDF_BLANK_OR_UNREADABLE';
+    else if (geminiResult == null)
+      failureReasonCode = 'WIRE_VERIFICATION_UNAVAILABLE';
+    else if (!checkAmountMatch) failureReasonCode = 'AMOUNT_MISMATCH';
     else if (!checkReferenceMatch) failureReasonCode = 'REFERENCE_MISMATCH';
     else if (!checkInvestorMatch) failureReasonCode = 'INVESTOR_MISMATCH';
     else if (!checkHashMatch) failureReasonCode = 'HASH_MISMATCH';
@@ -289,12 +423,20 @@ export class SettlementsService {
       data: { status: 'SETTLED', settledAt: now, updatedAt: now },
     });
 
-    // Create capital account for the settled subscription
+    // Roll forward the investor's current capital account instead of blindly creating
+    // a new current row on every confirmation attempt.
     const contributionAmount = parseFloat(
       subscription.committedAmount.toString(),
     );
-    await this.prisma.capitalAccount.create({
-      data: {
+    await this.prisma.capitalAccount.upsert({
+      where: {
+        fundId_investorId_isCurrent: {
+          fundId: subscription.fundId,
+          investorId: subscription.investorId,
+          isCurrent: true,
+        },
+      },
+      create: {
         fundId: subscription.fundId,
         investorId: subscription.investorId,
         openingBalance: 0,
@@ -306,6 +448,12 @@ export class SettlementsService {
         endingCapitalBalance: contributionAmount,
         asOfDate: now,
         isCurrent: true,
+      },
+      update: {
+        initialContribution: { increment: contributionAmount },
+        endingCapitalBalance: { increment: contributionAmount },
+        contributedAt: now,
+        asOfDate: now,
       },
     });
 

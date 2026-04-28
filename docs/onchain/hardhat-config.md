@@ -1,6 +1,6 @@
 # Hardhat Configuration
 
-This document describes the Hardhat setup for compiling, testing, and deploying Kadra smart contracts.
+This document describes the Hardhat setup for compiling, testing, and deploying Angainor smart contracts.
 
 ---
 
@@ -12,7 +12,7 @@ This document describes the Hardhat setup for compiling, testing, and deploying 
 | EVM target | Default (Shanghai) |
 | Optimizer | Default (disabled) |
 
-All three Kadra contracts (`IdentityRegistry.sol`, `KadraToken.sol`, `DocumentRegistry.sol`) and the legacy `Lock.sol` contract use `pragma solidity ^0.8.24`.
+All three Angainor contracts (`IdentityRegistry.sol`, `AngainorToken.sol`, `DocumentRegistry.sol`) and the legacy `Lock.sol` contract use `pragma solidity ^0.8.24`.
 
 ---
 
@@ -84,8 +84,8 @@ OpenZeppelin v5 contracts used:
 
 | Contract | Import Path | Used By |
 |---|---|---|
-| `ERC20` | `@openzeppelin/contracts/token/ERC20/ERC20.sol` | `KadraToken` |
-| `Ownable` | `@openzeppelin/contracts/access/Ownable.sol` | `KadraToken`, `IdentityRegistry`, `DocumentRegistry` |
+| `ERC20` | `@openzeppelin/contracts/token/ERC20/ERC20.sol` | `AngainorToken` |
+| `Ownable` | `@openzeppelin/contracts/access/Ownable.sol` | `AngainorToken`, `IdentityRegistry`, `DocumentRegistry` |
 
 OpenZeppelin v5 `Ownable` requires passing `msg.sender` to the constructor:
 
@@ -106,11 +106,11 @@ constructor() Ownable(msg.sender) {}
 
 ## Signer Convention
 
-Hardhat provides 20 deterministic signers when running on the local network. Kadra assigns them by index:
+Hardhat provides 20 deterministic signers when running on the local network. Angainor assigns them by index:
 
 | Index | Role | Description |
 |---|---|---|
-| `[0]` | Deployer / Owner | Deploys all contracts. Owns `IdentityRegistry`, `KadraToken`, and `DocumentRegistry`. Calls `addInvestor()`, `setEligibility()`, `mint()`, `registerDocument()`. |
+| `[0]` | Deployer / Owner | Deploys all contracts. Owns `IdentityRegistry`, `AngainorToken`, and `DocumentRegistry`. Calls `addInvestor()`, `setEligibility()`, `mint()`, `registerDocument()`. |
 | `[1]` | Investor A | Alpha Capital Partners (`investor-A`) |
 | `[2]` | Investor B | Beta Ventures LLC (`investor-B`) |
 | `[3]` | Investor C | Gamma Real Estate Trust (`investor-C`) |
@@ -157,14 +157,14 @@ npx hardhat test
 
 Runs all 123 tests across 11 test files on the local Hardhat EVM. No external dependencies required.
 
-### Deploy Kadra System (Local)
+### Deploy Angainor System (Local)
 
 ```bash
-npx hardhat run scripts/deploy-kadra.js
+npx hardhat run scripts/deploy-angainor.js
 ```
 
 Executes the full 9-step deployment:
-1. Deploy IdentityRegistry, DocumentRegistry, KadraToken
+1. Deploy IdentityRegistry, DocumentRegistry, AngainorToken
 2. Create fund entity (off-chain)
 3. Register 5 investors with LP eligibility
 4. Hash and anchor Master LPA on-chain
@@ -174,7 +174,7 @@ Executes the full 9-step deployment:
 8. Execute transfer enforcement tests
 9. Print updated cap table
 
-Saves deployment evidence to `EVIDENCE/kadra-deploy/`.
+Saves deployment evidence to `EVIDENCE/angainor-deploy/`.
 
 ### Read Cap Table
 
@@ -182,7 +182,7 @@ Saves deployment evidence to `EVIDENCE/kadra-deploy/`.
 npx hardhat run scripts/cap-table.js
 ```
 
-Reads deployed contract addresses from `EVIDENCE/kadra-deploy/addresses.json` and prints the current cap table by querying `balanceOf()` for each investor.
+Reads deployed contract addresses from `EVIDENCE/angainor-deploy/addresses.json` and prints the current cap table by querying `balanceOf()` for each investor.
 
 ### Deploy to Sepolia
 
@@ -231,7 +231,7 @@ The `lib/validate-env.js` module validates presence and format before any operat
 ```
 contracts/
     IdentityRegistry.sol    Investor identity + LP eligibility (Ownable)
-    KadraToken.sol          ERC-20 security token with transfer restrictions
+    AngainorToken.sol          ERC-20 security token with transfer restrictions
     DocumentRegistry.sol    On-chain document hash anchoring (immutable)
     Lock.sol                Legacy time-locked ETH contract (Hardhat sample)
 
@@ -240,9 +240,9 @@ artifacts/
         IdentityRegistry.sol/
             IdentityRegistry.json       ABI + bytecode
             IdentityRegistry.dbg.json   Debug info
-        KadraToken.sol/
-            KadraToken.json
-            KadraToken.dbg.json
+        AngainorToken.sol/
+            AngainorToken.json
+            AngainorToken.dbg.json
         DocumentRegistry.sol/
             DocumentRegistry.json
             DocumentRegistry.dbg.json

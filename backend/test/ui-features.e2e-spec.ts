@@ -73,7 +73,7 @@ describe('UI Features (e2e)', () => {
 
     // Resolve the seeded fund and investors
     const fund = await prisma.fund.findFirst({
-      where: { code: 'KADRA-DEMO-001' },
+      where: { code: 'ANGAINOR-DEMO-001' },
     });
     expect(fund).toBeTruthy();
     ctx.fundId = fund!.id;

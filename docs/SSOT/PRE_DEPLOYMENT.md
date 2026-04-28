@@ -1,12 +1,12 @@
-# Kadra: complete in-depth description
+# Angainor: complete in-depth description
 
-## 1. What Kadra is
+## 1. What Angainor is
 
-**Kadra is a programmable infrastructure layer for private real estate funds.** Its purpose is to replace fragmented, manual, trust-heavy back-office workflows with a blockchain-backed settlement and recordkeeping system. Instead of relying on siloed spreadsheets, PDFs, email threads, manual compliance checks, and human reconciliation, Kadra creates a single workflow where legal documents, investor permissions, settlement, ownership issuance, transfer enforcement, distributions, and audit exports all flow through one canonical system.  
+**Angainor is a programmable infrastructure layer for private real estate funds.** Its purpose is to replace fragmented, manual, trust-heavy back-office workflows with a blockchain-backed settlement and recordkeeping system. Instead of relying on siloed spreadsheets, PDFs, email threads, manual compliance checks, and human reconciliation, Angainor creates a single workflow where legal documents, investor permissions, settlement, ownership issuance, transfer enforcement, distributions, and audit exports all flow through one canonical system.  
 
-At a high level, Kadra is meant to prove several claims at once. It argues that blockchain-based infrastructure gives better integration of data, tamper-resistant and time-stamped records, fewer failure modes than existing systems, improved integrity, provable auditability, lower dependence on trust in people and processes, fewer handoff points between systems, lower operational redundancy, faster settlement, lower cost, and a simpler operating model overall. The documents explicitly position Kadra as a system where even if the application layer were compromised, the underlying ledger history could not be rewritten. 
+At a high level, Angainor is meant to prove several claims at once. It argues that blockchain-based infrastructure gives better integration of data, tamper-resistant and time-stamped records, fewer failure modes than existing systems, improved integrity, provable auditability, lower dependence on trust in people and processes, fewer handoff points between systems, lower operational redundancy, faster settlement, lower cost, and a simpler operating model overall. The documents explicitly position Angainor as a system where even if the application layer were compromised, the underlying ledger history could not be rewritten. 
 
-The short brief also states the strongest commercial framing: Kadra anchors legal documents on-chain and hardcodes compliance rules directly into an **ERC-3643 security token**, which allows it to automate administration, reduce wire-fraud risk, and compress settlement timelines from weeks to seconds while maintaining a mathematically verifiable system of record. 
+The short brief also states the strongest commercial framing: Angainor anchors legal documents on-chain and hardcodes compliance rules directly into an **ERC-3643 security token**, which allows it to automate administration, reduce wire-fraud risk, and compress settlement timelines from weeks to seconds while maintaining a mathematically verifiable system of record. 
 
 ---
 
@@ -36,7 +36,7 @@ So the real proof is not "we can mint tokens." The real proof is:
 
 ## 3. Core architecture
 
-Kadra is described as a layered system with a clean UI, a backend and database, a blockchain environment (Sepolia testnet for production, Hardhat for local dev), smart contracts, and export tooling. The recommended setup is intentionally practical and demo-friendly.  
+Angainor is described as a layered system with a clean UI, a backend and database, a blockchain environment (Sepolia testnet for production, Hardhat for local dev), smart contracts, and export tooling. The recommended setup is intentionally practical and demo-friendly.  
 
 ### Frontend
 
@@ -44,7 +44,7 @@ The frontend is a **React + Vite** application styled with **Tailwind CSS** and 
 
 ### Backend and off-chain state
 
-Kadra keeps important structured state off-chain as well. The short brief says the local backend stores off-chain data such as names and emails, while the full demo spec recommends **PostgreSQL or SQLite** with **Prisma or Drizzle** to manage the canonical off-chain subscription ledger. This off-chain layer is not optional decoration. It is what makes the blockchain events understandable, queryable, and presentable to humans.  
+Angainor keeps important structured state off-chain as well. The short brief says the local backend stores off-chain data such as names and emails, while the full demo spec recommends **PostgreSQL or SQLite** with **Prisma or Drizzle** to manage the canonical off-chain subscription ledger. This off-chain layer is not optional decoration. It is what makes the blockchain events understandable, queryable, and presentable to humans.  
 
 ### Blockchain environment
 
@@ -87,9 +87,9 @@ The PDF itself remains **stored off-chain**, but its content is transformed into
 * an **immutable hash**
 * a **time-stamped reference** 
 
-When uploaded, Kadra parses the document, extracts governing clauses such as fund identity, ownership, and transfer restrictions, computes a **SHA-256 cryptographic hash**, and then anchors the hash, timestamp, and document reference so that the existence and content of the document can be independently verified later. The system also registers the uploaded Master LPA as the governing agreement for the fund.  
+When uploaded, Angainor parses the document, extracts governing clauses such as fund identity, ownership, and transfer restrictions, computes a **SHA-256 cryptographic hash**, and then anchors the hash, timestamp, and document reference so that the existence and content of the document can be independently verified later. The system also registers the uploaded Master LPA as the governing agreement for the fund.  
 
-This means Kadra is not just storing a file. It is turning the file into a legally meaningful, cryptographically anchored reference object that downstream records can point to. 
+This means Angainor is not just storing a file. It is turning the file into a legally meaningful, cryptographically anchored reference object that downstream records can point to. 
 
 ---
 
@@ -118,7 +118,7 @@ One of the most important design points in the demo is that **ownership is not c
 
 ## 7. Identity and wallet permissioning
 
-Kadra includes an **Investor Registry UI** that maps real-world investor identities to specific blockchain wallet addresses. The shorter brief says this dashboard changes an investor’s status from "Unknown" to "Verified" and explicitly authorizes the wallet on-chain to hold the fund’s asset. The longer document says the investor registry contains **pre-approved and pre-structured LPs**, each mapped deterministically to exactly one wallet address. The wallets are visible and non-custodial, meaning investors retain control of their own wallets.  
+Angainor includes an **Investor Registry UI** that maps real-world investor identities to specific blockchain wallet addresses. The shorter brief says this dashboard changes an investor’s status from "Unknown" to "Verified" and explicitly authorizes the wallet on-chain to hold the fund’s asset. The longer document says the investor registry contains **pre-approved and pre-structured LPs**, each mapped deterministically to exactly one wallet address. The wallets are visible and non-custodial, meaning investors retain control of their own wallets.  
 
 The detailed spec adds that the five LP identities are initialized before the demo, identity-verified, wallet-linked, and marked both on-chain and off-chain as eligible LPs for the specific fund. Their wallets are stamped with a **fund-specific LP eligibility marker**. That is important because transfer rules are fund-specific, not merely "verified globally." 
 
@@ -149,7 +149,7 @@ The shorter brief describes this as the function that flips the state from pendi
 
 ## 9. Smart contract and tokenized ownership
 
-Once settlement is validated, Kadra uses an **ERC-3643 security token** to represent fund ownership. The contract is deployed or activated after settlement, encodes transfer restrictions and identity checks, and represents the ownership interest itself. The identity/compliance module is linked to the investor registry and checks eligibility on every transfer, blocking illegal transfers deterministically. 
+Once settlement is validated, Angainor uses an **ERC-3643 security token** to represent fund ownership. The contract is deployed or activated after settlement, encodes transfer restrictions and identity checks, and represents the ownership interest itself. The identity/compliance module is linked to the investor registry and checks eligibility on every transfer, blocking illegal transfers deterministically. 
 
 The shorter brief says the ERC-3643 deployment is the actual security token contract representing fund ownership, and its transfer restrictions are hardcoded logic that intercept transfer attempts, check the identity registry, and deterministically block transfers to unverified wallets. 
 
@@ -159,7 +159,7 @@ When settlement succeeds, tokens are minted in exact correspondence to the owner
 
 ## 10. On-chain ledger and off-chain event log
 
-Kadra is explicitly both an on-chain and off-chain system.
+Angainor is explicitly both an on-chain and off-chain system.
 
 ### On-chain ledger
 
@@ -199,7 +199,7 @@ These capital accounts update automatically when:
 * transfers occur
 * distribution simulation occurs 
 
-This means Kadra is not only tracking token balances. It is also maintaining investment-accounting state that supports waterfall calculations and investor reporting. 
+This means Angainor is not only tracking token balances. It is also maintaining investment-accounting state that supports waterfall calculations and investor reporting. 
 
 ---
 
@@ -259,7 +259,7 @@ At different points in the demo, the dashboard needs to show different states: e
 
 ## 14. Audit, provenance, and export
 
-Auditability is native to the Kadra pitch. The system must show not only operational state but also **how that state can be exported and independently examined**. The short brief says the audit packet generator should bundle:
+Auditability is native to the Angainor pitch. The system must show not only operational state but also **how that state can be exported and independently examined**. The short brief says the audit packet generator should bundle:
 
 * the original PDF
 * the cryptographic hash
@@ -301,7 +301,7 @@ The demo is not supposed to start from a blank engineering environment. The larg
 Before the demo begins, the following should already exist:
 
 * a fund entity created
-* fund name: **Kadra Demo Fund I**
+* fund name: **Angainor Demo Fund I**
 * legal form: LP or LLC taxed as partnership
 * jurisdiction metadata stored for reference
 * state: no ownership issued and no capital settled
@@ -327,11 +327,11 @@ This setup matters because the demo is meant to show the fund, rules, and invest
 
 The larger document provides a detailed nine-step demo narrative. Here is the complete interpretation.
 
-### Step 1: show the fragmented world Kadra is replacing
+### Step 1: show the fragmented world Angainor is replacing
 
-The executives first see the Kadra fund dashboard and are meant to recognize the contrast between existing fragmented analog systems and Kadra’s structured system. The opening dashboard should show:
+The executives first see the Angainor fund dashboard and are meant to recognize the contrast between existing fragmented analog systems and Angainor’s structured system. The opening dashboard should show:
 
-* fund name: Kadra Demo Fund I
+* fund name: Angainor Demo Fund I
 * ownership allocated: 0%
 * active LPs: 0
 * cap table: empty
@@ -341,7 +341,7 @@ The key message is: the fund, rules, and investors exist, but ownership does not
 
 ### Step 2: upload the Master LPA and structure legal intent
 
-The five investors are already onboarded, wallets are linked, and they are already marked as eligible LPs for the fund. One Master LPA governs the fund and defines ownership and transfer restrictions for all LPs. The user drags and drops the LPA PDF into the upload section. Kadra parses the document, extracts the relevant clauses, computes SHA-256, anchors the hash, timestamp, and document reference, and registers the LPA as the governing agreement. Then for each of the five investors, the system creates a subscription record with investor ID, wallet address, allocation percentage, references to the LPA hash and subscription ID, and initial state Pending. The dashboard should show the five LPs, their allocations, pending status, linked LPA hash, timestamp, and cap table representation. This is meant to replace email threads, spreadsheet rows, and PDF folders with a canonical structured representation. 
+The five investors are already onboarded, wallets are linked, and they are already marked as eligible LPs for the fund. One Master LPA governs the fund and defines ownership and transfer restrictions for all LPs. The user drags and drops the LPA PDF into the upload section. Angainor parses the document, extracts the relevant clauses, computes SHA-256, anchors the hash, timestamp, and document reference, and registers the LPA as the governing agreement. Then for each of the five investors, the system creates a subscription record with investor ID, wallet address, allocation percentage, references to the LPA hash and subscription ID, and initial state Pending. The dashboard should show the five LPs, their allocations, pending status, linked LPA hash, timestamp, and cap table representation. This is meant to replace email threads, spreadsheet rows, and PDF folders with a canonical structured representation. 
 
 ### Step 3: show intended ownership before settlement
 
@@ -349,9 +349,9 @@ The dashboard then shows the pre-settlement cap table, for example Investor A th
 
 ### Step 4: recognize settlement deterministically
 
-Next, a mock bank wire confirmation is uploaded for each investor matching the amount in the LPA. The uploaded statement includes amount and investor identity. Kadra automatically checks payment amount against subscription, investor identity, document hash or reference, and confirms there is no double settlement. Status goes through Verifying and then flips from Pending to Settled when correct. Once verification succeeds, ownership changes from intent to final ownership, the ownership ledger is finalized, the ERC-3643 contract is deployed or activated, compliance rules are embedded, tokens are minted in exact correspondence with ownership percentage, and those tokens are sent to the LP’s wallet. A ledger entry is added with timestamp, immutability, and linked documents. The fund dashboard updates live to show settled investors, finalized cap table entries, and activity log items indicating ownership recognition and settlement confirmation. 
+Next, a mock bank wire confirmation is uploaded for each investor matching the amount in the LPA. The uploaded statement includes amount and investor identity. Angainor automatically checks payment amount against subscription, investor identity, document hash or reference, and confirms there is no double settlement. Status goes through Verifying and then flips from Pending to Settled when correct. Once verification succeeds, ownership changes from intent to final ownership, the ownership ledger is finalized, the ERC-3643 contract is deployed or activated, compliance rules are embedded, tokens are minted in exact correspondence with ownership percentage, and those tokens are sent to the LP’s wallet. A ledger entry is added with timestamp, immutability, and linked documents. The fund dashboard updates live to show settled investors, finalized cap table entries, and activity log items indicating ownership recognition and settlement confirmation. 
 
-The demo then includes a negative case: upload a bank wire that is **less than the amount agreed in the LPA**. The statement is scanned and parsed, the discrepancy is detected automatically, the status stays Pending, a settlement mismatch is flagged, the system displays a message that the settlement amount does not match the subscribed commitment, and **no tokens are minted**. No partial ownership is created. The remaining mock bank statements can then be batch uploaded to show that in mixed-state conditions the cap table remains correct without manual reconciliation. That is supposed to prove Kadra eliminates back-office ambiguity. 
+The demo then includes a negative case: upload a bank wire that is **less than the amount agreed in the LPA**. The statement is scanned and parsed, the discrepancy is detected automatically, the status stays Pending, a settlement mismatch is flagged, the system displays a message that the settlement amount does not match the subscribed commitment, and **no tokens are minted**. No partial ownership is created. The remaining mock bank statements can then be batch uploaded to show that in mixed-state conditions the cap table remains correct without manual reconciliation. That is supposed to prove Angainor eliminates back-office ambiguity. 
 
 ### Step 5: final fund dashboard state
 
@@ -363,7 +363,7 @@ Once ownership is final, settled, and immutable, the demo shows a predefined wat
 
 ### Step 7: illegal transfer attempt
 
-The system then demonstrates deterministic compliance enforcement. LP A initiates a transfer to a wallet that is not approved for this fund. The transfer is rejected immediately. There is no pending state and no partial execution. An error should be shown, with wording along the lines of: **Transfer blocked: recipient is not an approved Limited Partner for Kadra Demo Fund I**. The spec says the demo should highlight the wallet stamp check, the fund-specific LP eligibility marker, the ERC-3643 transfer hook, and the failed pre-transfer validation. 
+The system then demonstrates deterministic compliance enforcement. LP A initiates a transfer to a wallet that is not approved for this fund. The transfer is rejected immediately. There is no pending state and no partial execution. An error should be shown, with wording along the lines of: **Transfer blocked: recipient is not an approved Limited Partner for Angainor Demo Fund I**. The spec says the demo should highlight the wallet stamp check, the fund-specific LP eligibility marker, the ERC-3643 transfer hook, and the failed pre-transfer validation. 
 
 ### Step 8: legal transfer execution
 
@@ -385,13 +385,13 @@ So the cap table is not just a static report. It is a living interface that show
 
 ## 18. Security and compliance logic
 
-Kadra’s security proposition rests on deterministic enforcement. Rather than relying on humans to check documents, approvals, and transfer rules manually, the system embeds compliance checks into the control flow itself. The short brief says transfer restrictions are hardcoded. The long brief says transfer hooks query the on-chain identity registry and require a fund-specific LP eligibility marker. Illegal recipients fail pre-transfer validation and are blocked immediately. There is no partial execution and no ambiguous intermediate state.  
+Angainor’s security proposition rests on deterministic enforcement. Rather than relying on humans to check documents, approvals, and transfer rules manually, the system embeds compliance checks into the control flow itself. The short brief says transfer restrictions are hardcoded. The long brief says transfer hooks query the on-chain identity registry and require a fund-specific LP eligibility marker. Illegal recipients fail pre-transfer validation and are blocked immediately. There is no partial execution and no ambiguous intermediate state.  
 
-The same deterministic philosophy applies to settlement. Until the amount, identity, and reference match correctly, the subscription remains pending and no ownership is issued. That directly supports the claim that Kadra reduces operational and fraud risk by eliminating ambiguous handoffs.  
+The same deterministic philosophy applies to settlement. Until the amount, identity, and reference match correctly, the subscription remains pending and no ownership is issued. That directly supports the claim that Angainor reduces operational and fraud risk by eliminating ambiguous handoffs.  
 
 ---
 
-## 19. What Kadra stores on-chain versus off-chain
+## 19. What Angainor stores on-chain versus off-chain
 
 The system is careful about what goes where.
 
@@ -415,7 +415,7 @@ The system is careful about what goes where.
 * time-stamped immutable ownership actions
 * document anchors or references such as the cryptographic fingerprint of the LPA  
 
-The documents consistently describe the off-chain layer as the structured, readable, canonical interface around the immutable ledger. Kadra is therefore hybrid by design, not purely on-chain. 
+The documents consistently describe the off-chain layer as the structured, readable, canonical interface around the immutable ledger. Angainor is therefore hybrid by design, not purely on-chain. 
 
 ---
 
@@ -429,5 +429,5 @@ The short brief summarizes that value crisply: legal docs are anchored on-chain,
 
 ## 21. Final one-paragraph description
 
-**Kadra is a private real-estate fund operating system that ingests governing legal documents, hashes and anchors them, maps verified investors to fund-specific eligible wallets, creates pending subscription records, validates off-chain settlement through a 3-way payment match, converts settled subscriptions into ERC-3643 tokenized ownership, blocks illegal transfers through on-chain transfer hooks tied to an identity registry, maintains structured off-chain capital-account and event data, computes distributions and waterfalls from the live ownership ledger, and exposes the entire lifecycle through a clean institutional dashboard with native audit and export functionality.**  
+**Angainor is a private real-estate fund operating system that ingests governing legal documents, hashes and anchors them, maps verified investors to fund-specific eligible wallets, creates pending subscription records, validates off-chain settlement through a 3-way payment match, converts settled subscriptions into ERC-3643 tokenized ownership, blocks illegal transfers through on-chain transfer hooks tied to an identity registry, maintains structured off-chain capital-account and event data, computes distributions and waterfalls from the live ownership ledger, and exposes the entire lifecycle through a clean institutional dashboard with native audit and export functionality.**  
 

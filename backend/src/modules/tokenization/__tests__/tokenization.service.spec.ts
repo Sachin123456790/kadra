@@ -32,6 +32,7 @@ describe('TokenizationService', () => {
   let service: TokenizationService;
   let prisma: ReturnType<typeof mockPrisma>;
   let adapter: any;
+  let notices: { generateNotice: jest.Mock };
 
   const fundId = 'fund-1';
   const subscriptionId = 'sub-1';
@@ -47,6 +48,7 @@ describe('TokenizationService', () => {
     id: subscriptionId,
     status: 'SETTLED',
     fundId,
+    investorId: 'inv-1',
     walletId: 'w-1',
     allocationPct: 20,
     wallet: mockWallet,
@@ -78,10 +80,14 @@ describe('TokenizationService', () => {
     const mockEventLog = {
       log: jest.fn().mockResolvedValue({}),
     } as unknown as EventLogService;
+    notices = {
+      generateNotice: jest.fn().mockResolvedValue({ id: 'notice-1' }),
+    };
     service = new TokenizationService(
       prisma as unknown as PrismaService,
       adapter,
       mockEventLog,
+      notices as any,
     );
   });
 
@@ -151,6 +157,12 @@ describe('TokenizationService', () => {
       expect(result.mintRequestId).toBe('evt-1');
       expect(prisma.tokenPositionEvent.create).toHaveBeenCalledTimes(1);
       expect(prisma.tokenPosition.create).toHaveBeenCalledTimes(1);
+      expect(notices.generateNotice).toHaveBeenCalledWith({
+        fundId,
+        type: 'TOKEN_MINTED',
+        recipientInvestorId: 'inv-1',
+        anchorTxHash: result.txHash,
+      });
     });
 
     it('rejects non-SETTLED subscription', async () => {

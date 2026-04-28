@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DEFAULT_FUND_CODE, QUERY_KEYS } from "@/config/constants";
 import {
@@ -11,7 +11,17 @@ import {
   updateExtractedFields,
   getInvestors,
 } from "@/services";
-import { getNotices } from "@/services/notices.service";
+import {
+  getNotices,
+  createNotice,
+  updateNoticeDelivery,
+  anchorPendingDocuments,
+  getNoticeTemplate,
+} from "@/services/notices.service";
+import { NoticeBodyEditor } from "@/components/angainor/NoticeBodyEditor";
+import { getCapitalCalls } from "@/services/capital-calls.service";
+import { toFriendlyMessage } from "@/lib/errorMessages";
+import { toast } from "sonner";
 import type {
   UploadResult,
   ParseStatus,
@@ -20,18 +30,23 @@ import type {
   ExtractedField,
   FieldUpdate,
   SubscriptionItem,
+  ReportingDocument,
+} from "@/services/documents.service";
+import {
+  getAdminReportingDocuments,
+  uploadReportingDocument,
 } from "@/services/documents.service";
 import type { Investor } from "@/services/investors.service";
 import type { Notice } from "@/services/notices.service";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { DataTable, Column } from "@/components/kadra/DataTable";
-import { StatusBadge } from "@/components/kadra/StatusBadge";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
-import { ExplorerLink } from "@/components/kadra/ExplorerLink";
-import { HashDisplay } from "@/components/kadra/HashDisplay";
-import { MetricCard } from "@/components/kadra/MetricCard";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { DataTable, Column } from "@/components/angainor/DataTable";
+import { StatusBadge } from "@/components/angainor/StatusBadge";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
+import { ExplorerLink } from "@/components/angainor/ExplorerLink";
+import { HashDisplay } from "@/components/angainor/HashDisplay";
+import { MetricCard } from "@/components/angainor/MetricCard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -67,8 +82,8 @@ import {
   TooltipContent,
   TooltipProvider,
 } from "@/components/ui/tooltip";
-import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
-import { DocumentViewerModal } from "@/components/kadra/DocumentViewerModal";
+import { TechnicalDetails } from "@/components/angainor/TechnicalDetails";
+import { DocumentViewerModal } from "@/components/angainor/DocumentViewerModal";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -91,12 +106,6 @@ function mapHashStatus(status: string): string {
     FAILED: "Failed",
   };
   return map[status] ?? status;
-}
-
-function confidenceColor(confidence: number): string {
-  if (confidence >= 0.9) return "text-green-700 bg-green-50";
-  if (confidence >= 0.7) return "text-amber-700 bg-amber-50";
-  return "text-red-700 bg-red-50";
 }
 
 const fmt = (n: number) =>
@@ -289,6 +298,7 @@ interface SubscriptionDraft {
 
 interface NoticeRow {
   id: string;
+  deliveryId: string | null;
   type: string;
   recipientName: string;
   generatedAt: string;
@@ -354,78 +364,167 @@ function NoticeTableWithFilter({
 
 // ── Reporting Section ────────────────────────────────────────
 
-// TODO: Replace MOCK_REPORTS with real API call to GET /admin/funds/:fundId/reporting-documents
-const MOCK_REPORTS = [
-  { id: '1', name: 'Q1 2027 Quarterly LP Report', type: 'Quarterly Report', uploadDate: '2027-03-31', recipients: 'All LPs', uploadedBy: 'Fund Admin' },
-  { id: '2', name: 'Annual Investor Update 2026', type: 'Annual Report', uploadDate: '2027-01-15', recipients: 'All LPs', uploadedBy: 'Fund Admin' },
-];
+function ReportingSection({
+  fundId,
+  onView,
+}: {
+  readonly fundId: string;
+  readonly onView: (doc: ReportingDocument) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [period, setPeriod] = useState("");
+  const [file, setFile] = useState<File | null>(null);
 
-function ReportingSection() {
+  const { data: reports, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.adminReportingDocs(fundId),
+    queryFn: () => getAdminReportingDocuments(fundId).then((r) => r.data),
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (args: { f: File; t: string; p: string }) =>
+      uploadReportingDocument(fundId, args.f, args.t, args.p),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.adminReportingDocs(fundId),
+      });
+      toast.success("Reporting document uploaded");
+      setIsUploadOpen(false);
+      setTitle("");
+      setPeriod("");
+      setFile(null);
+    },
+    onError: (err) => toast.error(toFriendlyMessage(err)),
+  });
+
+  const handleSubmit = () => {
+    if (!file || !title.trim() || !period.trim()) {
+      toast.error("Title, period, and a file are required");
+      return;
+    }
+    uploadMutation.mutate({ f: file, t: title.trim(), p: period.trim() });
+  };
+
+  const rows = reports ?? [];
+
   return (
-    <SectionCard
-      title="LP Reporting Packages"
-      action={
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>
-                <Button disabled variant="outline" size="sm" className="gap-1.5">
-                  <Upload className="h-4 w-4" />
-                  Upload Report
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>Coming soon</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      }
-    >
-      {MOCK_REPORTS.length === 0 ? (
-        <EmptyState
-          title="No reporting packages"
-          message="LP reporting packages will appear here once uploaded."
-        />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Document Name</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Type</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Upload Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Recipients</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Uploaded By</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">View</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MOCK_REPORTS.map((report) => (
-                <tr key={report.id} className="border-b border-border">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium text-foreground">{report.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{report.type}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{new Date(report.uploadDate).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{report.recipients}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{report.uploadedBy}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-muted transition-colors"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      View
-                    </button>
-                  </td>
+    <>
+      <SectionCard
+        title="LP Reporting Packages"
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setIsUploadOpen(true)}
+          >
+            <Upload className="h-4 w-4" />
+            Upload Report
+          </Button>
+        }
+      >
+        {isLoading ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">Loading reports…</div>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            title="No reporting packages"
+            message="LP reporting packages will appear here once uploaded."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Document Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Period</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Upload Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Uploaded By</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">View</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </SectionCard>
+              </thead>
+              <tbody>
+                {rows.map((report) => (
+                  <tr key={report.documentId} className="border-b border-border">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-foreground">{report.title}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{report.period ?? "—"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{new Date(report.uploadedAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{report.uploadedBy ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => onView(report)}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-muted transition-colors"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+
+      <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Reporting Document</DialogTitle>
+            <DialogDescription>
+              Add a new LP reporting package. It will be visible to all investors with a subscription in this fund.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="report-title" className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <input
+                id="report-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Q1 2027 Quarterly LP Report"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="report-period" className="block text-sm font-medium text-gray-700 mb-1">Period</label>
+              <input
+                id="report-period"
+                type="text"
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                placeholder="Q1 2027"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="report-file" className="block text-sm font-medium text-gray-700 mb-1">File</label>
+              <input
+                id="report-file"
+                type="file"
+                accept=".pdf,.docx,.xlsx"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className="w-full text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsUploadOpen(false)} disabled={uploadMutation.isPending}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={uploadMutation.isPending}>
+              {uploadMutation.isPending ? "Uploading…" : "Upload"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -447,6 +546,26 @@ export default function DocumentsPage() {
   const [notes, setNotes] = useState("");
   const [uploadDocType, setUploadDocType] = useState<string>("Master LPA");
   const [viewerDoc, setViewerDoc] = useState<{ id: string; filename: string } | null>(null);
+  const [showGenerateNoticeModal, setShowGenerateNoticeModal] = useState(false);
+  const [noticeForm, setNoticeForm] = useState<{
+    type: "CAPITAL_CALL" | "DISTRIBUTION" | "TRANSFER" | "GENERAL";
+    recipientInvestorId: string;
+    capitalCallId: string;
+    distributionRunId: string;
+    subject: string;
+    body: string;
+    templateKey: string;
+  }>({
+    type: "GENERAL",
+    recipientInvestorId: "",
+    capitalCallId: "",
+    distributionRunId: "",
+    subject: "",
+    body: "",
+    templateKey: "",
+  });
+  const [bodyTouched, setBodyTouched] = useState(false);
+  const [availableTokens, setAvailableTokens] = useState<readonly string[]>([]);
 
   const governingDocColumns = buildGoverningDocColumns((doc) =>
     setViewerDoc({ id: doc.documentId, filename: doc.originalFilename }),
@@ -495,6 +614,45 @@ export default function DocumentsPage() {
     queryKey: QUERY_KEYS.investors(fundId),
     queryFn: () => getInvestors(fundId).then((r) => r.data),
   });
+
+  const { data: capitalCalls } = useQuery({
+    queryKey: QUERY_KEYS.capitalCalls(fundId),
+    queryFn: () => getCapitalCalls(fundId).then((r) => r.data),
+  });
+
+  // Fetch the default template body whenever the type/recipient/related entity
+  // changes; only auto-fill the editor when the admin hasn't started typing.
+  const { data: noticeTemplate } = useQuery({
+    queryKey: [
+      "notice-template",
+      fundId,
+      noticeForm.type,
+      noticeForm.recipientInvestorId,
+      noticeForm.capitalCallId,
+      noticeForm.distributionRunId,
+    ],
+    queryFn: () =>
+      getNoticeTemplate({
+        type: noticeForm.type,
+        fundId,
+        recipientInvestorId: noticeForm.recipientInvestorId || undefined,
+        capitalCallId: noticeForm.capitalCallId || undefined,
+        distributionRunId: noticeForm.distributionRunId || undefined,
+      }).then((r) => r.data),
+    enabled: showGenerateNoticeModal,
+  });
+
+  // Sync template into the form unless the admin has edited the body manually.
+  useEffect(() => {
+    if (!noticeTemplate || bodyTouched) return;
+    setNoticeForm((prev) => ({
+      ...prev,
+      subject: noticeTemplate.subject,
+      body: noticeTemplate.body,
+      templateKey: noticeTemplate.templateKey,
+    }));
+    setAvailableTokens(noticeTemplate.availableTokens);
+  }, [noticeTemplate, bodyTouched]);
 
   const extractedFields = extractedFieldsData ?? [];
 
@@ -556,6 +714,78 @@ export default function DocumentsPage() {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.documentParseStatus(selectedDocId ?? ""),
       });
+    },
+  });
+
+  const createNoticeMutation = useMutation({
+    mutationFn: () => {
+      const body: Parameters<typeof createNotice>[0] = {
+        fundId,
+        type: noticeForm.type,
+        recipientInvestorId: noticeForm.recipientInvestorId,
+        subject: noticeForm.subject || undefined,
+        bodyMarkdown: noticeForm.body || undefined,
+        templateKey: noticeForm.templateKey || undefined,
+      };
+      if (noticeForm.type === "CAPITAL_CALL" && noticeForm.capitalCallId) {
+        body.capitalCallId = noticeForm.capitalCallId;
+      }
+      if (noticeForm.type === "DISTRIBUTION" && noticeForm.distributionRunId) {
+        body.distributionRunId = noticeForm.distributionRunId;
+      }
+      return createNotice(body).then((r) => r.data);
+    },
+    onSuccess: () => {
+      toast.success("Notice generated");
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notices(fundId) });
+      setShowGenerateNoticeModal(false);
+      setNoticeForm({
+        type: "GENERAL",
+        recipientInvestorId: "",
+        capitalCallId: "",
+        distributionRunId: "",
+        subject: "",
+        body: "",
+        templateKey: "",
+      });
+      setBodyTouched(false);
+    },
+    onError: (err: unknown) => {
+      toast.error(toFriendlyMessage(err));
+    },
+  });
+
+  const updateDeliveryMutation = useMutation({
+    mutationFn: ({
+      noticeId,
+      deliveryId,
+      status,
+    }: {
+      noticeId: string;
+      deliveryId: string;
+      status: string;
+    }) =>
+      updateNoticeDelivery(noticeId, deliveryId, status).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notices(fundId) });
+    },
+    onError: (err: unknown) => {
+      toast.error(toFriendlyMessage(err));
+    },
+  });
+
+  const anchorPendingMutation = useMutation({
+    mutationFn: () => anchorPendingDocuments().then((r) => r.data),
+    onSuccess: (result) => {
+      const count =
+        (result as { anchoredCount?: number } | null)?.anchoredCount ?? 0;
+      toast.success(
+        count > 0 ? `Anchored ${count} document${count === 1 ? "" : "s"}` : "No pending documents to anchor",
+      );
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.documents(fundId) });
+    },
+    onError: (err: unknown) => {
+      toast.error(toFriendlyMessage(err));
     },
   });
 
@@ -731,6 +961,7 @@ export default function DocumentsPage() {
     const effectiveStatus = delivery?.status ?? "GENERATED";
     return {
       id: n.id,
+      deliveryId: delivery?.id ?? null,
       type: n.type,
       recipientName: n.investor?.legalName ?? n.recipientInvestorId,
       generatedAt: n.generatedAt,
@@ -774,7 +1005,37 @@ export default function DocumentsPage() {
     { key: "sentAt", header: "Sent", render: (r) => r.sentAt ? new Date(r.sentAt).toLocaleString() : "--" },
     { key: "openedAt", header: "Opened", render: (r) => r.openedAt ? new Date(r.openedAt).toLocaleString() : "--" },
     { key: "downloadedAt", header: "Downloaded", render: (r) => r.downloadedAt ? new Date(r.downloadedAt).toLocaleString() : "--" },
-    { key: "status", header: "Status", render: (r) => noticeStatusBadge(r.status) },
+    {
+      key: "status",
+      header: "Status",
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          {noticeStatusBadge(r.status)}
+          {r.deliveryId && (
+            <select
+              value=""
+              onChange={(e) => {
+                const next = e.target.value;
+                if (!next || !r.deliveryId) return;
+                updateDeliveryMutation.mutate({
+                  noticeId: r.id,
+                  deliveryId: r.deliveryId,
+                  status: next,
+                });
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-md border border-border bg-card px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted"
+              aria-label="Update delivery status"
+            >
+              <option value="">Mark as…</option>
+              <option value="SENT">Sent</option>
+              <option value="VIEWED">Opened</option>
+              <option value="DOWNLOADED">Downloaded</option>
+            </select>
+          )}
+        </div>
+      ),
+    },
   ];
 
   // ── Render ─────────────────────────────────────────────────
@@ -826,7 +1087,22 @@ export default function DocumentsPage() {
 
         {/* Tab 1: Governing Documents */}
         <TabsContent value="governing">
-          <SectionCard title="Uploaded Documents" className="mb-6">
+          <SectionCard
+            title="Uploaded Documents"
+            className="mb-6"
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => anchorPendingMutation.mutate()}
+                disabled={anchorPendingMutation.isPending}
+                className="gap-1.5"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                {anchorPendingMutation.isPending ? "Anchoring…" : "Anchor Pending"}
+              </Button>
+            }
+          >
             {docsLoading && (
               <div className="flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -1029,9 +1305,6 @@ export default function DocumentsPage() {
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                               Value
                             </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Confidence
-                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1066,13 +1339,6 @@ export default function DocumentsPage() {
                                   />
                                 )}
                               </td>
-                              <td className="px-4 py-3">
-                                <span
-                                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${confidenceColor(field.confidence)}`}
-                                >
-                                  {(field.confidence * 100).toFixed(0)}%
-                                </span>
-                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1080,18 +1346,7 @@ export default function DocumentsPage() {
                     </div>
                   )}
 
-                  {/* Low-confidence warning */}
-                  {extractedFields.some((f) => f.confidence < 0.7) && (
-                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                      <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span>
-                        Some fields have low confidence scores. Review carefully
-                        before creating subscriptions.
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Save edits button (only before approval) */}
+{/* Save edits button (only before approval) */}
                   {!isApproved && Object.keys(fieldEdits).length > 0 && (
                     <div className="mt-4 flex justify-end">
                       <Button
@@ -1140,7 +1395,7 @@ export default function DocumentsPage() {
               {/* Eligible Investors (MASTER_LPA only) */}
               {isParsed && isMasterLpa && (
                 <SectionCard title="Eligible Investors" className="mb-6">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
                     <MetricCard
                       label="Total Eligible"
                       value={eligibleInvestors.length}
@@ -1154,15 +1409,6 @@ export default function DocumentsPage() {
                     <MetricCard
                       label="Fields Extracted"
                       value={extractedFields.length}
-                    />
-                    <MetricCard
-                      label="Low Confidence"
-                      value={extractedFields.filter((f) => f.confidence < 0.7).length}
-                      subtitle={
-                        extractedFields.filter((f) => f.confidence < 0.7).length > 0
-                          ? "Review recommended"
-                          : undefined
-                      }
                     />
                   </div>
 
@@ -1253,7 +1499,19 @@ export default function DocumentsPage() {
 
         {/* Tab 2: Generated Notices */}
         <TabsContent value="notices">
-          <SectionCard title="Generated Notices">
+          <SectionCard
+            title="Generated Notices"
+            action={
+              <Button
+                size="sm"
+                onClick={() => setShowGenerateNoticeModal(true)}
+                className="gap-1.5"
+              >
+                <Plus className="h-4 w-4" />
+                Generate Notice
+              </Button>
+            }
+          >
             {noticesLoading && (
               <div className="flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -1277,7 +1535,10 @@ export default function DocumentsPage() {
 
         {/* Tab 3: Reporting */}
         <TabsContent value="reporting">
-          <ReportingSection />
+          <ReportingSection
+            fundId={fundId}
+            onView={(doc) => setViewerDoc({ id: doc.documentId, filename: doc.fileName })}
+          />
         </TabsContent>
 
         {/* Tab 4: Document Upload */}
@@ -1605,6 +1866,157 @@ export default function DocumentsPage() {
               ) : (
                 `Create ${subscriptionDrafts.length} Subscription${subscriptionDrafts.length !== 1 ? "s" : ""}`
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generate Notice Modal */}
+      <Dialog
+        open={showGenerateNoticeModal}
+        onOpenChange={(open) => {
+          setShowGenerateNoticeModal(open);
+          if (!open) {
+            createNoticeMutation.reset();
+            setBodyTouched(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Generate Notice</DialogTitle>
+            <DialogDescription>
+              Create a notice record for an investor. Notices are backed by the
+              audit log and can be linked to a capital call or distribution run.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Type
+              </label>
+              <select
+                value={noticeForm.type}
+                onChange={(e) => {
+                  setNoticeForm((prev) => ({
+                    ...prev,
+                    type: e.target.value as typeof prev.type,
+                  }));
+                  setBodyTouched(false);
+                }}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="GENERAL">General</option>
+                <option value="CAPITAL_CALL">Capital Call</option>
+                <option value="DISTRIBUTION">Distribution</option>
+                <option value="TRANSFER">Transfer</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Recipient
+              </label>
+              <select
+                value={noticeForm.recipientInvestorId}
+                onChange={(e) => {
+                  setNoticeForm((prev) => ({
+                    ...prev,
+                    recipientInvestorId: e.target.value,
+                  }));
+                  setBodyTouched(false);
+                }}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Select an investor…</option>
+                {(investors ?? []).map((inv) => (
+                  <option key={inv.investorId} value={inv.investorId}>
+                    {inv.legalName} ({inv.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+            {noticeForm.type === "CAPITAL_CALL" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Capital Call
+                </label>
+                <select
+                  value={noticeForm.capitalCallId}
+                  onChange={(e) => {
+                    setNoticeForm((prev) => ({
+                      ...prev,
+                      capitalCallId: e.target.value,
+                    }));
+                    setBodyTouched(false);
+                  }}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">Select a capital call…</option>
+                  {(capitalCalls ?? []).map((call) => (
+                    <option key={call.id} value={call.id}>
+                      Call #{call.callNumber} — ${Number(call.amountDue).toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {noticeForm.type === "DISTRIBUTION" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Distribution Run ID
+                </label>
+                <input
+                  type="text"
+                  value={noticeForm.distributionRunId}
+                  onChange={(e) =>
+                    setNoticeForm((prev) => ({
+                      ...prev,
+                      distributionRunId: e.target.value,
+                    }))
+                  }
+                  placeholder="Optional"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            )}
+            <div className="border-t border-border pt-4">
+              <NoticeBodyEditor
+                value={{ subject: noticeForm.subject, body: noticeForm.body }}
+                availableTokens={availableTokens}
+                disabled={createNoticeMutation.isPending}
+                onChange={(next) => {
+                  setNoticeForm((prev) => ({
+                    ...prev,
+                    subject: next.subject,
+                    body: next.body,
+                  }));
+                  setBodyTouched(true);
+                }}
+              />
+            </div>
+            {createNoticeMutation.isError && (
+              <ErrorAlert
+                title="Unable to generate notice"
+                message={toFriendlyMessage(createNoticeMutation.error)}
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowGenerateNoticeModal(false)}
+              disabled={createNoticeMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createNoticeMutation.mutate()}
+              disabled={
+                createNoticeMutation.isPending ||
+                !noticeForm.recipientInvestorId
+              }
+            >
+              {createNoticeMutation.isPending ? "Generating…" : "Generate"}
             </Button>
           </DialogFooter>
         </DialogContent>

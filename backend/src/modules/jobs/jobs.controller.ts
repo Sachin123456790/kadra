@@ -1,10 +1,10 @@
 import { Controller, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { JobsService } from './jobs.service';
-import { ServiceTokenGuard } from '../../common/guards/service-token.guard';
+import { ServiceTokenOrAdminGuard } from '../../common/guards/service-token-or-admin.guard';
 import { randomUUID } from 'crypto';
 
 @Controller('admin/jobs')
-@UseGuards(ServiceTokenGuard)
+@UseGuards(ServiceTokenOrAdminGuard)
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
 

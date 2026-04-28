@@ -4,14 +4,14 @@
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '/api/v1';
 
-export const AUTH_TOKEN_KEY = 'kadra_auth_token';
-export const AUTH_REFRESH_TOKEN_KEY = 'kadra_auth_refresh_token';
-export const AUTH_USER_KEY = 'kadra_auth_user';
+export const AUTH_TOKEN_KEY = 'angainor_auth_token';
+export const AUTH_REFRESH_TOKEN_KEY = 'angainor_auth_refresh_token';
+export const AUTH_USER_KEY = 'angainor_auth_user';
 
-export const FUND_ID_KEY = 'kadra_active_fund_id';
+export const FUND_ID_KEY = 'angainor_active_fund_id';
 
 // Default fund for demo — matches seed data
-export const DEFAULT_FUND_CODE = 'KADRA-DEMO-001';
+export const DEFAULT_FUND_CODE = 'ANGAINOR-DEMO-001';
 
 export const HTTP_STATUS = {
   UNAUTHORIZED: 401,
@@ -48,6 +48,9 @@ export const QUERY_KEYS = {
   documentProvenance: (fundId: string) => ['document-provenance', fundId] as const,
   capitalAccounts: (fundId: string) => ['capital-accounts', fundId] as const,
   investorDocuments: (fundId: string) => ['investor-documents', fundId] as const,
+  investorGpReports: (fundId: string) => ['investor-gp-reports', fundId] as const,
+  adminReportingDocs: (fundId: string) => ['admin-reporting-docs', fundId] as const,
+  taxPackagePreview: (fundId: string, year: number) => ['tax-package-preview', fundId, year] as const,
   investorActivityFeed: (fundId: string) => ['investor-activity-feed', fundId] as const,
   investorCapitalAccount: (fundId: string) => ['investor-capital-account', fundId] as const,
   taxReport: (fundId: string, year: number) => ['tax-report', fundId, year] as const,
@@ -80,4 +83,5 @@ export const ROUTES = {
   INVESTOR_PROFILE: '/investor/profile',
   INVESTOR_CAPITAL_ACCOUNT: '/investor/capital-account',
   INVESTOR_DOCUMENTS: '/investor/documents',
+  INVESTOR_ONBOARDING: '/investor/onboarding',
 } as const;

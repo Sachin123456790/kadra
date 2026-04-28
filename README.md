@@ -1,4 +1,4 @@
-# Kadra
+# Angainor
 
 Programmable infrastructure layer for private real estate funds. Replaces manual back-office workflows with a blockchain-based settlement engine using ERC-3643 security tokens.
 
@@ -10,7 +10,7 @@ Programmable infrastructure layer for private real estate funds. Replaces manual
 ## Project Structure
 
 ```
-contracts/          Solidity smart contracts (IdentityRegistry, KadraToken, DocumentRegistry)
+contracts/          Solidity smart contracts (IdentityRegistry, AngainorToken, DocumentRegistry)
 lib/                Off-chain business logic (settlement validator, subscription ledger, etc.)
 scripts/            Deployment and utility scripts
 test/               123 tests across 11 files
@@ -67,7 +67,7 @@ The dashboard is available at **http://localhost:3000**.
 
 Open `http://localhost:3000` and click through the steps in order:
 
-1. **Deploy Infrastructure** — deploys IdentityRegistry, KadraToken, and DocumentRegistry contracts to the local chain, then registers 5 investors as eligible LPs
+1. **Deploy Infrastructure** — deploys IdentityRegistry, AngainorToken, and DocumentRegistry contracts to the local chain, then registers 5 investors as eligible LPs
 2. **Upload Master LPA** — drag-and-drop (or click to select) a PDF; the file is SHA-256 hashed and the hash is anchored on-chain in DocumentRegistry
 3. **Settle Wires** — processes 5 mock wire confirmations through the 3-way match validator (investor + amount + document reference), flips subscriptions from Pending to Settled, and mints 2,000 KDRA tokens per investor
 4. **Test Illegal Transfer** — attempts a transfer to a non-LP wallet; the on-chain transfer hook reverts immediately
@@ -92,7 +92,7 @@ The local demo (Hardhat node + frontend) works without any `.env` configuration.
 | `npm test` | Run all 123 tests on local Hardhat EVM |
 | `npm run compile` | Compile Solidity contracts |
 | `npx hardhat node` | Start persistent local blockchain on port 8545 |
-| `npx hardhat run scripts/deploy-kadra.js --network localhost` | Run full 9-step deployment script against local node |
+| `npx hardhat run scripts/deploy-angainor.js --network localhost` | Run full 9-step deployment script against local node |
 | `npx hardhat run scripts/cap-table.js --network localhost` | Print cap table from deployed contracts |
 | `npm run deploy:sepolia` | Deploy to Sepolia testnet |
 
@@ -101,7 +101,7 @@ The local demo (Hardhat node + frontend) works without any `.env` configuration.
 ### Smart Contracts
 
 - **IdentityRegistry** — investor whitelist with two-flag verification (isVerified + isEligible). Only the deployer can add/remove investors.
-- **KadraToken** — ERC-20 security token (OpenZeppelin v5) with transfer restrictions. Overrides `_update()` to query IdentityRegistry before every transfer. Both sender and recipient must be eligible LPs.
+- **AngainorToken** — ERC-20 security token (OpenZeppelin v5) with transfer restrictions. Overrides `_update()` to query IdentityRegistry before every transfer. Both sender and recipient must be eligible LPs.
 - **DocumentRegistry** — immutable on-chain document hash anchoring. Each document hash can only be registered once with a timestamp and document type.
 
 ### Off-Chain Libraries
@@ -114,7 +114,7 @@ The local demo (Hardhat node + frontend) works without any `.env` configuration.
 
 ### Token Details
 
-- Name: Kadra Demo Fund I
+- Name: Angainor Demo Fund I
 - Symbol: KDRA
 - Total supply: 10,000 tokens (2,000 per investor at 20% each)
 - Decimals: 18

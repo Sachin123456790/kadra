@@ -5,14 +5,16 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
 } from "recharts";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { StatusBadge } from "@/components/kadra/StatusBadge";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
-import { TableSkeleton } from "@/components/kadra/Skeleton";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { StatusBadge } from "@/components/angainor/StatusBadge";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
+import { TableSkeleton } from "@/components/angainor/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getSubscriptions, getInvestors, getDocuments, createSubscriptions } from "@/services";
+import { createNotice } from "@/services/notices.service";
+import { toFriendlyMessage } from "@/lib/errorMessages";
 import {
   Dialog,
   DialogContent,
@@ -40,11 +42,10 @@ import {
   Search,
   AlertTriangle,
   MoreHorizontal,
-  Mail,
   Bell,
   BarChart3,
 } from "lucide-react";
-import { HashDisplay } from "@/components/kadra/HashDisplay";
+import { HashDisplay } from "@/components/angainor/HashDisplay";
 import { cn } from "@/lib/utils";
 import { useHighlightRow } from "@/hooks/useHighlightRow";
 import type { Subscription } from "@/services/subscriptions.service";
@@ -60,6 +61,12 @@ const STATUS_COLORS: Record<string, string> = {
 
 const fmt = (n: number): string =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+
+function buildSubscriptionRef(investorId: string): string {
+  const investorPrefix = investorId.replace(/-/g, "").slice(0, 6).toUpperCase();
+  const suffix = Date.now().toString(36).toUpperCase();
+  return `SUB-${investorPrefix}-${suffix}`;
+}
 
 function statusBadge(status: string) {
   if (status === "MISMATCH") {
@@ -126,6 +133,22 @@ export default function SubscriptionsPage() {
 
   const latestLpaHash = latestLpa?.hash?.hashHex ?? "";
 
+  const remindMutation = useMutation({
+    mutationFn: (sub: Subscription) =>
+      createNotice({
+        fundId,
+        type: "GENERAL",
+        recipientInvestorId: sub.investorId,
+      }).then((r) => r.data),
+    onSuccess: () => {
+      toast.success("Reminder notice generated");
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notices(fundId) });
+    },
+    onError: (err: unknown) => {
+      toast.error(toFriendlyMessage(err));
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: () => {
       if (!latestLpa) return Promise.reject(new Error("No LPA document found"));
@@ -137,7 +160,7 @@ export default function SubscriptionsPage() {
           walletId,
           allocationPct: Number(createAllocation),
           committedAmount: createAmount,
-          subscriptionRef: `SUB-${createLpId.slice(0, 6).toUpperCase()}`,
+          subscriptionRef: buildSubscriptionRef(createLpId),
         },
       ]).then(r => r.data);
     },
@@ -477,6 +500,7 @@ export default function SubscriptionsPage() {
                     onToggle={() => toggleExpand(sub.subscriptionId)}
                     isHighlighted={highlightId === sub.subscriptionId}
                     isPulsing={isPulsing}
+                    onRemind={(s) => remindMutation.mutate(s)}
                   />
                 );
               })}
@@ -590,9 +614,10 @@ interface SubscriptionTableRowProps {
   onToggle: () => void;
   isHighlighted?: boolean;
   isPulsing?: boolean;
+  onRemind?: (sub: Subscription) => void;
 }
 
-function SubscriptionTableRow({ sub, isExpanded, walletAddress, onToggle, isHighlighted, isPulsing }: SubscriptionTableRowProps) {
+function SubscriptionTableRow({ sub, isExpanded, walletAddress, onToggle, isHighlighted, isPulsing, onRemind }: SubscriptionTableRowProps) {
   const isPending = sub.status.toUpperCase() === "PENDING";
 
   return (
@@ -640,17 +665,12 @@ function SubscriptionTableRow({ sub, isExpanded, walletAddress, onToggle, isHigh
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => toast.info("Reminder feature coming soon")}>
+              <DropdownMenuItem
+                onClick={() => onRemind?.(sub)}
+                disabled={!onRemind}
+              >
                 <Bell className="h-4 w-4 mr-2" />
                 Remind Investor
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info("Document viewer coming soon")}>
-                <FileText className="h-4 w-4 mr-2" />
-                View Docs
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.info("Messaging feature coming soon")}>
-                <Mail className="h-4 w-4 mr-2" />
-                Message
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

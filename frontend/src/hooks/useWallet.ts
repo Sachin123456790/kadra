@@ -65,7 +65,7 @@ export function useWallet(): UseWalletReturn {
     };
   }, []);
 
-  const connectWallet = useCallback(async (provider?: any): Promise<string> => {
+  const connectWallet = useCallback(async (provider?: any): Promise<{ address: string; chainId: number }> => {
     const p = provider || (window as any).ethereum;
     if (!p) {
       setError('No wallet provider found. Please install MetaMask or Phantom.');
@@ -86,7 +86,7 @@ export function useWallet(): UseWalletReturn {
       setChainId(chain);
       setActiveProvider(p);
       setStatus('connected');
-      return addr;
+      return { address: addr, chainId: chain };
     } catch (err: any) {
       const msg = err?.message || 'Failed to connect wallet';
       setError(msg);

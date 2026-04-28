@@ -1,6 +1,6 @@
 # Backend-Chain Adapter Interface
 
-This document specifies the `TokenContractAdapter` interface that decouples the Kadra backend from direct blockchain library dependencies. All chain interaction flows through this adapter layer.
+This document specifies the `TokenContractAdapter` interface that decouples the Angainor backend from direct blockchain library dependencies. All chain interaction flows through this adapter layer.
 
 ---
 
@@ -35,7 +35,7 @@ The adapter pattern enforces a clean separation:
 ```typescript
 interface TokenContractAdapter {
   /**
-   * Deploy a new KadraToken contract linked to an IdentityRegistry.
+   * Deploy a new AngainorToken contract linked to an IdentityRegistry.
    * Also deploys the IdentityRegistry and DocumentRegistry for the fund.
    */
   deploy(input: DeployInput): Promise<DeployOutput>;
@@ -68,7 +68,7 @@ interface TokenContractAdapter {
 
 ```typescript
 interface DeployInput {
-  /** Token name, e.g., "Kadra Demo Fund I" */
+  /** Token name, e.g., "Angainor Demo Fund I" */
   name: string;
 
   /** Token symbol, e.g., "KDRA" */
@@ -83,7 +83,7 @@ interface DeployInput {
 
 ```typescript
 interface MintInput {
-  /** Address of the deployed KadraToken contract */
+  /** Address of the deployed AngainorToken contract */
   contractAddress: string;
 
   /** Investor wallet address to receive tokens */
@@ -101,7 +101,7 @@ interface MintInput {
 
 ```typescript
 interface TransferInput {
-  /** Address of the deployed KadraToken contract */
+  /** Address of the deployed AngainorToken contract */
   contractAddress: string;
 
   /** Sender wallet address (must be an eligible LP) */
@@ -126,7 +126,7 @@ interface TransferInput {
 
 ```typescript
 interface DeployOutput {
-  /** Deployed KadraToken contract address */
+  /** Deployed AngainorToken contract address */
   contractAddress: string;
 
   /** Transaction hash of the deployment */
@@ -179,10 +179,10 @@ interface TxOutput {
 **Behavior (planned):**
 
 - Uses `ethers.js` to connect to a Hardhat local node or Sepolia testnet.
-- `deploy()` compiles and deploys the `KadraToken` contract, waits for the transaction receipt.
-- `mint()` calls `kadraToken.mint(to, amount)` and waits for confirmation.
-- `transfer()` connects as the sender signer and calls `kadraToken.transfer(to, amount)`.
-- `getBalance()` calls `kadraToken.balanceOf(address)` and formats the result.
+- `deploy()` compiles and deploys the `AngainorToken` contract, waits for the transaction receipt.
+- `mint()` calls `angainorToken.mint(to, amount)` and waits for confirmation.
+- `transfer()` connects as the sender signer and calls `angainorToken.transfer(to, amount)`.
+- `getBalance()` calls `angainorToken.balanceOf(address)` and formats the result.
 - Handles gas estimation, nonce management, and transaction receipt parsing.
 
 **Use cases:**
@@ -247,4 +247,4 @@ CHAIN_ADAPTER=mock      -->  MockTokenContractAdapter
 CHAIN_ADAPTER=hardhat   -->  HardhatTokenContractAdapter  (planned)
 ```
 
-In test environments, the mock adapter is used by default. In deployment scripts (e.g., `scripts/deploy-kadra.js`), the Hardhat adapter will be used to interact with the local node or testnet.
+In test environments, the mock adapter is used by default. In deployment scripts (e.g., `scripts/deploy-angainor.js`), the Hardhat adapter will be used to interact with the local node or testnet.

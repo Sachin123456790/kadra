@@ -6,6 +6,8 @@ import { getSubscriptions } from '@/services/subscriptions.service';
 import { getOwnershipHistory } from '@/services/ownership.service';
 import { getInvestors } from '@/services/investors.service';
 import { getMySubscriptions, getMyTransfers } from '@/services/investor-portal.service';
+import { getInvestorNotices } from '@/services/notices.service';
+import { useAppConfig } from './useAppConfig';
 
 export interface AppNotification {
   id: string;
@@ -59,7 +61,7 @@ export function getNotificationRoute(
   }
 }
 
-const STORAGE_KEY = 'kadra_read_notifications';
+const STORAGE_KEY = 'angainor_read_notifications';
 
 function getReadIds(): Set<string> {
   try {
@@ -76,8 +78,9 @@ function saveReadIds(ids: Set<string>) {
 
 export function useNotifications() {
   const { user } = useAuth();
+  const { data: appConfig } = useAppConfig();
   const isAdmin = user?.role && (ADMIN_ROLES as readonly string[]).includes(user.role);
-  const fundId = DEFAULT_FUND_CODE;
+  const fundId = appConfig?.defaults.fundCode ?? DEFAULT_FUND_CODE;
 
   // Admin: fetch subscriptions + ownership events + investors for name lookup
   const { data: subscriptions } = useQuery({
@@ -111,6 +114,12 @@ export function useNotifications() {
     enabled: !isAdmin && !!user,
   });
 
+  const { data: myNotices } = useQuery({
+    queryKey: [...QUERY_KEYS.investorNotices(), 'notif'],
+    queryFn: () => getInvestorNotices().then(r => r.data),
+    enabled: !isAdmin && !!user,
+  });
+
   const notifications = useMemo((): AppNotification[] => {
     const readIds = getReadIds();
     const items: AppNotification[] = [];
@@ -140,15 +149,20 @@ export function useNotifications() {
               targetRoute: getNotificationRoute('settlement', role, sub.subscriptionId),
             });
           } else if (sub.status === 'PENDING') {
-            items.push({
-              id: `subscription-${sub.subscriptionId}`,
-              message: `New subscription created: ${sub.subscriptionRef}`,
-              timestamp: new Date(), // no createdAt in admin subscription response
-              type: 'subscription',
-              read: readIds.has(`subscription-${sub.subscriptionId}`),
-              targetId: sub.subscriptionId,
-              targetRoute: getNotificationRoute('subscription', role, sub.subscriptionId),
-            });
+            // Only surface a timestamp if the backend actually returned one.
+            // Fabricating `new Date()` on render made every refresh look like
+            // a brand-new notification.
+            if (sub.createdAt) {
+              items.push({
+                id: `subscription-${sub.subscriptionId}`,
+                message: `New subscription created: ${sub.subscriptionRef}`,
+                timestamp: new Date(sub.createdAt),
+                type: 'subscription',
+                read: readIds.has(`subscription-${sub.subscriptionId}`),
+                targetId: sub.subscriptionId,
+                targetRoute: getNotificationRoute('subscription', role, sub.subscriptionId),
+              });
+            }
           }
         }
       }
@@ -229,6 +243,17 @@ export function useNotifications() {
               targetRoute: getNotificationRoute('settlement', role, sub.id),
             });
           }
+          if (sub.mintTxHash && sub.mintedAt) {
+            items.push({
+              id: `my-mint-${sub.id}`,
+              message: `Tokens minted for subscription ${sub.subscriptionRef}`,
+              timestamp: new Date(sub.mintedAt),
+              type: 'mint',
+              read: readIds.has(`my-mint-${sub.id}`),
+              targetId: sub.id,
+              targetRoute: getNotificationRoute('mint', role, sub.id),
+            });
+          }
           items.push({
             id: `my-sub-${sub.id}`,
             message: `Subscription ${sub.subscriptionRef} created`,
@@ -256,12 +281,32 @@ export function useNotifications() {
           });
         }
       }
+
+      if (myNotices) {
+        for (const notice of myNotices) {
+          const kind =
+            notice.type === 'TRANSFER'
+              ? 'transfer_notice'
+              : notice.type === 'TOKEN_MINTED'
+                ? 'mint'
+                : 'general';
+          items.push({
+            id: `my-notice-${notice.id}`,
+            message: `${notice.type.replace(/_/g, ' ')} notice available`,
+            timestamp: new Date(notice.generatedAt),
+            type: kind,
+            read: readIds.has(`my-notice-${notice.id}`),
+            targetId: notice.id,
+            targetRoute: '/investor/documents?tab=notices',
+          });
+        }
+      }
     }
 
     // Sort by timestamp descending (newest first)
     items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     return items;
-  }, [isAdmin, subscriptions, ownershipEvents, investors, mySubscriptions, myTransfers]);
+  }, [isAdmin, subscriptions, ownershipEvents, investors, mySubscriptions, myTransfers, myNotices]);
 
   const unreadCount = useMemo(
     () => notifications.filter(n => !n.read).length,

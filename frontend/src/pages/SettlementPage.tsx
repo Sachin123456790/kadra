@@ -1,13 +1,13 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { StatusBadge } from "@/components/kadra/StatusBadge";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
-import { ExplorerLink } from "@/components/kadra/ExplorerLink";
-import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { StatusBadge } from "@/components/angainor/StatusBadge";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
+import { ExplorerLink } from "@/components/angainor/ExplorerLink";
+import { TechnicalDetails } from "@/components/angainor/TechnicalDetails";
 import {
   CheckCircle,
   XCircle,
@@ -19,25 +19,31 @@ import {
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
+import { toFriendlyMessage } from "@/lib/errorMessages";
 import {
   getSubscriptions,
   requestPaymentValidation,
   confirmSettlement,
   uploadWireConfirmation,
 } from "@/services";
+import { mintTokens } from "@/services/tokenization.service";
 import {
   getCapitalCalls,
   createCapitalCall,
 } from "@/services/capital-calls.service";
 import type { CapitalCall } from "@/services/capital-calls.service";
+import { mintAllSettled } from "@/services/notices.service";
+import { Button } from "@/components/ui/button";
 import type { ValidationResult } from "@/services/settlements.service";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Sparkles } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -122,6 +128,7 @@ interface QueueItem {
   rawAmount: string;
   ref: string;
   status: string;
+  subscriptionStatus: string;
 }
 
 // ── Capital Calls Section ────────────────────────────────
@@ -372,11 +379,12 @@ function SettlementValidationSection({
         rawAmount: String(sub.committedAmount),
         ref: sub.subscriptionRef,
         status: sub.latestSettlementStatus ?? "Pending",
+        subscriptionStatus: sub.status,
       })),
   });
 
   const selected =
-    queue?.find((q) => q.id === selectedId) ?? queue?.[0] ?? null;
+    selectedId != null ? (queue?.find((q) => q.id === selectedId) ?? null) : null;
 
   const uploadMutation = useMutation({
     mutationFn: ({
@@ -412,6 +420,15 @@ function SettlementValidationSection({
       }).then((r) => r.data),
     onSuccess: (result, item) => {
       setValidationResults((prev) => ({ ...prev, [item.id]: result }));
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.subscriptions(fundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.capitalCalls(fundId),
+      });
+    },
+    onError: (err: Error) => {
+      toast.error(toFriendlyMessage(err));
     },
   });
 
@@ -431,6 +448,12 @@ function SettlementValidationSection({
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.subscriptions(fundId),
       });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.capitalCalls(fundId),
+      });
+    },
+    onError: (err: Error) => {
+      toast.error(toFriendlyMessage(err));
     },
   });
 
@@ -476,7 +499,7 @@ function SettlementValidationSection({
           message="All subscriptions have been settled, or no subscriptions exist yet."
         />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           <SectionCard title="Payment Evidence Queue">
             <div className="space-y-2">
               {queue.map((p) => {
@@ -532,9 +555,10 @@ function SettlementValidationSection({
             </div>
           </SectionCard>
 
+          {selected && (
+          <div className="lg:sticky lg:top-6">
           <SectionCard title="Validation Checklist">
-            {selected && (
-              <>
+            <>
                 {/* Wire Upload */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-muted-foreground mb-2">
@@ -642,7 +666,10 @@ function SettlementValidationSection({
                       selected && validateMutation.mutate(selected)
                     }
                     disabled={
-                      !hasPaymentDoc || validateMutation.isPending
+                      !hasPaymentDoc ||
+                      validateMutation.isPending ||
+                      (selected?.subscriptionStatus !== undefined &&
+                        selected.subscriptionStatus !== "PENDING")
                     }
                     className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
@@ -698,8 +725,9 @@ function SettlementValidationSection({
                   />
                 )}
               </>
-            )}
           </SectionCard>
+          </div>
+          )}
         </div>
       )}
     </>
@@ -707,6 +735,147 @@ function SettlementValidationSection({
 }
 
 // ── Main Page ────────────────────────────────────────────
+
+function MintAllSettledAction({ fundId }: { readonly fundId: string }) {
+  const queryClient = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const mutation = useMutation({
+    mutationFn: () => mintAllSettled(fundId).then((r) => r.data),
+    onSuccess: (data) => {
+      toast.success(
+        `Minted tokens for ${data.mintedCount} subscription${data.mintedCount === 1 ? "" : "s"}`,
+      );
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.capTable(fundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.fundOverview(fundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.subscriptions(fundId),
+      });
+      setConfirmOpen(false);
+    },
+    onError: (err: Error) => {
+      toast.error(toFriendlyMessage(err));
+    },
+  });
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setConfirmOpen(true)}
+        className="gap-1.5"
+      >
+        <Sparkles className="h-4 w-4" />
+        Mint All Settled
+      </Button>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mint tokens for all settled subscriptions?</DialogTitle>
+            <DialogDescription>
+              This will deploy/mint ERC-20 units for every subscription
+              currently in the SETTLED state. Subscriptions that have already
+              been minted will be skipped. This action writes to Sepolia and
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+              disabled={mutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? "Minting…" : "Confirm Mint"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function MintSubscriptionAction({
+  fundId,
+  subscriptionId,
+  mintedTxHash,
+}: {
+  readonly fundId: string;
+  readonly subscriptionId: string;
+  readonly mintedTxHash: string | null;
+}) {
+  const queryClient = useQueryClient();
+  const autoFiredRef = useRef(false);
+  const mutation = useMutation({
+    mutationFn: () => mintTokens(subscriptionId).then((r) => r.data),
+    onSuccess: () => {
+      toast.success("Minted tokens for subscription");
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.capTable(fundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.fundOverview(fundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.subscriptions(fundId),
+      });
+    },
+    onError: (err: Error) => {
+      toast.error(toFriendlyMessage(err));
+    },
+  });
+
+  useEffect(() => {
+    if (mintedTxHash) return;
+    if (autoFiredRef.current) return;
+    if (mutation.isPending || mutation.isError || mutation.isSuccess) return;
+    autoFiredRef.current = true;
+    mutation.mutate();
+  }, [mintedTxHash, mutation]);
+
+  if (mintedTxHash) {
+    return (
+      <div className="inline-flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 text-green-600">
+          <CheckCircle className="h-4 w-4" />
+          <span className="text-xs font-medium">Minted</span>
+        </span>
+        <ExplorerLink value={mintedTxHash} type="tx" label="View tx" />
+      </div>
+    );
+  }
+
+  if (mutation.isError) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => mutation.mutate()}
+        disabled={mutation.isPending}
+        className="gap-1.5"
+      >
+        <Sparkles className="h-4 w-4" />
+        Retry mint
+      </Button>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      Minting…
+    </span>
+  );
+}
 
 export default function SettlementPage() {
   const fundId = DEFAULT_FUND_CODE;
@@ -716,6 +885,7 @@ export default function SettlementPage() {
       <PageHeader
         title="Settlement"
         subtitle="Issue capital calls, upload payment evidence, and confirm investor settlements"
+        action={<MintAllSettledAction fundId={fundId} />}
       />
 
       <Tabs defaultValue="history" className="mt-2">
@@ -775,26 +945,42 @@ function SettlementHistoryOnly({ fundId }: { readonly fundId: string }) {
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Settlement Date</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Verification</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {settledSubs.map((sub) => (
+            {settledSubs.map((sub) => {
+              const checks = sub.latestSettlement?.validation?.checks;
+              return (
               <tr key={sub.subscriptionId} className="border-b border-border">
                 <td className="px-4 py-3 font-medium text-foreground">{sub.investorName || sub.investorId}</td>
-                {/* TODO: Replace with calledAmount from capital calls cross-reference */}
+                <td className="px-4 py-3 text-muted-foreground">Not exposed</td>
                 <td className="px-4 py-3 text-foreground">${Number(sub.committedAmount).toLocaleString()}</td>
-                <td className="px-4 py-3 text-foreground">${Number(sub.committedAmount).toLocaleString()}</td>
-                {/* TODO: Replace with actual settledAmount from settlement records */}
-                <td className="px-4 py-3 text-foreground">${Number(sub.committedAmount).toLocaleString()}</td>
+                <td className="px-4 py-3 text-muted-foreground">Not exposed</td>
                 <td className="px-4 py-3 text-foreground">{Number(sub.allocationPct)}%</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    {["Amount", "Identity", "Reference"].map((label) => (
-                      <div key={label} className="flex items-center gap-1">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-xs text-muted-foreground">{label}</span>
-                      </div>
-                    ))}
+                    {checks && checks.length > 0 ? (
+                      checks.map((chk) => (
+                        <div key={chk.name} className="flex items-center gap-1">
+                          {chk.passed === true ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : chk.passed === false ? (
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          ) : (
+                            <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
+                          )}
+                          <span className="text-xs text-muted-foreground">{chk.name}</span>
+                        </div>
+                      ))
+                    ) : (
+                      ["Amount", "Identity", "Reference"].map((label) => (
+                        <div key={label} className="flex items-center gap-1">
+                          <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
+                          <span className="text-xs text-muted-foreground">{label}</span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-3"><StatusBadge status="Settled" /></td>
@@ -809,8 +995,16 @@ function SettlementHistoryOnly({ fundId }: { readonly fundId: string }) {
                     <span className="text-gray-400">--</span>
                   )}
                 </td>
+                <td className="px-4 py-3">
+                  <MintSubscriptionAction
+                    fundId={fundId}
+                    subscriptionId={sub.subscriptionId}
+                    mintedTxHash={sub.mintTxHash}
+                  />
+                </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

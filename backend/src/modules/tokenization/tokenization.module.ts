@@ -4,8 +4,10 @@ import { TokenizationService } from './tokenization.service';
 import { TOKEN_CONTRACT_ADAPTER } from '../../adapters/blockchain/token-contract.adapter';
 import { ViemTokenContractAdapter } from '../../adapters/blockchain/viem-token-contract.adapter';
 import { ViemClientProvider } from '../../adapters/blockchain/viem-client.provider';
+import { NoticesModule } from '../notices/notices.module';
 
 @Module({
+  imports: [NoticesModule],
   controllers: [TokenizationController],
   providers: [
     TokenizationService,

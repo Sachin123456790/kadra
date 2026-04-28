@@ -1,6 +1,6 @@
-# Kadra Backend -- Overview
+# Angainor Backend -- Overview
 
-Kadra's backend is a **NestJS 11 modular monolith** running on the **Fastify** HTTP adapter. It exposes a versioned REST API (`/api/v1`) that drives the full lifecycle of a private real estate fund: document upload, investor identity management, subscription tracking, off-chain settlement validation, token minting, LP-to-LP transfers, distribution waterfall calculations, and audit export generation.
+Angainor's backend is a **NestJS 11 modular monolith** running on the **Fastify** HTTP adapter. It exposes a versioned REST API (`/api/v1`) that drives the full lifecycle of a private real estate fund: document upload, investor identity management, subscription tracking, off-chain settlement validation, token minting, LP-to-LP transfers, distribution waterfall calculations, and audit export generation.
 
 ---
 

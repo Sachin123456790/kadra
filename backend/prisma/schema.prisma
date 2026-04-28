@@ -48,6 +48,24 @@ model Fund {
 }
 
 // ─────────────────────────────────────────────────────────
+// 1b. auth_users — local email/password identity
+// ─────────────────────────────────────────────────────────
+model AuthUser {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String    @map("password_hash")
+  role           String    @default("investor") // investor | admin | platform_admin | fund_admin | operations_analyst
+  fullName       String?   @map("full_name")
+  emailVerified  Boolean   @default(true) @map("email_verified")
+  lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz()
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz()
+
+  @@map("auth_users")
+}
+
+// ─────────────────────────────────────────────────────────
 // 2. investors
 // ─────────────────────────────────────────────────────────
 model Investor {
@@ -56,6 +74,8 @@ model Investor {
   legalName            String    @map("legal_name")
   email                String?
   verificationStatus   String    @default("UNKNOWN") @map("verification_status") // UNKNOWN | VERIFIED | REVOKED
+  kycStatus            String    @default("PENDING") @map("kyc_status") // PENDING | APPROVED | REJECTED
+  accreditationStatus  String    @default("PENDING") @map("accreditation_status") // PENDING | APPROVED | REJECTED
   verificationProvider String?   @map("verification_provider")
   verifiedAt           DateTime? @map("verified_at") @db.Timestamptz()
   metadata             Json      @default("{}")
@@ -108,10 +128,11 @@ model Wallet {
   toTransferRequests   TransferRequest[] @relation("toWallet")
   distributionLineItems DistributionLineItem[]
 
-  @@unique([chainId, addressNorm], name: "chainId_addressNorm")
   // Partial unique: one primary wallet per investor+chain (where is_primary and deleted_at is null)
   // Cannot be expressed in Prisma; enforce in application code or raw SQL migration
+  @@unique([investorId, chainId, addressNorm], name: "investorId_chainId_addressNorm")
   @@index([investorId, chainId])
+  @@index([chainId, addressNorm])
   @@map("wallets")
 }
 
@@ -249,7 +270,6 @@ model ExtractedDocumentField {
   fieldValueDate    DateTime? @map("field_value_date") @db.Date
   fieldValueJson    Json?     @map("field_value_json")
   normalizedValue   String?   @map("normalized_value")
-  confidence        Decimal?  @db.Decimal(5, 4)
   sourcePage        Int?      @map("source_page")
   sourceBbox        Json?     @map("source_bbox")
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz()
@@ -892,6 +912,9 @@ model Notice {
   distributionRunId   String?   @map("distribution_run_id")
   documentHash        String?   @map("document_hash") @db.VarChar(128)
   anchorTxHash        String?   @map("anchor_tx_hash") @db.VarChar(66)
+  subject             String?   @db.VarChar(255)
+  bodyMarkdown        String?   @map("body_markdown") @db.Text
+  templateKey         String?   @map("template_key") @db.VarChar(64)
   generatedAt         DateTime  @default(now()) @map("generated_at") @db.Timestamptz()
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()

@@ -8,6 +8,7 @@ import {
   ExternalDependencyError,
 } from '../../common/errors';
 import { EventLogService } from '../../common/event-log.service';
+import { NoticesService } from '../notices/notices.service';
 
 @Injectable()
 export class TokenizationService {
@@ -16,6 +17,7 @@ export class TokenizationService {
     @Inject(TOKEN_CONTRACT_ADAPTER)
     private readonly tokenAdapter: TokenContractAdapter,
     private readonly eventLog: EventLogService,
+    private readonly noticesService: NoticesService,
   ) {}
 
   async ensureContract(fundId: string) {
@@ -113,13 +115,37 @@ export class TokenizationService {
     const tokenAmount =
       (Number(subscription.allocationPct) / 100) * totalSupply;
 
-    try {
-      const result = await this.tokenAdapter.mint({
-        contractAddress: contract.contractAddress,
-        toAddress: subscription.wallet.address,
-        amount: tokenAmount.toString(),
-      });
+    const MAX_ATTEMPTS = 3;
+    let lastError: unknown = null;
+    let result: Awaited<ReturnType<typeof this.tokenAdapter.mint>> | null =
+      null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        result = await this.tokenAdapter.mint({
+          contractAddress: contract.contractAddress,
+          toAddress: subscription.wallet.address,
+          amount: tokenAmount.toString(),
+        });
+        break;
+      } catch (err) {
+        lastError = err;
+        console.warn(
+          `[mint] attempt ${attempt}/${MAX_ATTEMPTS} failed for sub ${subscriptionId}:`,
+          err instanceof Error ? err.message : err,
+        );
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, 2000 * 2 ** (attempt - 1)));
+        }
+      }
+    }
+    if (!result) {
+      throw new ExternalDependencyError(
+        'Blockchain',
+        `Mint failed after ${MAX_ATTEMPTS} attempts: ${lastError instanceof Error ? lastError.message : 'unknown'}`,
+      );
+    }
 
+    try {
       // Record the mint event
       const event = await this.prisma.tokenPositionEvent.create({
         data: {
@@ -185,6 +211,7 @@ export class TokenizationService {
         fundId: subscription.fundId,
         payload: {
           subscriptionId,
+          investorId: subscription.investorId,
           walletAddress: subscription.wallet.address,
           tokenAmount,
           contractAddress: contract.contractAddress,
@@ -192,6 +219,29 @@ export class TokenizationService {
         txHash: result.txHash,
         blockNumber: result.blockNumber,
       });
+
+      try {
+        await this.noticesService.generateNotice({
+          fundId: subscription.fundId,
+          type: 'TOKEN_MINTED',
+          recipientInvestorId: subscription.investorId,
+          anchorTxHash: result.txHash,
+        });
+      } catch (noticeError) {
+        await this.eventLog.log({
+          eventType: 'NOTICE_GENERATION_FAILED',
+          aggregateType: 'SUBSCRIPTION',
+          aggregateId: subscriptionId,
+          fundId: subscription.fundId,
+          payload: {
+            stage: 'TOKEN_MINT',
+            recipientInvestorId: subscription.investorId,
+            txHash: result.txHash,
+            error:
+              noticeError instanceof Error ? noticeError.message : 'unknown',
+          },
+        });
+      }
 
       return {
         mintRequestId: event.id,
@@ -211,7 +261,7 @@ export class TokenizationService {
 
   /**
    * Validate a transfer (pre-checks only). Does NOT submit to chain.
-   * Returns a transferRequestId with status PENDING_SIGNATURE if pre-checks pass.
+   * Returns a transferRequestId with status REQUESTED if pre-checks pass.
    * The frontend must then sign the tx with the investor's wallet and call confirmTransfer.
    */
   async validateTransfer(
@@ -353,18 +403,9 @@ export class TokenizationService {
       };
     }
 
-    // Pre-checks passed — waiting for frontend to sign and submit
-    await this.prisma.transferRequest.update({
-      where: { id: transferRequest.id },
-      data: {
-        requestStatus: 'PENDING_SIGNATURE',
-        precheckPassed: true,
-      },
-    });
-
     return {
       transferRequestId: transferRequest.id,
-      requestStatus: 'PENDING_SIGNATURE',
+      requestStatus: 'REQUESTED',
       precheck: {
         recipientEligible: true,
         senderEligible: true,
@@ -385,13 +426,10 @@ export class TokenizationService {
     });
     if (!transferRequest)
       throw new NotFoundError('TransferRequest', transferRequestId);
-    if (
-      transferRequest.requestStatus !== 'PENDING_SIGNATURE' &&
-      transferRequest.requestStatus !== 'REQUESTED'
-    ) {
+    if (transferRequest.requestStatus !== 'REQUESTED') {
       throw new ConflictError(
         'TRANSFER_NOT_PENDING',
-        `Transfer is in ${transferRequest.requestStatus} state, not PENDING_SIGNATURE`,
+        `Transfer is in ${transferRequest.requestStatus} state, not REQUESTED`,
       );
     }
 
@@ -414,6 +452,30 @@ export class TokenizationService {
         'Adapter does not support verifyTransferTx',
       );
     }
+    await this.prisma.transferRequest.update({
+      where: { id: transferRequestId },
+      data: {
+        requestStatus: 'SUBMITTED',
+        submittedTxHash: txHash,
+        submittedAt: new Date(),
+      },
+    });
+
+    await this.prisma.transferEvent.create({
+      data: {
+        transferRequestId,
+        fundId,
+        tokenContractId: contract.id,
+        eventKind: 'SUBMITTED',
+        txHash,
+        payload: {
+          fromWallet: transferRequest.fromWalletAddress,
+          toWallet: transferRequest.toWalletAddress,
+          amount: transferRequest.tokenAmount.toString(),
+        },
+      },
+    });
+
     let receipt: { txHash: string; blockNumber: number; status: string };
     try {
       receipt = await adapter.verifyTransferTx(txHash);

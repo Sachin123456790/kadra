@@ -4,9 +4,9 @@ const path = require("path");
 
 async function main() {
   // Read deployed addresses
-  const addressesPath = path.join(__dirname, "..", "EVIDENCE", "kadra-deploy", "addresses.json");
+  const addressesPath = path.join(__dirname, "..", "EVIDENCE", "angainor-deploy", "addresses.json");
   if (!fs.existsSync(addressesPath)) {
-    console.error("No deployed addresses found. Run deploy-kadra.js first.");
+    console.error("No deployed addresses found. Run deploy-angainor.js first.");
     process.exitCode = 1;
     return;
   }
@@ -15,7 +15,7 @@ async function main() {
   const investorsData = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "investors.json"), "utf8"));
   const signers = await hre.ethers.getSigners();
 
-  const token = await hre.ethers.getContractAt("KadraToken", addresses.kadraToken);
+  const token = await hre.ethers.getContractAt("AngainorToken", addresses.angainorToken);
   const tokenName = await token.name();
   const tokenSymbol = await token.symbol();
   const totalSupply = await token.totalSupply();

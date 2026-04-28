@@ -15,6 +15,15 @@ vi.mock("recharts", () => ({
   Cell: () => null,
   Tooltip: () => null,
   Legend: () => null,
+  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Bar: () => null,
+  Line: () => null,
+  Area: () => null,
+  AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  XAxis: () => null,
+  YAxis: () => null,
+  CartesianGrid: () => null,
 }));
 
 vi.mock("@/services", () => ({
@@ -123,18 +132,21 @@ describe("SubscriptionsPage", () => {
     renderWithProviders(<SubscriptionsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Alpine Capital Partners")).toBeInTheDocument();
+      const els = screen.getAllByText("Alpine Capital Partners");
+      expect(els.length).toBeGreaterThanOrEqual(1);
     });
 
-    expect(screen.getByText("SUB-ALPINE")).toBeInTheDocument();
-    expect(screen.getByText("20%")).toBeInTheDocument();
+    // subscriptionRef is only rendered inside the expandable detail row now;
+    // the top-level table shows the investor name + status + allocation only.
+    expect(screen.getAllByText("20%").length).toBeGreaterThanOrEqual(1);
   });
 
   it("opens create subscription modal when clicking button", async () => {
     renderWithProviders(<SubscriptionsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Alpine Capital Partners")).toBeInTheDocument();
+      const els = screen.getAllByText("Alpine Capital Partners");
+      expect(els.length).toBeGreaterThanOrEqual(1);
     });
 
     const createButton = screen.getByText("Create Subscription");
@@ -154,7 +166,8 @@ describe("SubscriptionsPage", () => {
     renderWithProviders(<SubscriptionsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Alpine Capital Partners")).toBeInTheDocument();
+      const els = screen.getAllByText("Alpine Capital Partners");
+      expect(els.length).toBeGreaterThanOrEqual(1);
     });
 
     // Open modal
@@ -185,13 +198,14 @@ describe("SubscriptionsPage", () => {
 
       await waitFor(() => {
         expect(vi.mocked(createSubscriptions)).toHaveBeenCalledWith(
-          "KADRA-DEMO-001",
+          "ANGAINOR-DEMO-001",
           "doc-lpa-001",
           expect.arrayContaining([
             expect.objectContaining({
               investorId: "inv-002",
               committedAmount: "2000000",
               allocationPct: 20,
+              subscriptionRef: expect.stringMatching(/^SUB-INV002-[A-Z0-9]+$/),
             }),
           ]),
         );

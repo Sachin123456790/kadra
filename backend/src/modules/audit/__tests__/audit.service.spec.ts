@@ -51,7 +51,7 @@ describe('AuditService', () => {
 
   const fundId = 'fund-1';
   const exportId = 'export-1';
-  const mockFund = { id: fundId, name: 'Kadra Demo Fund I', status: 'ACTIVE' };
+  const mockFund = { id: fundId, name: 'Angainor Demo Fund I', status: 'ACTIVE' };
 
   beforeEach(() => {
     prisma = mockPrisma();

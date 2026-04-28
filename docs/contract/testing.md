@@ -1,6 +1,6 @@
 # Contract Testing Guide
 
-The Kadra project includes 123 tests across 11 test files. All tests run on the local Hardhat EVM -- no external network connections, API keys, or services are required.
+The Angainor project includes 123 tests across 11 test files. All tests run on the local Hardhat EVM -- no external network connections, API keys, or services are required.
 
 ## Running Tests
 
@@ -14,9 +14,9 @@ This executes `npx hardhat test`, which compiles all contracts and runs the full
 
 | File | Tests | Scope |
 |---|---|---|
-| `test/e2e-kadra.test.js` | Full lifecycle | End-to-end: deploy, register, settle, mint, transfer |
+| `test/e2e-angainor.test.js` | Full lifecycle | End-to-end: deploy, register, settle, mint, transfer |
 | `test/identity-registry.test.js` | Unit | IdentityRegistry contract functions and access control |
-| `test/kadra-token.test.js` | Unit | KadraToken minting, transfers, and transfer restrictions |
+| `test/angainor-token.test.js` | Unit | AngainorToken minting, transfers, and transfer restrictions |
 | `test/document-registry.test.js` | Unit | DocumentRegistry registration, verification, duplicates |
 | `test/settlement-validator.test.js` | Unit | 3-way match validation logic (off-chain) |
 | `test/document-hasher.test.js` | Unit | SHA-256 hashing functions (off-chain) |
@@ -51,11 +51,11 @@ const outsider = signers[6];
 
 ## Key Test Scenarios
 
-### End-to-End Lifecycle (`e2e-kadra.test.js`)
+### End-to-End Lifecycle (`e2e-angainor.test.js`)
 
 This is the most comprehensive test file. It mirrors the 9-step deployment script and validates the full lifecycle:
 
-1. Deploy IdentityRegistry, DocumentRegistry, and KadraToken contracts
+1. Deploy IdentityRegistry, DocumentRegistry, and AngainorToken contracts
 2. Register 5 investors with verified identity and LP eligibility
 3. Hash the sample LPA document and anchor it on-chain
 4. Create subscription records (off-chain)
@@ -73,7 +73,7 @@ This is the most comprehensive test file. It mirrors the 9-step deployment scrip
 - Access control: non-owner calls revert
 - Removing an investor clears both `isVerified` and `isEligible`
 
-### KadraToken Tests (`kadra-token.test.js`)
+### AngainorToken Tests (`angainor-token.test.js`)
 
 - Token deployment with correct name, symbol, and IdentityRegistry linkage
 - Owner can mint tokens

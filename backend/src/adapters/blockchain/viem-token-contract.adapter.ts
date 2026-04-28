@@ -6,7 +6,7 @@ import {
   TransferInput,
 } from './token-contract.adapter';
 import { ViemClientProvider } from './viem-client.provider';
-import { KADRA_TOKEN_ABI } from './abi/kadra-token.abi';
+import { ANGAINOR_TOKEN_ABI } from './abi/angainor-token.abi';
 import { parseUnits, formatUnits, type Address } from 'viem';
 
 @Injectable()
@@ -15,15 +15,15 @@ export class ViemTokenContractAdapter implements TokenContractAdapter {
 
   async deploy(input: DeployInput) {
     // Contracts are pre-deployed to Sepolia. Return the existing address.
-    const contractAddress = process.env.KADRA_TOKEN_ADDRESS;
+    const contractAddress = process.env.ANGAINOR_TOKEN_ADDRESS;
     if (!contractAddress) {
       throw new Error(
-        'KADRA_TOKEN_ADDRESS env var required — deploy contracts via scripts/deploy-kadra-sepolia.js first',
+        'ANGAINOR_TOKEN_ADDRESS env var required — deploy contracts via scripts/deploy-angainor-sepolia.js first',
       );
     }
 
     const txHash =
-      process.env.KADRA_TOKEN_DEPLOY_TX_HASH ||
+      process.env.ANGAINOR_TOKEN_DEPLOY_TX_HASH ||
       '0x0000000000000000000000000000000000000000000000000000000000000000';
 
     // Get current block number for the record
@@ -43,7 +43,7 @@ export class ViemTokenContractAdapter implements TokenContractAdapter {
 
     const hash = await this.viem.deployerWalletClient.writeContract({
       address: contractAddress,
-      abi: KADRA_TOKEN_ABI,
+      abi: ANGAINOR_TOKEN_ABI,
       functionName: 'mint',
       args: [toAddress, amount],
     });
@@ -92,7 +92,7 @@ export class ViemTokenContractAdapter implements TokenContractAdapter {
   ): Promise<string> {
     const balance = await this.viem.publicClient.readContract({
       address: contractAddress as Address,
-      abi: KADRA_TOKEN_ABI,
+      abi: ANGAINOR_TOKEN_ABI,
       functionName: 'balanceOf',
       args: [walletAddress as Address],
     });

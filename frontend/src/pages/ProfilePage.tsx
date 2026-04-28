@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { PageHeader } from '@/components/kadra/PageHeader';
-import { SectionCard } from '@/components/kadra/SectionCard';
+import { PageHeader } from '@/components/angainor/PageHeader';
+import { SectionCard } from '@/components/angainor/SectionCard';
 import { useAuth } from '@/hooks/useAuth';
-import { useTheme } from '@/components/kadra/ThemeProvider';
+import { useTheme } from '@/components/angainor/ThemeProvider';
 import { User, Shield, Moon, Sun, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 

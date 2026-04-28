@@ -11,7 +11,7 @@ import { AppExceptionFilter } from '../src/common/filters/app-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
- * Kadra Demo Flow — End-to-End Test
+ * Angainor Demo Flow — End-to-End Test
  *
  * Mirrors the 9-step demo described in CLAUDE.md.
  * Requires: DATABASE_URL pointing at a seeded Supabase/Postgres instance.
@@ -45,7 +45,7 @@ const ctx: {
   auditExportId: string;
 } = {} as any;
 
-describe('Kadra Demo Flow (e2e)', () => {
+describe('Angainor Demo Flow (e2e)', () => {
   let app: INestApplication;
   let server: any;
   let prisma: PrismaService;
@@ -72,7 +72,7 @@ describe('Kadra Demo Flow (e2e)', () => {
     prisma = app.get(PrismaService);
 
     // Clean up any leftover data from previous runs (preserves seed data)
-    const fund = await prisma.fund.findFirst({ where: { code: 'KADRA-DEMO-001' } });
+    const fund = await prisma.fund.findFirst({ where: { code: 'ANGAINOR-DEMO-001' } });
     if (fund) {
       ctx.fundId = fund.id;
       await cleanFundTransactionalData(prisma, fund.id);
@@ -97,8 +97,8 @@ describe('Kadra Demo Flow (e2e)', () => {
       expect(res.body.status).toBe('ok');
     });
 
-    it('fund "Kadra Demo Fund I" exists and is ACTIVE', async () => {
-      const fund = await prisma.fund.findFirst({ where: { code: 'KADRA-DEMO-001' } });
+    it('fund "Angainor Demo Fund I" exists and is ACTIVE', async () => {
+      const fund = await prisma.fund.findFirst({ where: { code: 'ANGAINOR-DEMO-001' } });
       expect(fund).toBeTruthy();
       ctx.fundId = fund!.id;
 
@@ -106,7 +106,7 @@ describe('Kadra Demo Flow (e2e)', () => {
         .get(`/api/v1/admin/funds/${ctx.fundId}/overview`)
         .expect(200);
 
-      expect(res.body.data.fundName).toBe('Kadra Demo Fund I');
+      expect(res.body.data.fundName).toBe('Angainor Demo Fund I');
       expect(res.body.data.status).toBe('ACTIVE');
       expect(res.body.data.lpCount).toBe(5);
       expect(res.body.data.eligibleWalletCount).toBe(5);
@@ -184,7 +184,7 @@ describe('Kadra Demo Flow (e2e)', () => {
 
   describe('Step 2 — Upload Master LPA', () => {
     it('rejects non-PDF files with 400', async () => {
-      const tmpFile = '/tmp/kadra-e2e-test.txt';
+      const tmpFile = '/tmp/angainor-e2e-test.txt';
       fs.writeFileSync(tmpFile, 'This is not a PDF');
 
       const res = await request(server)

@@ -1,13 +1,13 @@
-# KadraToken Contract
+# AngainorToken Contract
 
-**File**: `contracts/KadraToken.sol`
+**File**: `contracts/AngainorToken.sol`
 **License**: MIT
 **Solidity**: `^0.8.24`
 **Inherits**: `ERC20`, `Ownable` (OpenZeppelin v5)
 
 ## Purpose
 
-KadraToken is an ERC-20 security token that enforces transfer restrictions via the IdentityRegistry contract. It represents fractional ownership in a private real estate fund. Both the sender and recipient of any transfer must be verified, eligible Limited Partners -- otherwise the transaction reverts immediately.
+AngainorToken is an ERC-20 security token that enforces transfer restrictions via the IdentityRegistry contract. It represents fractional ownership in a private real estate fund. Both the sender and recipient of any transfer must be verified, eligible Limited Partners -- otherwise the transaction reverts immediately.
 
 This implements the ERC-3643 security token pattern: compliance rules are hardcoded into the token contract itself, not enforced externally after the fact.
 
@@ -47,7 +47,7 @@ constructor(
 
 | Parameter | Type | Description |
 |---|---|---|
-| `name` | `string` | Token name (e.g., `"Kadra Demo Fund I"`) |
+| `name` | `string` | Token name (e.g., `"Angainor Demo Fund I"`) |
 | `symbol` | `string` | Token symbol (e.g., `"KDRA"`) |
 | `_identityRegistry` | `address` | Address of the deployed IdentityRegistry contract |
 
@@ -108,11 +108,11 @@ If either check fails, the transaction reverts with a descriptive error message.
 
 ## Demo Configuration
 
-In the Kadra demo deployment (`scripts/deploy-kadra.js`), the token is configured as follows:
+In the Angainor demo deployment (`scripts/deploy-angainor.js`), the token is configured as follows:
 
 | Property | Value |
 |---|---|
-| Name | `Kadra Demo Fund I` |
+| Name | `Angainor Demo Fund I` |
 | Symbol | `KDRA` |
 | Decimals | `18` (ERC-20 default, not overridden) |
 | Total Supply | `10,000 KDRA` (minted across 5 investors) |

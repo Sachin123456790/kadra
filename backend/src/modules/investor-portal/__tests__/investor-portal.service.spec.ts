@@ -22,10 +22,19 @@ const mockPrisma = () => ({
   transferRequest: {
     findMany: jest.fn(),
   },
+  notice: {
+    findMany: jest.fn(),
+  },
   systemEventLog: {
     findMany: jest.fn(),
   },
   taxReport: {
+    findFirst: jest.fn(),
+  },
+  fund: {
+    findUnique: jest.fn(),
+  },
+  capitalAccount: {
     findFirst: jest.fn(),
   },
   waterfallConfig: {
@@ -35,6 +44,7 @@ const mockPrisma = () => ({
     findFirst: jest.fn(),
   },
   distributionLineItem: {
+    findMany: jest.fn(),
     findFirst: jest.fn(),
   },
 });
@@ -112,6 +122,7 @@ describe('InvestorPortalService', () => {
     it('returns filtered events for investor', async () => {
       prisma.subscription.findMany.mockResolvedValue([{ id: 'sub-1' }]);
       prisma.wallet.findMany.mockResolvedValue([{ id: 'wallet-1' }]);
+      prisma.notice.findMany.mockResolvedValue([{ id: 'notice-1' }]);
       prisma.transferRequest.findMany.mockResolvedValue([{ id: 'transfer-1' }]);
       prisma.systemEventLog.findMany.mockResolvedValue([
         {
@@ -133,8 +144,18 @@ describe('InvestorPortalService', () => {
       expect(prisma.systemEventLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            fundId,
-            aggregateId: { in: ['sub-1', 'transfer-1', investorId] },
+            OR: [
+              {
+                fundId,
+                aggregateId: {
+                  in: ['sub-1', 'transfer-1', 'wallet-1', 'notice-1', investorId],
+                },
+              },
+              {
+                fundId: null,
+                aggregateId: { in: [investorId, 'wallet-1'] },
+              },
+            ],
           },
         }),
       );
@@ -160,10 +181,41 @@ describe('InvestorPortalService', () => {
       expect(result!.taxYear).toBe(2025);
       expect(result!.taxEntityName).toBe('Alpine Capital Partners');
       expect(result!.ordinaryIncome).toBe('50000.00');
+      expect(result!.source).toBe('TAX_REPORT');
     });
 
-    it('returns null when no tax report exists', async () => {
+    it('returns a derived preview when there is investor fund activity', async () => {
       prisma.taxReport.findFirst.mockResolvedValue(null);
+      prisma.fund.findUnique.mockResolvedValue({
+        name: 'Angainor Demo Fund',
+        code: 'ANGAINOR-DEMO-001',
+      });
+      prisma.capitalAccount.findFirst.mockResolvedValue({
+        id: 'ca-1',
+        asOfDate: new Date('2025-03-01T00:00:00Z'),
+      });
+      prisma.subscription.findMany.mockResolvedValue([
+        { id: 'sub-1' },
+      ]);
+      prisma.distributionLineItem.findMany.mockResolvedValue([]);
+
+      const result = await service.getTaxReport(investorId, fundId, 2025);
+
+      expect(result).not.toBeNull();
+      expect(result!.taxEntityName).toBe('Angainor Demo Fund');
+      expect(result!.totalDistributions).toBe('0.00');
+      expect(result!.source).toBe('DERIVED_LEDGER_PREVIEW');
+    });
+
+    it('returns null when no tax report or investor fund activity exists', async () => {
+      prisma.taxReport.findFirst.mockResolvedValue(null);
+      prisma.fund.findUnique.mockResolvedValue({
+        name: 'Angainor Demo Fund',
+        code: 'ANGAINOR-DEMO-001',
+      });
+      prisma.capitalAccount.findFirst.mockResolvedValue(null);
+      prisma.subscription.findMany.mockResolvedValue([]);
+      prisma.distributionLineItem.findMany.mockResolvedValue([]);
 
       const result = await service.getTaxReport(investorId, fundId, 2025);
 

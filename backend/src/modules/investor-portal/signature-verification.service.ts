@@ -18,7 +18,7 @@ export class SignatureVerificationService {
     return [
       `${payload.appName} Wallet Verification`,
       '',
-      `I am linking wallet ${payload.walletAddress} to my Kadra account.`,
+      `I am linking wallet ${payload.walletAddress} to my ${payload.appName} account.`,
       '',
       `Account: ${payload.authUserId}`,
       `Chain ID: ${payload.chainId}`,
@@ -32,7 +32,11 @@ export class SignatureVerificationService {
     return ethers.verifyMessage(message, signature);
   }
 
-  isValidSignature(message: string, signature: string, expectedAddress: string): boolean {
+  isValidSignature(
+    message: string,
+    signature: string,
+    expectedAddress: string,
+  ): boolean {
     try {
       const recovered = this.recoverAddress(message, signature);
       return recovered.toLowerCase() === expectedAddress.toLowerCase();

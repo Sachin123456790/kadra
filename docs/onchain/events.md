@@ -1,6 +1,6 @@
 # On-Chain Event Catalog
 
-This document catalogs every event emitted by the Kadra smart contracts, their parameters, when they fire, and how the backend ingests them.
+This document catalogs every event emitted by the Angainor smart contracts, their parameters, when they fire, and how the backend ingests them.
 
 ---
 
@@ -81,9 +81,9 @@ event DocumentRegistered(
 
 ---
 
-## KadraToken Events
+## AngainorToken Events
 
-KadraToken inherits from OpenZeppelin's ERC-20 implementation. The following events are emitted by the inherited `_update()` function (called by `transfer`, `transferFrom`, and `_mint`).
+AngainorToken inherits from OpenZeppelin's ERC-20 implementation. The following events are emitted by the inherited `_update()` function (called by `transfer`, `transferFrom`, and `_mint`).
 
 ### `Transfer`
 
@@ -151,7 +151,7 @@ The backend indexes on-chain events into the `token_position_events` table for f
 ```
 Chain (Hardhat / Sepolia)
     |
-    |  Poll for Transfer events on KadraToken
+    |  Poll for Transfer events on AngainorToken
     |
     v
 Event Parser
@@ -204,4 +204,4 @@ For each investor address:
              + SUM(ADJUSTMENT values)
 ```
 
-This projection should always match `KadraToken.balanceOf(address)`. Any discrepancy triggers a `SYNC` event to re-index from chain.
+This projection should always match `AngainorToken.balanceOf(address)`. Any discrepancy triggers a `SYNC` event to re-index from chain.

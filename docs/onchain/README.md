@@ -1,12 +1,12 @@
 # On-Chain Architecture Overview
 
-This document describes what Kadra stores on-chain versus off-chain, how contracts are organized per fund, which networks are targeted, and how the backend interfaces with the blockchain layer.
+This document describes what Angainor stores on-chain versus off-chain, how contracts are organized per fund, which networks are targeted, and how the backend interfaces with the blockchain layer.
 
 ---
 
 ## On-Chain vs Off-Chain Boundary
 
-Kadra draws a strict line between what is canonical on-chain and what lives off-chain. The chain is the settlement layer and system of record for ownership. Everything else -- documents, workflows, calculations -- stays off-chain with cryptographic links back to the chain.
+Angainor draws a strict line between what is canonical on-chain and what lives off-chain. The chain is the settlement layer and system of record for ownership. Everything else -- documents, workflows, calculations -- stays off-chain with cryptographic links back to the chain.
 
 ### On-Chain Canonical
 
@@ -14,8 +14,8 @@ These records live on the blockchain and are the single source of truth:
 
 | Record | Contract | Description |
 |---|---|---|
-| Settled token balances | `KadraToken` (ERC-20) | `balanceOf(address)` is the canonical ownership ledger. |
-| Transfer and mint execution facts | `KadraToken` | Every `Transfer` event (including mints where `from == address(0)`) is immutable and timestamped. |
+| Settled token balances | `AngainorToken` (ERC-20) | `balanceOf(address)` is the canonical ownership ledger. |
+| Transfer and mint execution facts | `AngainorToken` | Every `Transfer` event (including mints where `from == address(0)`) is immutable and timestamped. |
 | Document hash anchors | `DocumentRegistry` | SHA-256 hash of the source document, document type, uploader address, and block timestamp. The document itself is NOT stored on-chain. |
 | Identity eligibility state | `IdentityRegistry` | Per-address `isVerified` and `isEligible` flags that gate token transfers. |
 
@@ -38,7 +38,7 @@ These records are managed by the backend and are NOT stored on-chain:
 
 | Record | Source | Description |
 |---|---|---|
-| Cap table projections | `KadraToken.balanceOf()` | Ownership percentages computed from token balances and total supply. |
+| Cap table projections | `AngainorToken.balanceOf()` | Ownership percentages computed from token balances and total supply. |
 | Ownership snapshots | `Transfer` events | Historical ownership reconstructed by replaying the event stream. |
 | Token position events | Event ingestion | Backend indexes chain events into `token_position_events` for fast querying and projection. |
 
@@ -49,10 +49,10 @@ These records are managed by the backend and are NOT stored on-chain:
 Each fund gets its own isolated set of three contracts:
 
 ```
-Fund "Kadra Demo Fund I"
+Fund "Angainor Demo Fund I"
   +-- IdentityRegistry   (investor whitelist + LP eligibility for this fund)
   +-- DocumentRegistry    (document hash anchors for this fund's legal docs)
-  +-- KadraToken          (ERC-20 security token representing ownership in this fund)
+  +-- AngainorToken          (ERC-20 security token representing ownership in this fund)
 ```
 
 **Why per-fund isolation:**
@@ -62,7 +62,7 @@ Fund "Kadra Demo Fund I"
 - Token supply represents ownership in exactly one fund entity.
 - Clean audit trail -- every contract address maps to exactly one legal entity.
 
-The `KadraToken` constructor takes the `IdentityRegistry` address as a parameter, permanently linking the token's transfer restriction logic to that fund's identity registry:
+The `AngainorToken` constructor takes the `IdentityRegistry` address as a parameter, permanently linking the token's transfer restriction logic to that fund's identity registry:
 
 ```solidity
 constructor(

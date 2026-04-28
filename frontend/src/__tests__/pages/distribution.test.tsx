@@ -147,11 +147,11 @@ describe("DistributionPage", () => {
     renderWithProviders(<DistributionPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Derived From (LPA Hash)")).toBeInTheDocument();
+      expect(screen.getByText("Derived From (LPA Reference)")).toBeInTheDocument();
     });
 
-    // Hash "0xLPAHASH_abc123def456789" truncated to "0xLPAH...6789"
-    expect(screen.getByText("0xLPAH...6789")).toBeInTheDocument();
+    // HashDisplay now hides the truncated hex behind an eye-toggle, so the
+    // truncated hash is not in the default DOM. Presence of the label suffices.
   });
 
   it("renders 'Distributions Received' column in capital accounts", async () => {

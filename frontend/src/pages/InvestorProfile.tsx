@@ -1,19 +1,22 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { StatusBadge } from "@/components/kadra/StatusBadge";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
-import { SkeletonCard } from "@/components/kadra/Skeleton";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { StatusBadge } from "@/components/angainor/StatusBadge";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
+import { SkeletonCard } from "@/components/angainor/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMyProfile, getMyWallets, createWalletChallenge, verifyWalletLink, getMyDashboard } from "@/services";
 import { getInvestorTaxReport } from "@/services/tax.service";
+import { exportInvestorTaxPackage } from "@/services/investor-portal.service";
+import { toFriendlyMessage } from "@/lib/errorMessages";
+import { useAppConfig } from "@/hooks/useAppConfig";
 import type { LinkedWallet } from "@/services/wallet-profile.service";
 import { useWallet } from "@/hooks/useWallet";
-import { ExplorerLink } from "@/components/kadra/ExplorerLink";
-import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
+import { ExplorerLink } from "@/components/angainor/ExplorerLink";
+import { TechnicalDetails } from "@/components/angainor/TechnicalDetails";
 import {
   Dialog,
   DialogContent,
@@ -84,15 +87,16 @@ function IdentitySection({
     createdAt?: string;
   };
 }) {
-  const createdDate = profile.createdAt ? new Date(profile.createdAt) : new Date();
-  const expiryDate = new Date(createdDate);
-  expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-
-  const verificationHistory = [
-    { checkType: "KYC Verification", status: "Verified", date: fmtDate(createdDate.toISOString()) },
-    { checkType: "Accreditation Check", status: "Verified", date: fmtDate(createdDate.toISOString()) },
-    { checkType: "Identity Confirmation", status: "Verified", date: fmtDate(createdDate.toISOString()) },
-  ];
+  const createdDate = profile.createdAt ? new Date(profile.createdAt) : null;
+  const verificationHistory = createdDate
+    ? [
+        {
+          checkType: "Account Verification",
+          status: profile.verificationStatus,
+          date: fmtDate(createdDate.toISOString()),
+        },
+      ]
+    : [];
 
   return (
     <SectionCard title="Identity and Verification">
@@ -108,30 +112,33 @@ function IdentitySection({
             <p className="text-sm font-medium text-foreground">{profile.email}</p>
           </div>
           <div>
+            <p className="text-xs text-muted-foreground mb-1">Verification Status</p>
+            <div className="flex items-center gap-2">
+              <StatusBadge status={profile.verificationStatus} />
+              {createdDate ? (
+                <span className="text-xs text-muted-foreground">
+                  Recorded: {fmtDate(createdDate.toISOString())}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div>
             <p className="text-xs text-muted-foreground mb-1">KYC Status</p>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                Verified
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Last verified: {fmtDate(createdDate.toISOString())}
+              <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                Not exposed by profile API
               </span>
             </div>
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-1">Accreditation Status</p>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                Accredited
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Expires: {fmtDate(expiryDate.toISOString())}
-              </span>
-            </div>
+            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+              Not exposed by profile API
+            </span>
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-1">Residency</p>
-            <p className="text-sm font-medium text-foreground">United States</p>
+            <p className="text-sm font-medium text-muted-foreground">Not provided</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-1">Account Status</p>
@@ -144,30 +151,34 @@ function IdentitySection({
         {/* Verification History */}
         <div>
           <h4 className="text-sm font-medium text-foreground mb-3">Verification History</h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Check Type</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {verificationHistory.map((row) => (
-                  <tr key={row.checkType} className="border-b border-border">
-                    <td className="px-4 py-2.5 text-foreground">{row.checkType}</td>
-                    <td className="px-4 py-2.5">
-                      <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                        {row.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{row.date}</td>
+          {verificationHistory.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Check Type</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {verificationHistory.map((row) => (
+                    <tr key={row.checkType} className="border-b border-border">
+                      <td className="px-4 py-2.5 text-foreground">{row.checkType}</td>
+                      <td className="px-4 py-2.5">
+                        <StatusBadge status={row.status} />
+                      </td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{row.date}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No verification timestamps are available for this profile yet.
+            </p>
+          )}
         </div>
       </div>
     </SectionCard>
@@ -177,9 +188,10 @@ function IdentitySection({
 // ── Section 2: Tax Information ──────────────────────────────
 
 function TaxInformationSection({ profile, fundName }: { profile: { legalName: string }; fundName: string }) {
-  const fundId = DEFAULT_FUND_CODE;
+  const { data: appConfig } = useAppConfig();
+  const fundId = appConfig?.defaults.fundCode ?? DEFAULT_FUND_CODE;
   const currentYear = new Date().getFullYear();
-  const [taxYear, setTaxYear] = useState(currentYear - 1);
+  const [taxYear, setTaxYear] = useState(currentYear);
 
   const { data: taxReport, isLoading: taxLoading } = useQuery({
     queryKey: QUERY_KEYS.taxReport(fundId, taxYear),
@@ -188,14 +200,18 @@ function TaxInformationSection({ profile, fundName }: { profile: { legalName: st
 
   const yearOptions = useMemo(() => {
     const years: number[] = [];
-    for (let y = currentYear - 1; y >= currentYear - 5; y--) {
+    for (let y = currentYear; y >= currentYear - 5; y--) {
       years.push(y);
     }
     return years;
   }, [currentYear]);
 
-  const handleExport = () => {
-    toast.info("Tax export feature coming soon");
+  const handleExport = async () => {
+    try {
+      await exportInvestorTaxPackage(taxYear, 'pdf', fundId);
+    } catch (err) {
+      toast.error(toFriendlyMessage(err));
+    }
   };
 
   return (
@@ -268,14 +284,14 @@ function TaxInformationSection({ profile, fundName }: { profile: { legalName: st
               </div>
               <div>
                 <SourceOfIncomeLabel />
-                <p className="text-sm font-medium text-gray-900">Not provided</p>
+                <p className="text-sm font-medium text-gray-900">Not provided by current profile API</p>
               </div>
             </div>
 
             <div>
               <button
                 onClick={handleExport}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium"
               >
                 Export Tax Data
               </button>
@@ -303,7 +319,7 @@ function WalletSection({
   const linkWalletButton = (
     <button
       onClick={onOpenModal}
-      className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+      className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
     >
       <Wallet className="h-4 w-4" />
       Link Wallet
@@ -397,7 +413,6 @@ function WalletSection({
 // ── Main Page Component ──────────────────────────────────────
 
 export default function InvestorProfile() {
-  const fundId = DEFAULT_FUND_CODE;
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [step, setStep] = useState<ModalStep>("choose");
@@ -406,6 +421,8 @@ export default function InvestorProfile() {
   const [connectedChain, setConnectedChain] = useState<number | null>(null);
 
   const wallet = useWallet();
+  const { data: appConfig } = useAppConfig();
+  const fundId = appConfig?.defaults.fundCode ?? DEFAULT_FUND_CODE;
 
   const { data: profile, isLoading: profileLoading, error: profileError } = useQuery({
     queryKey: QUERY_KEYS.investorProfile(),
@@ -424,8 +441,9 @@ export default function InvestorProfile() {
 
   const fundName = useMemo(() => {
     const sub = dashboard?.subscriptions?.[0];
-    return (sub as Record<string, unknown> | undefined)?.fundName as string | undefined ?? "Angainor Demo Fund I";
-  }, [dashboard]);
+    const subName = (sub as Record<string, unknown> | undefined)?.fundName as string | undefined;
+    return subName ?? appConfig?.defaults.fundName ?? "—";
+  }, [dashboard, appConfig]);
 
   const openModal = () => {
     setStep("choose");
@@ -445,9 +463,9 @@ export default function InvestorProfile() {
     setStep("connecting");
     setModalError(null);
     try {
-      const addr = await wallet.connectWallet(provider);
+      const { address: addr, chainId: chain } = await wallet.connectWallet(provider);
       setConnectedAddr(addr);
-      setConnectedChain(wallet.chainId);
+      setConnectedChain(chain);
       setStep("sign");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to connect wallet";
@@ -457,20 +475,20 @@ export default function InvestorProfile() {
   };
 
   const handleSign = async () => {
-    if (!connectedAddr) return;
+    if (!connectedAddr || !connectedChain) return;
     setStep("verifying");
     setModalError(null);
     try {
       const challengeRes = await createWalletChallenge({
         address: connectedAddr,
-        chainId: connectedChain || 1,
+        chainId: connectedChain,
       });
       const challenge = challengeRes.data;
       const signature = await wallet.signMessage(challenge.message);
       await verifyWalletLink({
         challengeId: challenge.challengeId,
         address: connectedAddr,
-        chainId: connectedChain || 1,
+        chainId: connectedChain,
         signature,
       });
       setStep("success");
@@ -639,7 +657,7 @@ export default function InvestorProfile() {
                 </TechnicalDetails>
                 <button
                   onClick={handleSign}
-                  className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+                  className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                 >
                   Sign Verification Message
                 </button>
@@ -669,7 +687,7 @@ export default function InvestorProfile() {
                 </p>
                 <button
                   onClick={closeModal}
-                  className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+                  className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                 >
                   Done
                 </button>
@@ -688,7 +706,7 @@ export default function InvestorProfile() {
                 </p>
                 <button
                   onClick={() => { setStep("choose"); setModalError(null); wallet.disconnect(); }}
-                  className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+                  className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                 >
                   Try Again
                 </button>

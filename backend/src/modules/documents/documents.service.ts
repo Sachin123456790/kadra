@@ -113,6 +113,91 @@ export class DocumentsService {
     };
   }
 
+  /**
+   * Generic document upload used for investor uploads and GP reports.
+   * Stores file, hashes it, creates Document + DocumentHash rows.
+   * No on-chain anchoring.
+   */
+  async uploadGenericDocument(params: {
+    fundId: string;
+    documentType: string;
+    storageKeyPrefix: string;
+    file: Buffer;
+    filename: string;
+    mimeType: string;
+    uploadedBy?: string;
+    linkedEntityType?: string;
+    linkedEntityId?: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    const fund = await this.prisma.fund.findUnique({
+      where: { id: params.fundId },
+    });
+    if (!fund) throw new NotFoundError('Fund', params.fundId);
+
+    const storageKey = `${params.storageKeyPrefix}/${randomUUID()}-${params.filename}`;
+    await this.storage.save(storageKey, params.file, params.mimeType);
+    const hashHex = this.hashProvider.hash(params.file);
+
+    const document = await this.prisma.$transaction(async (tx) => {
+      const doc = await tx.document.create({
+        data: {
+          fundId: params.fundId,
+          documentType: params.documentType,
+          storageProvider: process.env.SUPABASE_URL ? 'SUPABASE' : 'LOCAL_FS',
+          storageKey,
+          originalFilename: params.filename,
+          mimeType: params.mimeType,
+          byteSize: BigInt(params.file.length),
+          uploadedBy: params.uploadedBy,
+          parseStatus: 'COMPLETED',
+          linkedEntityType: params.linkedEntityType ?? null,
+          linkedEntityId: params.linkedEntityId ?? null,
+          metadata: { hashHex, ...(params.metadata ?? {}) },
+        },
+      });
+
+      const existingHash = await tx.documentHash.findUnique({
+        where: {
+          hashAlgorithm_hashHex: { hashAlgorithm: 'SHA256', hashHex },
+        },
+      });
+      if (!existingHash) {
+        await tx.documentHash.create({
+          data: {
+            documentId: doc.id,
+            hashAlgorithm: 'SHA256',
+            hashHex,
+            isPrimary: true,
+          },
+        });
+      }
+
+      return doc;
+    });
+
+    await this.eventLog.log({
+      eventType: 'DOCUMENT_UPLOADED',
+      aggregateType: 'DOCUMENT',
+      aggregateId: document.id,
+      fundId: params.fundId,
+      payload: {
+        filename: params.filename,
+        mimeType: params.mimeType,
+        hashHex,
+        documentType: params.documentType,
+        uploadedBy: params.uploadedBy,
+      },
+    });
+
+    return {
+      documentId: document.id,
+      fileName: document.originalFilename,
+      byteSize: Number(document.byteSize),
+      uploadedAt: document.createdAt.toISOString(),
+    };
+  }
+
   async uploadWireConfirmation(
     fundId: string,
     investorId: string,
@@ -268,7 +353,6 @@ export class DocumentsService {
                 field.fieldValueNumeric != null
                   ? field.fieldValueNumeric
                   : undefined,
-              confidence: field.confidence,
               sourcePage: field.sourcePage,
             },
           });
@@ -462,10 +546,6 @@ export class DocumentsService {
     });
     if (!doc) throw new NotFoundError('Document', documentId);
 
-    const lowConfidenceCount = doc.extractedFields.filter(
-      (f) => f.confidence != null && Number(f.confidence) < 0.9,
-    ).length;
-
     let primaryHash: { anchoredOnchain: boolean } | null =
       doc.hashes[0] ?? null;
     // Fall back to looking up shared hash via metadata
@@ -486,7 +566,6 @@ export class DocumentsService {
       hashStatus,
       extractionSummary: {
         fieldsExtracted: doc.extractedFields.length,
-        lowConfidenceFields: lowConfidenceCount,
       },
       updatedAt: doc.updatedAt.toISOString(),
     };
@@ -585,6 +664,8 @@ export class DocumentsService {
         byteSize: Number(doc.byteSize),
         parseStatus: doc.parseStatus,
         uploadedBy: doc.uploadedBy,
+        linkedEntityType: doc.linkedEntityType,
+        linkedEntityId: doc.linkedEntityId,
         hash: hashInfo
           ? {
               hashHex: hashInfo.hashHex,
@@ -618,7 +699,6 @@ export class DocumentsService {
       fieldValueNumeric:
         f.fieldValueNumeric != null ? Number(f.fieldValueNumeric) : null,
       fieldValueJson: f.fieldValueJson,
-      confidence: f.confidence != null ? Number(f.confidence) : null,
       sourcePage: f.sourcePage,
       extractionRunRef: f.extractionRunRef,
       createdAt: f.createdAt.toISOString(),
@@ -793,10 +873,6 @@ export class DocumentsService {
             fieldName: field.fieldName.trim(),
             fieldValueText: field.fieldValueText?.trim(),
             fieldValueNumeric: field.fieldValueNumeric,
-            confidence:
-              field.confidence != null
-                ? Math.max(0, Math.min(1, field.confidence))
-                : 1,
             sourcePage:
               field.sourcePage != null ? Math.floor(field.sourcePage) : null,
             fieldValueJson: addedBy

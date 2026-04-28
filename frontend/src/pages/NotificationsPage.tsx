@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '@/components/kadra/PageHeader';
-import { SectionCard } from '@/components/kadra/SectionCard';
-import { EmptyState } from '@/components/kadra/EmptyState';
+import { PageHeader } from '@/components/angainor/PageHeader';
+import { SectionCard } from '@/components/angainor/SectionCard';
+import { EmptyState } from '@/components/angainor/EmptyState';
 import { useNotifications, formatRelativeTime } from '@/hooks/useNotifications';
 import type { AppNotification } from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';

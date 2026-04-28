@@ -1,11 +1,8 @@
-import {
-  Injectable,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError } from '../../common/errors';
 import { SignatureVerificationService } from './signature-verification.service';
+import { computeOnboardingStage } from '../identity/onboarding-stage';
 
 @Injectable()
 export class InvestorPortalService {
@@ -27,6 +24,17 @@ export class InvestorPortalService {
       throw new NotFoundError('Investor', email);
     }
     return investor;
+  }
+
+  private formatMoney(value: number) {
+    return value.toFixed(2);
+  }
+
+  private getYearBounds(taxYear: number) {
+    return {
+      start: new Date(`${taxYear}-01-01T00:00:00.000Z`),
+      end: new Date(`${taxYear + 1}-01-01T00:00:00.000Z`),
+    };
   }
 
   /**
@@ -171,6 +179,11 @@ export class InvestorPortalService {
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
+        tokenPositionEvents: {
+          where: { eventType: 'MINT', ingestStatus: 'CONFIRMED' },
+          orderBy: [{ blockTimestamp: 'desc' }, { createdAt: 'desc' }],
+          take: 1,
+        },
         governingDocument: {
           select: { id: true, originalFilename: true, documentType: true },
         },
@@ -178,24 +191,30 @@ export class InvestorPortalService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return subscriptions.map((s) => ({
-      id: s.id,
-      subscriptionRef: s.subscriptionRef,
-      allocationPct: Number(s.allocationPct),
-      committedAmount: s.committedAmount.toString(),
-      currency: s.currency,
-      status: s.status,
-      settledAt: s.settledAt?.toISOString() ?? null,
-      createdAt: s.createdAt.toISOString(),
-      latestSettlementStatus: s.settlementRecords[0]?.status ?? null,
-      governingDocument: s.governingDocument
-        ? {
-            id: s.governingDocument.id,
-            originalFilename: s.governingDocument.originalFilename,
-            documentType: s.governingDocument.documentType,
-          }
-        : null,
-    }));
+    return subscriptions.map((s) => {
+      const latestMint = s.tokenPositionEvents[0];
+      return {
+        id: s.id,
+        subscriptionRef: s.subscriptionRef,
+        allocationPct: Number(s.allocationPct),
+        committedAmount: s.committedAmount.toString(),
+        currency: s.currency,
+        status: s.status,
+        settledAt: s.settledAt?.toISOString() ?? null,
+        createdAt: s.createdAt.toISOString(),
+        latestSettlementStatus: s.settlementRecords[0]?.status ?? null,
+        mintTxHash: latestMint?.txHash ?? null,
+        mintedAt: latestMint?.blockTimestamp?.toISOString() ?? null,
+        mintEventId: latestMint?.id ?? null,
+        governingDocument: s.governingDocument
+          ? {
+              id: s.governingDocument.id,
+              originalFilename: s.governingDocument.originalFilename,
+              documentType: s.governingDocument.documentType,
+            }
+          : null,
+      };
+    });
   }
 
   /**
@@ -318,6 +337,72 @@ export class InvestorPortalService {
     }));
   }
 
+  /**
+   * Derived onboarding stage for the current investor. Uses the default fund
+   * (looked up by caller) for the eligibility check.
+   */
+  async getOnboardingForInvestor(investorId: string, fundId: string) {
+    const inv = await this.prisma.investor.findFirst({
+      where: { id: investorId, deletedAt: null },
+      include: {
+        wallets: { where: { deletedAt: null } },
+        eligibilities: { where: { fundId, deletedAt: null } },
+      },
+    });
+    if (!inv) throw new NotFoundError('Investor', investorId);
+
+    return computeOnboardingStage({
+      investor: inv,
+      wallets: inv.wallets,
+      eligibilities: inv.eligibilities,
+    });
+  }
+
+  /**
+   * Investor-driven profile step. Merges into metadata JSON — no new columns.
+   */
+  async updateMyProfile(
+    email: string,
+    input: {
+      legalName?: string;
+      country?: string;
+      taxId?: string;
+      sourceOfIncome?: string;
+    },
+  ) {
+    const investor = await this.resolveInvestor(email);
+    const existingMeta =
+      (investor.metadata as Record<string, unknown> | null) ?? {};
+
+    const nextMeta: Record<string, unknown> = {
+      ...existingMeta,
+      profileCompleted: true,
+    };
+    if (input.country !== undefined) nextMeta.country = input.country;
+    if (input.taxId !== undefined) nextMeta.taxId = input.taxId;
+    if (input.sourceOfIncome !== undefined)
+      nextMeta.sourceOfIncome = input.sourceOfIncome;
+
+    const updated = await this.prisma.investor.update({
+      where: { id: investor.id },
+      data: {
+        legalName:
+          input.legalName && input.legalName.trim().length > 0
+            ? input.legalName.trim()
+            : investor.legalName,
+        metadata: nextMeta as any,
+        updatedAt: new Date(),
+      },
+    });
+
+    return {
+      investorId: updated.id,
+      legalName: updated.legalName,
+      email: updated.email,
+      metadata: updated.metadata,
+    };
+  }
+
   async getMyProfile(email: string) {
     const investor = await this.resolveInvestor(email);
     const walletCount = await this.prisma.wallet.count({
@@ -356,22 +441,12 @@ export class InvestorPortalService {
     const investor = await this.resolveInvestor(email);
     const addressNorm = input.address.toLowerCase();
 
-    // Check if wallet already linked to another investor
-    const existing = await this.prisma.wallet.findFirst({
-      where: { addressNorm, chainId: input.chainId, deletedAt: null },
-    });
-    if (existing && existing.investorId !== investor.id) {
-      throw new ConflictException(
-        'This wallet is already linked to another account',
-      );
-    }
-
     const nonce = this.signatureService.generateNonce();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
 
     const message = this.signatureService.buildChallengeMessage({
-      appName: 'Kadra',
+      appName: 'Angainor',
       authUserId,
       walletAddress: input.address,
       chainId: input.chainId,
@@ -473,16 +548,6 @@ export class InvestorPortalService {
 
       if (existingWallet) {
         return existingWallet;
-      }
-
-      // Check for duplicate across investors
-      const duplicateWallet = await tx.wallet.findFirst({
-        where: { addressNorm, chainId: input.chainId, deletedAt: null },
-      });
-      if (duplicateWallet) {
-        throw new ConflictException(
-          'This wallet is already linked to another account',
-        );
       }
 
       // Determine if this should be primary (first wallet = primary)
@@ -632,6 +697,16 @@ export class InvestorPortalService {
     });
     const walletIds = wallets.map((w) => w.id);
 
+    const notices = await this.prisma.notice.findMany({
+      where: {
+        fundId,
+        recipientInvestorId: investorId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    const noticeIds = notices.map((n) => n.id);
+
     const transfers =
       walletIds.length > 0
         ? await this.prisma.transferRequest.findMany({
@@ -648,12 +723,26 @@ export class InvestorPortalService {
         : [];
     const transferIds = transfers.map((t) => t.id);
 
-    const aggregateIds = [...subIds, ...transferIds, investorId];
+    const aggregateIds = [
+      ...subIds,
+      ...transferIds,
+      ...walletIds,
+      ...noticeIds,
+      investorId,
+    ];
 
     const events = await this.prisma.systemEventLog.findMany({
       where: {
-        fundId,
-        aggregateId: { in: aggregateIds },
+        OR: [
+          {
+            fundId,
+            aggregateId: { in: aggregateIds },
+          },
+          {
+            fundId: null,
+            aggregateId: { in: [investorId, ...walletIds] },
+          },
+        ],
       },
       orderBy: { occurredAt: 'desc' },
       take: limit,
@@ -672,6 +761,98 @@ export class InvestorPortalService {
   }
 
   /**
+   * Fetch capital account statement for an investor within a fund.
+   * Returns null if none exists.
+   */
+  async getCapitalAccountStatement(investorId: string, fundId: string) {
+    const account = await this.prisma.capitalAccount.findFirst({
+      where: { investorId, fundId, isCurrent: true, deletedAt: null },
+    });
+    if (!account) return null;
+    return {
+      openingBalance: account.openingBalance.toString(),
+      initialContribution: account.initialContribution.toString(),
+      capitalReturned: account.capitalReturned.toString(),
+      accruedPreferredReturn: account.accruedPref.toString(),
+      residualAllocation: account.residualAllocation.toString(),
+      endingBalance: account.endingCapitalBalance.toString(),
+      asOfDate: account.asOfDate.toISOString(),
+    };
+  }
+
+  /**
+   * Fetch a fund record with its name for CSV filenames etc.
+   */
+  async getFundMeta(fundId: string) {
+    const fund = await this.prisma.fund.findUnique({
+      where: { id: fundId },
+      select: { id: true, name: true, code: true },
+    });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+    return fund;
+  }
+
+  /**
+   * List GP reports visible to this investor within a fund.
+   * Scoped by investor's fund membership (subscription existence).
+   */
+  async listGpReportsForInvestor(investorId: string, fundId: string) {
+    const sub = await this.prisma.subscription.findFirst({
+      where: { fundId, investorId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!sub) return [];
+
+    const docs = await this.prisma.document.findMany({
+      where: {
+        fundId,
+        documentType: 'GP_REPORT',
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return docs.map((d) => {
+      const meta = (d.metadata as Record<string, unknown>) ?? {};
+      return {
+        documentId: d.id,
+        title: (meta.title as string) ?? d.originalFilename,
+        period: (meta.period as string) ?? null,
+        fileName: d.originalFilename,
+        byteSize: Number(d.byteSize),
+        uploadedAt: d.createdAt.toISOString(),
+      };
+    });
+  }
+
+  /**
+   * List GP reports for an admin view of a fund.
+   */
+  async listGpReportsForFund(fundId: string) {
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    const docs = await this.prisma.document.findMany({
+      where: { fundId, documentType: 'GP_REPORT', deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return docs.map((d) => {
+      const meta = (d.metadata as Record<string, unknown>) ?? {};
+      return {
+        documentId: d.id,
+        title: (meta.title as string) ?? d.originalFilename,
+        period: (meta.period as string) ?? null,
+        fileName: d.originalFilename,
+        mimeType: d.mimeType,
+        byteSize: Number(d.byteSize),
+        uploadedAt: d.createdAt.toISOString(),
+        uploadedBy: d.uploadedBy,
+      };
+    });
+  }
+
+  /**
    * Tax report for this investor in a fund for a given year.
    */
   async getTaxReport(investorId: string, fundId: string, taxYear: number) {
@@ -679,17 +860,85 @@ export class InvestorPortalService {
       where: { investorId, fundId, taxYear },
     });
 
-    if (!report) return null;
+    if (report) {
+      return {
+        taxYear: report.taxYear,
+        taxEntityName: report.taxEntityName,
+        ordinaryIncome: report.ordinaryIncome.toString(),
+        returnOfCapital: report.returnOfCapital.toString(),
+        ltcg: report.ltcg.toString(),
+        stcg: report.stcg.toString(),
+        totalDistributions: report.totalDistributions.toString(),
+        generatedAt: report.generatedAt.toISOString(),
+        source: 'TAX_REPORT' as const,
+      };
+    }
+
+    const { start, end } = this.getYearBounds(taxYear);
+    const [fund, capitalAccount, settledSubscriptions, distributionItems] =
+      await Promise.all([
+        this.prisma.fund.findUnique({
+          where: { id: fundId },
+          select: { name: true, code: true },
+        }),
+        this.prisma.capitalAccount.findFirst({
+          where: { investorId, fundId, deletedAt: null, isCurrent: true },
+          select: { id: true, asOfDate: true },
+        }),
+        this.prisma.subscription.findMany({
+          where: {
+            investorId,
+            fundId,
+            deletedAt: null,
+            status: 'SETTLED',
+            settledAt: { gte: start, lt: end },
+          },
+          select: { id: true },
+        }),
+        this.prisma.distributionLineItem.findMany({
+          where: {
+            investorId,
+            distributionRun: {
+              fundId,
+              runStatus: 'COMPLETED',
+              asOfTimestamp: { gte: start, lt: end },
+            },
+          },
+          select: {
+            netAmount: true,
+            returnOfCapitalAmount: true,
+          },
+        }),
+      ]);
+
+    const hasFundActivity =
+      settledSubscriptions.length > 0 ||
+      distributionItems.length > 0 ||
+      Boolean(capitalAccount && capitalAccount.asOfDate >= start);
+
+    if (!hasFundActivity) {
+      return null;
+    }
+
+    const totalDistributions = distributionItems.reduce(
+      (sum, item) => sum + Number(item.netAmount),
+      0,
+    );
+    const returnOfCapital = distributionItems.reduce(
+      (sum, item) => sum + Number(item.returnOfCapitalAmount),
+      0,
+    );
 
     return {
-      taxYear: report.taxYear,
-      taxEntityName: report.taxEntityName,
-      ordinaryIncome: report.ordinaryIncome.toString(),
-      returnOfCapital: report.returnOfCapital.toString(),
-      ltcg: report.ltcg.toString(),
-      stcg: report.stcg.toString(),
-      totalDistributions: report.totalDistributions.toString(),
-      generatedAt: report.generatedAt.toISOString(),
+      taxYear,
+      taxEntityName: fund?.name ?? fund?.code ?? null,
+      ordinaryIncome: this.formatMoney(0),
+      returnOfCapital: this.formatMoney(returnOfCapital),
+      ltcg: this.formatMoney(0),
+      stcg: this.formatMoney(0),
+      totalDistributions: this.formatMoney(totalDistributions),
+      generatedAt: new Date().toISOString(),
+      source: 'DERIVED_LEDGER_PREVIEW' as const,
     };
   }
 

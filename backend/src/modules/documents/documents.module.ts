@@ -16,6 +16,28 @@ import { FUND_TERMS_REGISTRY_ADAPTER } from '../../adapters/blockchain/viem-fund
 import { ViemFundTermsRegistryAdapter } from '../../adapters/blockchain/viem-fund-terms-registry.adapter';
 import { ViemClientProvider } from '../../adapters/blockchain/viem-client.provider';
 
+export function resolveDocumentParserAdapter() {
+  const configuredProvider = process.env.DOCUMENT_PARSER_PROVIDER
+    ?.trim()
+    .toLowerCase();
+
+  if (configuredProvider === 'gemini' && !process.env.GEMINI_API_KEY) {
+    throw new Error(
+      'DOCUMENT_PARSER_PROVIDER=gemini requires GEMINI_API_KEY',
+    );
+  }
+
+  if (configuredProvider === 'mock') {
+    return new MockParserAdapter();
+  }
+
+  if (configuredProvider === 'gemini' || process.env.GEMINI_API_KEY) {
+    return new GeminiParserAdapter();
+  }
+
+  return new MockParserAdapter();
+}
+
 @Module({
   imports: [SubscriptionsModule],
   controllers: [DocumentsController],
@@ -31,11 +53,7 @@ import { ViemClientProvider } from '../../adapters/blockchain/viem-client.provid
     { provide: HASH_PROVIDER, useClass: Sha256HashProvider },
     {
       provide: PARSER_ADAPTER,
-      useClass:
-        (process.env.DOCUMENT_PARSER_PROVIDER ?? 'mock').toLowerCase() ===
-          'gemini' && !!process.env.GEMINI_API_KEY
-          ? GeminiParserAdapter
-          : MockParserAdapter,
+      useFactory: resolveDocumentParserAdapter,
     },
     {
       provide: DOCUMENT_REGISTRY_ADAPTER,

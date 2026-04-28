@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError, ConflictError } from '../../common/errors';
 import { EventLogService } from '../../common/event-log.service';
+import { computeOnboardingStage } from './onboarding-stage';
 
 @Injectable()
 export class IdentityService {
@@ -16,7 +17,7 @@ export class IdentityService {
     email?: string;
     verificationStatus?: string;
   }) {
-    const verificationStatus = input.verificationStatus ?? 'VERIFIED';
+    const verificationStatus = input.verificationStatus ?? 'UNKNOWN';
     const now = new Date();
 
     const investor = await this.prisma.investor.create({
@@ -47,6 +48,78 @@ export class IdentityService {
     };
   }
 
+  async updateVerification(
+    investorId: string,
+    input: {
+      verificationStatus?: string;
+      kycStatus?: string;
+      accreditationStatus?: string;
+      reason?: string;
+    },
+    actorUserId?: string,
+  ) {
+    const investor = await this.prisma.investor.findUnique({
+      where: { id: investorId },
+    });
+    if (!investor) throw new NotFoundError('Investor', investorId);
+
+    const now = new Date();
+
+    const oldValues = {
+      verificationStatus: investor.verificationStatus,
+      kycStatus: investor.kycStatus,
+      accreditationStatus: investor.accreditationStatus,
+    };
+
+    const nextVerificationStatus =
+      input.verificationStatus ?? investor.verificationStatus;
+    const nextKycStatus = input.kycStatus ?? investor.kycStatus;
+    const nextAccreditationStatus =
+      input.accreditationStatus ?? investor.accreditationStatus;
+
+    const updated = await this.prisma.investor.update({
+      where: { id: investorId },
+      data: {
+        verificationStatus: nextVerificationStatus,
+        kycStatus: nextKycStatus,
+        accreditationStatus: nextAccreditationStatus,
+        verifiedAt:
+          input.verificationStatus === 'VERIFIED'
+            ? now
+            : input.verificationStatus === 'REVOKED'
+              ? null
+              : investor.verifiedAt,
+        updatedBy: actorUserId,
+        updatedAt: now,
+      },
+    });
+
+    await this.eventLog.log({
+      eventType: 'INVESTOR_VERIFICATION_UPDATED',
+      aggregateType: 'INVESTOR',
+      aggregateId: investor.id,
+      payload: {
+        actorUserId,
+        reason: input.reason,
+        old: oldValues,
+        new: {
+          verificationStatus: updated.verificationStatus,
+          kycStatus: updated.kycStatus,
+          accreditationStatus: updated.accreditationStatus,
+        },
+      },
+    });
+
+    return {
+      investorId: updated.id,
+      legalName: updated.legalName,
+      email: updated.email,
+      verificationStatus: updated.verificationStatus,
+      kycStatus: updated.kycStatus,
+      accreditationStatus: updated.accreditationStatus,
+    };
+  }
+
   async linkWallet(
     investorId: string,
     input: {
@@ -72,7 +145,12 @@ export class IdentityService {
         label: input.label ?? null,
         isPrimary: input.isPrimary ?? false,
         walletStatus: 'ACTIVE',
-        walletSource: 'SYSTEM_GENERATED',
+        // When an admin links a wallet on behalf of an investor (via the
+        // Investors > Add Wallet modal), the address came from the investor
+        // out-of-band — so it represents real investor custody. Mark it
+        // IMPORTED so the onboarding stepper accepts it. SYSTEM_GENERATED is
+        // reserved for wallets actually generated server-side (e.g. seeds).
+        walletSource: 'IMPORTED',
       },
     });
 
@@ -123,13 +201,17 @@ export class IdentityService {
           where: { fundId, deletedAt: null },
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
     let results = investors.map((inv) => ({
       investorId: inv.id,
       legalName: inv.legalName,
       email: inv.email,
+      createdAt: inv.createdAt.toISOString(),
       verificationStatus: inv.verificationStatus,
+      kycStatus: inv.kycStatus,
+      accreditationStatus: inv.accreditationStatus,
       wallets: inv.wallets.map((w) => ({
         walletId: w.id,
         address: w.address,
@@ -145,6 +227,11 @@ export class IdentityService {
               inv.eligibilities[0].effectiveAt?.toISOString() ?? null,
           }
         : null,
+      onboarding: computeOnboardingStage({
+        investor: inv,
+        wallets: inv.wallets,
+        eligibilities: inv.eligibilities,
+      }),
     }));
 
     if (filters?.eligibilityStatus) {
@@ -156,6 +243,49 @@ export class IdentityService {
     }
 
     return results;
+  }
+
+  async getInvestorDetail(investorId: string, fundId: string) {
+    const inv = await this.prisma.investor.findFirst({
+      where: { id: investorId, deletedAt: null },
+      include: {
+        wallets: { where: { deletedAt: null } },
+        eligibilities: { where: { fundId, deletedAt: null } },
+      },
+    });
+    if (!inv) throw new NotFoundError('Investor', investorId);
+
+    return {
+      investorId: inv.id,
+      legalName: inv.legalName,
+      email: inv.email,
+      verificationStatus: inv.verificationStatus,
+      kycStatus: inv.kycStatus,
+      accreditationStatus: inv.accreditationStatus,
+      metadata: inv.metadata,
+      wallets: inv.wallets.map((w) => ({
+        walletId: w.id,
+        address: w.address,
+        chainId: w.chainId,
+        isPrimary: w.isPrimary,
+        status: w.walletStatus,
+        walletSource: w.walletSource,
+      })),
+      fundEligibility: inv.eligibilities[0]
+        ? {
+            eligibilityId: inv.eligibilities[0].id,
+            status: inv.eligibilities[0].eligibilityStatus,
+            effectiveAt:
+              inv.eligibilities[0].effectiveAt?.toISOString() ?? null,
+            walletId: inv.eligibilities[0].walletId,
+          }
+        : null,
+      onboarding: computeOnboardingStage({
+        investor: inv,
+        wallets: inv.wallets,
+        eligibilities: inv.eligibilities,
+      }),
+    };
   }
 
   async upsertEligibility(
@@ -174,10 +304,13 @@ export class IdentityService {
       where: { id: input.investorId },
     });
     if (!investor) throw new NotFoundError('Investor', input.investorId);
-    if (investor.verificationStatus !== 'VERIFIED') {
+    const canGrantEligibility =
+      investor.kycStatus === 'APPROVED' &&
+      investor.accreditationStatus === 'APPROVED';
+    if (input.status === 'ELIGIBLE' && !canGrantEligibility) {
       throw new ConflictError(
-        'INVESTOR_NOT_VERIFIED',
-        'Investor must be VERIFIED before granting eligibility',
+        'INVESTOR_NOT_APPROVED',
+        'Investor must have approved KYC and accreditation before granting eligibility',
       );
     }
 

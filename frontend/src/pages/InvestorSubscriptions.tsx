@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { DataTable, Column } from "@/components/kadra/DataTable";
-import { StatusBadge } from "@/components/kadra/StatusBadge";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { DataTable, Column } from "@/components/angainor/DataTable";
+import { StatusBadge } from "@/components/angainor/StatusBadge";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMySubscriptions } from "@/services";
 import type { InvestorSubscription } from "@/services/investor-portal.service";

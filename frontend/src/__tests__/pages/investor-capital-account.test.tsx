@@ -20,10 +20,39 @@ vi.mock("sonner", () => ({
 
 vi.mock("@/services/investor-portal.service", () => ({
   getInvestorCapitalAccount: vi.fn(),
+  exportCapitalAccount: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/hooks/useCurrentFund", () => ({
+  useCurrentFund: () => ({
+    fundId: "ANGAINOR-DEMO-001",
+    fund: null,
+    waterfallConfig: {
+      waterfallConfigId: "wf-001",
+      version: "1.0",
+      calculationBasis: "IRR",
+      distributionFrequency: "Quarterly",
+      catchUpEnabled: true,
+      gpPromotePct: 20,
+      prefReturnPct: 8,
+      rules: {
+        tiers: [
+          { name: "Return of Capital", hurdle: "100% to LPs", lpShare: 100, gpShare: 0 },
+          { name: "Carried Interest", hurdle: "80/20 split", lpShare: 80, gpShare: 20 },
+        ],
+      },
+    },
+    targetSize: 10_000_000,
+    isLoading: false,
+    error: null,
+  }),
 }));
 
 import InvestorCapitalAccount from "@/pages/InvestorCapitalAccount";
-import { getInvestorCapitalAccount } from "@/services/investor-portal.service";
+import {
+  getInvestorCapitalAccount,
+  exportCapitalAccount,
+} from "@/services/investor-portal.service";
 
 function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -86,8 +115,9 @@ describe("InvestorCapitalAccount", () => {
     expect(screen.getByText("$75,000.00")).toBeInTheDocument();
   });
 
-  it("uses toast.info instead of alert() for export action", async () => {
-    // Spy on window.alert to verify it is NOT called
+  it("calls exportCapitalAccount service on Export Statement click (no alert)", async () => {
+    // The Export button used to call alert(); it now delegates to the service
+    // which does a blob download. Verify the service is called and alert isn't.
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
 
     renderWithProviders(<InvestorCapitalAccount />);
@@ -99,7 +129,9 @@ describe("InvestorCapitalAccount", () => {
     fireEvent.click(screen.getByText("Export Statement"));
 
     expect(alertSpy).not.toHaveBeenCalled();
-    expect(mockToast.info).toHaveBeenCalledWith("Export feature coming soon");
+    await waitFor(() => {
+      expect(vi.mocked(exportCapitalAccount)).toHaveBeenCalled();
+    });
 
     alertSpy.mockRestore();
   });

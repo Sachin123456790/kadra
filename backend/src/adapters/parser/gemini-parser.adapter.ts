@@ -6,7 +6,6 @@ interface GeminiField {
   fieldName: string;
   fieldValueText?: string;
   fieldValueNumeric?: number;
-  confidence?: number;
   sourcePage?: number;
 }
 
@@ -35,12 +34,11 @@ export class GeminiParserAdapter implements DocumentParserAdapter {
       'You are a legal document extraction engine for institutional real estate funds.',
       `Document type: ${documentType}.`,
       'Extract important contract keywords/fields and return only strict JSON with this schema:',
-      '{"fields":[{"fieldName":"string","fieldValueText":"string optional","fieldValueNumeric":0 optional,"confidence":0.0-1.0,"sourcePage":1 optional}]}',
+      '{"fields":[{"fieldName":"string","fieldValueText":"string optional","fieldValueNumeric":0 optional,"sourcePage":1 optional}]}',
       'Rules:',
       '1. Include useful normalized field names like fund_name, legal_form, committed_amount, allocation_pct, preferred_return, gp_promote, jurisdiction, investor_name, investor_wallet_address, subscription_ref, payment_reference.',
       '2. If numeric, use fieldValueNumeric.',
-      '3. If uncertain still include field but lower confidence.',
-      '4. Return valid JSON only. No markdown.',
+      '3. Return valid JSON only. No markdown.',
     ].join('\n');
 
     const body = {
@@ -98,11 +96,9 @@ export class GeminiParserAdapter implements DocumentParserAdapter {
         fieldName: f.fieldName.trim(),
         fieldValueText: f.fieldValueText?.trim(),
         fieldValueNumeric:
-          typeof f.fieldValueNumeric === 'number' ? f.fieldValueNumeric : undefined,
-        confidence:
-          typeof f.confidence === 'number'
-            ? Math.max(0, Math.min(1, f.confidence))
-            : 0.75,
+          typeof f.fieldValueNumeric === 'number'
+            ? f.fieldValueNumeric
+            : undefined,
         sourcePage:
           typeof f.sourcePage === 'number' && f.sourcePage > 0
             ? Math.floor(f.sourcePage)

@@ -12,7 +12,7 @@ Added automatic JWT refresh to prevent "token expired" errors that required manu
 
 ### Frontend
 - `frontend/src/services/api-client.ts` -- Added `tryRefreshToken()` and `refreshOnce()` for deduplicated silent refresh; all requests retry once on 401
-- `frontend/src/components/kadra/AuthProvider.tsx` -- Stores/clears refresh token in localStorage
+- `frontend/src/components/angainor/AuthProvider.tsx` -- Stores/clears refresh token in localStorage
 - `frontend/src/hooks/useAuth.ts` -- Login accepts optional refreshToken parameter
 - `frontend/src/config/constants.ts` -- Added `AUTH_REFRESH_TOKEN_KEY`
 - `frontend/src/pages/LoginPage.tsx` -- Passes refreshToken from login response

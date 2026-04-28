@@ -5,11 +5,13 @@ import {
   Param,
   Post,
   Put,
+  Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { NoticesService } from './notices.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/auth/roles.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -19,7 +21,7 @@ import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
 
 @Controller('admin')
-@UseGuards(SupabaseAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(...ADMIN_ROLES)
 export class NoticesAdminController {
   constructor(
@@ -38,9 +40,38 @@ export class NoticesAdminController {
       distributionRunId?: string;
       documentHash?: string;
       anchorTxHash?: string;
+      subject?: string;
+      bodyMarkdown?: string;
+      templateKey?: string;
     },
   ) {
-    const data = await this.noticesService.generateNotice(body);
+    const fundId = await resolveFundId(this.prisma, body.fundId);
+    const data = await this.noticesService.generateNotice({
+      ...body,
+      fundId,
+    });
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Get('notice-templates/:type')
+  async getNoticeTemplate(
+    @Param('type') type: string,
+    @Query('fundId') fundIdOrCode: string,
+    @Query('recipientInvestorId') recipientInvestorId?: string,
+    @Query('capitalCallId') capitalCallId?: string,
+    @Query('distributionRunId') distributionRunId?: string,
+  ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
+    const data = await this.noticesService.getTemplateForType({
+      fundId,
+      type,
+      recipientInvestorId,
+      capitalCallId,
+      distributionRunId,
+    });
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
@@ -71,10 +102,34 @@ export class NoticesAdminController {
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
     };
   }
+
+  @Get('notices/:noticeId/pdf')
+  async getNoticePdf(@Param('noticeId') noticeId: string, @Res() res: any) {
+    const result = await this.noticesService.renderNoticePdf({ noticeId });
+    sendBinary(res, result);
+  }
+}
+
+function sendBinary(
+  res: any,
+  result: { buffer: Buffer; filename: string; mimeType: string },
+): void {
+  const disposition = `inline; filename="${result.filename.replace(/"/g, '')}"`;
+  if (typeof res.header === 'function' && typeof res.send === 'function') {
+    res.header('Content-Type', result.mimeType);
+    res.header('Content-Disposition', disposition);
+    res.header('Content-Length', String(result.buffer.length));
+    res.send(result.buffer);
+    return;
+  }
+  res.setHeader('Content-Type', result.mimeType);
+  res.setHeader('Content-Disposition', disposition);
+  res.setHeader('Content-Length', String(result.buffer.length));
+  res.end(result.buffer);
 }
 
 @Controller('investor')
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(JwtAuthGuard)
 export class NoticesInvestorController {
   constructor(private readonly noticesService: NoticesService) {}
 
@@ -85,5 +140,18 @@ export class NoticesInvestorController {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
     };
+  }
+
+  @Get('me/notices/:noticeId/pdf')
+  async getMyNoticePdf(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('noticeId') noticeId: string,
+    @Res() res: any,
+  ) {
+    const result = await this.noticesService.renderNoticePdf({
+      noticeId,
+      investorEmail: user.email,
+    });
+    sendBinary(res, result);
   }
 }

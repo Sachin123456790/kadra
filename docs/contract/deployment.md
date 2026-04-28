@@ -1,22 +1,22 @@
 # Deployment Guide
 
-This guide covers deploying Kadra smart contracts to the local Hardhat network and to the Sepolia testnet.
+This guide covers deploying Angainor smart contracts to the local Hardhat network and to the Sepolia testnet.
 
-## Local Deployment (Full Kadra System)
+## Local Deployment (Full Angainor System)
 
 ### Command
 
 ```bash
-npx hardhat run scripts/deploy-kadra.js
+npx hardhat run scripts/deploy-angainor.js
 ```
 
-This runs the full 9-step Kadra system orchestration on the local Hardhat network.
+This runs the full 9-step Angainor system orchestration on the local Hardhat network.
 
 ### Deployment Steps
 
 | Step | Action | Details |
 |---|---|---|
-| 1 | Deploy smart contracts | IdentityRegistry, DocumentRegistry, KadraToken |
+| 1 | Deploy smart contracts | IdentityRegistry, DocumentRegistry, AngainorToken |
 | 2 | Create fund entity | Off-chain fund record with waterfall configuration (display-only) |
 | 3 | Register investors | 5 investors added to IdentityRegistry with verified + eligible status |
 | 4 | Hash and anchor LPA | SHA-256 hash of `data/sample-lpa.txt` registered in DocumentRegistry |
@@ -33,19 +33,19 @@ The contracts must be deployed in this order due to dependencies:
 ```
 1. IdentityRegistry  (no dependencies)
 2. DocumentRegistry   (no dependencies)
-3. KadraToken         (depends on IdentityRegistry address)
+3. AngainorToken         (depends on IdentityRegistry address)
 ```
 
-KadraToken requires the IdentityRegistry address in its constructor:
+AngainorToken requires the IdentityRegistry address in its constructor:
 
 ```javascript
-const KadraToken = await hre.ethers.getContractFactory("KadraToken");
-const token = await KadraToken.deploy("Kadra Demo Fund I", "KDRA", registryAddr);
+const AngainorToken = await hre.ethers.getContractFactory("AngainorToken");
+const token = await AngainorToken.deploy("Angainor Demo Fund I", "KDRA", registryAddr);
 ```
 
 ### Evidence Output
 
-The deployment script saves evidence to `EVIDENCE/kadra-deploy/`:
+The deployment script saves evidence to `EVIDENCE/angainor-deploy/`:
 
 | File | Contents |
 |---|---|
@@ -59,7 +59,7 @@ Example `addresses.json`:
 {
   "identityRegistry": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   "documentRegistry": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-  "kadraToken": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+  "angainorToken": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
   "network": "hardhat",
   "deployedAt": "2025-01-01T00:00:00.000Z"
 }
@@ -130,7 +130,7 @@ module.exports = {
 npx hardhat run scripts/cap-table.js
 ```
 
-Reads the deployed KadraToken contract and prints the current cap table. Requires a prior run of `deploy-kadra.js` (reads addresses from `EVIDENCE/kadra-deploy/addresses.json`).
+Reads the deployed AngainorToken contract and prints the current cap table. Requires a prior run of `deploy-angainor.js` (reads addresses from `EVIDENCE/angainor-deploy/addresses.json`).
 
 Output includes token name, symbol, per-investor balances, ownership percentages, and total supply.
 

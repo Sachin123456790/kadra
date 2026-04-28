@@ -20,6 +20,6 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
-  console.log(`Kadra API running on port ${port}`);
+  console.log(`Angainor API running on port ${port}`);
 }
 bootstrap();

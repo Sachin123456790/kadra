@@ -1,0 +1,20 @@
+0 verbose cli /Users/chinmay_shringi/.nvm/versions/node/v24.2.0/bin/node /Users/chinmay_shringi/.nvm/versions/node/v24.2.0/bin/npm
+1 info using npm@11.7.0
+2 info using node@v24.2.0
+3 silly config load:file:/Users/chinmay_shringi/.nvm/versions/node/v24.2.0/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/chinmay_shringi/Desktop/markus/.npmrc
+5 silly config load:file:/Users/chinmay_shringi/.nvm/versions/node/v24.2.0/etc/npmrc
+6 verbose title npm exec node -e console.log(require.resolve('playwright'))
+7 verbose argv "exec" "--yes" "--package" "playwright" "--" "node" "-e" "console.log(require.resolve('playwright'))"
+8 verbose logfile logs-max:10 dir:/Users/chinmay_shringi/Desktop/markus/.npm/_logs/2026-04-21T20_27_15_421Z-
+9 verbose logfile /Users/chinmay_shringi/Desktop/markus/.npm/_logs/2026-04-21T20_27_15_421Z-debug-0.log
+10 silly logfile done cleaning log files
+11 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+12 http fetch GET 200 https://registry.npmjs.org/playwright 161ms (cache revalidated)
+13 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+14 verbose cwd /Users/chinmay_shringi/Desktop/markus
+15 verbose os Darwin 25.3.0
+16 verbose node v24.2.0
+17 verbose npm  v11.7.0
+18 verbose exit 1
+19 verbose code 1

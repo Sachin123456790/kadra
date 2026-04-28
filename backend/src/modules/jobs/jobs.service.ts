@@ -1,8 +1,8 @@
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { NotFoundError } from '../../common/errors';
+import { NotFoundError, ConflictError } from '../../common/errors';
 import { ViemClientProvider } from '../../adapters/blockchain/viem-client.provider';
-import { KADRA_TOKEN_ABI } from '../../adapters/blockchain/abi/kadra-token.abi';
+import { ANGAINOR_TOKEN_ABI } from '../../adapters/blockchain/abi/angainor-token.abi';
 import type { Address } from 'viem';
 
 export interface RunSummary {
@@ -111,7 +111,7 @@ export class JobsService {
           await this.prisma.job.update({
             where: { id: job.id },
             data: {
-              status: 'FAILED',
+              status: 'DEAD_LETTERED',
               lastError: errorMessage,
               lockedBy: null,
               lockedAt: null,
@@ -147,13 +147,20 @@ export class JobsService {
         `${jobId} (status ${job.status} is not retriable)`,
       );
     }
+    if (job.status === 'FAILED' && job.attempts >= job.maxAttempts) {
+      throw new ConflictError(
+        'JOB_NOT_RETRIABLE',
+        `Job ${jobId} has reached max attempts and is not retriable`,
+      );
+    }
 
+    const startedAt = new Date();
     await this.prisma.job.update({
       where: { id: job.id },
       data: {
         status: 'RUNNING',
         attempts: job.attempts + 1,
-        startedAt: new Date(),
+        startedAt,
       },
     });
 
@@ -166,6 +173,33 @@ export class JobsService {
       return { jobId: job.id, status: 'COMPLETED' };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
+      const newAttempts = job.attempts + 1;
+
+      if (newAttempts >= job.maxAttempts) {
+        await this.prisma.jobDeadLetter.create({
+          data: {
+            originalJobId: job.id,
+            jobType: job.jobType,
+            payload: job.payload as object,
+            attempts: newAttempts,
+            lastError: errorMessage,
+            failedAt: new Date(),
+          },
+        });
+        await this.prisma.job.update({
+          where: { id: job.id },
+          data: {
+            status: 'DEAD_LETTERED',
+            lastError: errorMessage,
+          },
+        });
+        return {
+          jobId: job.id,
+          status: 'DEAD_LETTERED',
+          error: errorMessage,
+        };
+      }
+
       await this.prisma.job.update({
         where: { id: job.id },
         data: { status: 'FAILED', lastError: errorMessage },
@@ -181,20 +215,10 @@ export class JobsService {
     if (!deadLetter) {
       throw new NotFoundError('JobDeadLetter', deadLetterId);
     }
-
-    const newJob = await this.prisma.job.create({
-      data: {
-        jobType: deadLetter.jobType,
-        payload: deadLetter.payload as object,
-        status: 'QUEUED',
-        priority: 0,
-        attempts: 0,
-        maxAttempts: 3,
-        scheduledAt: new Date(),
-      },
-    });
-
-    return newJob;
+    throw new ConflictError(
+      'DEAD_LETTER_TERMINAL',
+      `Dead-lettered job ${deadLetter.originalJobId} is terminal and cannot be retried`,
+    );
   }
 
   async ingestChainEvents(fundId?: string): Promise<ChainIngestSummary> {
@@ -226,7 +250,7 @@ export class JobsService {
 
         const logs = await this.viem.publicClient.getContractEvents({
           address: contract.contractAddress as Address,
-          abi: KADRA_TOKEN_ABI,
+          abi: ANGAINOR_TOKEN_ABI,
           eventName: 'Transfer',
           fromBlock,
           toBlock: currentBlock,

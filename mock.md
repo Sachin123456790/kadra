@@ -1,4 +1,4 @@
-# Kadra — Mock/Fake/Stub Inventory
+# Angainor — Mock/Fake/Stub Inventory
 
 Everything that needs to become real before an investor demo. Ordered by severity.
 
@@ -16,7 +16,7 @@ Everything that needs to become real before an investor demo. Ordered by severit
 - `getBalance()` — reads in-memory map (always empty after cold start)
 - `genTxHash()` — `SHA-256(randomUUID())` — not real, not on BaseScan
 
-**Fix:** Replace with real adapter using viem/permissionless. Deploy actual KadraToken.sol + IdentityRegistry.sol + DocumentRegistry.sol to Sepolia. Generate real wallets for investors.
+**Fix:** Replace with real adapter using viem/permissionless. Deploy actual AngainorToken.sol + IdentityRegistry.sol + DocumentRegistry.sol to Sepolia. Generate real wallets for investors.
 
 ### 2. SepoliaTokenContractAdapter (also mock despite the name) -- FIXED
 **File:** `backend/src/adapters/blockchain/sepolia-token-contract.adapter.ts` (DELETED)
@@ -61,7 +61,7 @@ Everything that needs to become real before an investor demo. Ordered by severit
 ### 7. IdentityRegistry Address Hardcoded as Null -- FIXED
 **File:** `backend/src/modules/tokenization/tokenization.service.ts`
 - `identityRegistryAddress: '0x0000000000000000000000000000000000000000'` — "Mock for MVP"
-- Means KadraToken is deployed without a real identity registry reference
+- Means AngainorToken is deployed without a real identity registry reference
 
 **Fix:** Pass actual deployed IdentityRegistry address.
 
@@ -71,7 +71,7 @@ Everything that needs to become real before an investor demo. Ordered by severit
 
 ### 8. MockParserAdapter (document extraction)
 **File:** `backend/src/adapters/parser/mock-parser.adapter.ts`
-- Returns hardcoded extraction: "Kadra Demo Fund I", allocation=20%, pref_return=8%, gp_promote=20%
+- Returns hardcoded extraction: "Angainor Demo Fund I", allocation=20%, pref_return=8%, gp_promote=20%
 - Every uploaded document returns identical fields regardless of content
 - GeminiParserAdapter exists but requires `DOCUMENT_PARSER_PROVIDER=gemini` + `GEMINI_API_KEY`
 
@@ -105,7 +105,7 @@ Everything that needs to become real before an investor demo. Ordered by severit
 
 ### 13. Seed Data & Demo Constants
 - `backend/prisma/seed.ts` — 1 fund, 6 investors, hardcoded wallet addresses
-- `frontend/src/config/constants.ts` — `DEFAULT_FUND_CODE = 'KADRA-DEMO-001'`
+- `frontend/src/config/constants.ts` — `DEFAULT_FUND_CODE = 'ANGAINOR-DEMO-001'`
 - `data/` — mock investor/wire/fund JSON files for Hardhat scripts
 - These are intentional demo fixtures, not production mocks
 

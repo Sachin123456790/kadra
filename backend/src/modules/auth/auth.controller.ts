@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { Public } from '../../common/auth/public.decorator';
 import type { AuthenticatedUser } from '../../common/auth/auth.types';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { LoginDto, RefreshDto, SignupDto } from './auth.dto';
 import { AuthService } from './auth.service';
 
@@ -41,7 +41,7 @@ export class AuthController {
     };
   }
 
-  @UseGuards(SupabaseAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   async me(@CurrentUser() user: AuthenticatedUser) {
     return {

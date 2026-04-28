@@ -1,0 +1,15 @@
+[2026-04-21T21:03:02.392Z] [debug] Notifying parent we're ready
+[2026-04-21T21:03:02.394Z] [debug] Received message from parent: {
+  cacheFile: '/Users/chinmay_shringi/Desktop/markus/Library/Caches/com.vercel.cli/package-updates/vercel-latest.json',
+  distTag: 'latest',
+  name: 'vercel',
+  updateCheckInterval: 86400000
+}
+[2026-04-21T21:03:02.394Z] [debug] Disconnecting from parent
+[2026-04-21T21:03:02.395Z] [debug] Checking lock file: /Users/chinmay_shringi/Desktop/markus/Library/Caches/com.vercel.cli/package-updates/vercel-latest.lock
+[2026-04-21T21:03:02.395Z] [debug] Initializing lock file with pid 60975
+[2026-04-21T21:03:02.396Z] [debug] Fetching https://registry.npmjs.org/-/package/vercel/dist-tags
+[2026-04-21T21:03:02.652Z] [debug] Found dist tag "latest" with version "51.8.0"
+[2026-04-21T21:03:02.652Z] [debug] Writing cache file: /Users/chinmay_shringi/Desktop/markus/Library/Caches/com.vercel.cli/package-updates/vercel-latest.json
+[2026-04-21T21:03:02.652Z] [debug] Releasing lock file: /Users/chinmay_shringi/Desktop/markus/Library/Caches/com.vercel.cli/package-updates/vercel-latest.lock
+[2026-04-21T21:03:02.652Z] [debug] Worker finished successfully!

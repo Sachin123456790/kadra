@@ -1,0 +1,22 @@
+0 verbose cli /Users/chinmay_shringi/.nvm/versions/node/v24.2.0/bin/node /Users/chinmay_shringi/.nvm/versions/node/v24.2.0/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@11.7.0
+2 info using node@v24.2.0
+3 silly config load:file:/Users/chinmay_shringi/.nvm/versions/node/v24.2.0/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/chinmay_shringi/Desktop/markus/backend/.npmrc
+5 silly config load:file:/Users/chinmay_shringi/Desktop/markus/.npmrc
+6 silly config load:file:/Users/chinmay_shringi/.nvm/versions/node/v24.2.0/etc/npmrc
+7 verbose title npm exec vercel@latest deploy --prod -y
+8 verbose argv "exec" "--" "vercel@latest" "deploy" "--prod" "-y"
+9 verbose logfile logs-max:10 dir:/Users/chinmay_shringi/Desktop/markus/.npm/_logs/2026-04-21T21_13_57_037Z-
+10 verbose logfile /Users/chinmay_shringi/Desktop/markus/.npm/_logs/2026-04-21T21_13_57_037Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 http fetch GET 200 https://registry.npmjs.org/vercel 193ms (cache revalidated)
+14 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+15 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+16 verbose cwd /Users/chinmay_shringi/Desktop/markus/backend
+17 verbose os Darwin 25.3.0
+18 verbose node v24.2.0
+19 verbose npm  v11.7.0
+20 verbose exit 0
+21 info ok

@@ -8,21 +8,20 @@ import {
   getInvestors,
 } from "@/services";
 import type { FailedTransfer, SuccessfulTransfer } from "@/services/tokenization.service";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
-import { TableSkeleton } from "@/components/kadra/Skeleton";
-import { ExplorerLink } from "@/components/kadra/ExplorerLink";
-import { HashDisplay } from "@/components/kadra/HashDisplay";
-import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
+import { TableSkeleton } from "@/components/angainor/Skeleton";
+import { ExplorerLink } from "@/components/angainor/ExplorerLink";
+import { HashDisplay } from "@/components/angainor/HashDisplay";
+import { TechnicalDetails } from "@/components/angainor/TechnicalDetails";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useHighlightRow } from "@/hooks/useHighlightRow";
+import { useAppConfig } from "@/hooks/useAppConfig";
 
 // ── Constants ────────────────────────────────────────────
-
-const IDENTITY_REGISTRY_ADDRESS = "0x55822888507cac67bE5C11516e00C4597E7c78fb";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", {
@@ -114,7 +113,7 @@ function TransferRulesCard({
   identityRegistryAddress,
   lpaHash,
 }: {
-  readonly identityRegistryAddress: string;
+  readonly identityRegistryAddress: string | null;
   readonly lpaHash: string;
 }) {
   return (
@@ -143,10 +142,14 @@ function TransferRulesCard({
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
               Identity Registry
             </p>
-            <ExplorerLink
-              value={identityRegistryAddress}
-              type="address"
-            />
+            {identityRegistryAddress ? (
+              <ExplorerLink
+                value={identityRegistryAddress}
+                type="address"
+              />
+            ) : (
+              <span className="text-sm text-muted-foreground">—</span>
+            )}
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
@@ -384,6 +387,8 @@ function TransferNoticesSection({
 export default function TransfersPage() {
   const fundId = DEFAULT_FUND_CODE;
   const { highlightId, isPulsing } = useHighlightRow();
+  const { data: appConfig } = useAppConfig();
+  const identityRegistryAddress = appConfig?.contracts.identityRegistry ?? null;
 
   const {
     data: failedData,
@@ -472,7 +477,7 @@ export default function TransfersPage() {
       />
 
       <TransferRulesCard
-        identityRegistryAddress={IDENTITY_REGISTRY_ADDRESS}
+        identityRegistryAddress={identityRegistryAddress}
         lpaHash={lpaHash}
       />
 

@@ -1,22 +1,23 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMyTransfers, getMyDashboard, getInvestorCapTable } from "@/services";
 import { getMyProfile } from "@/services/wallet-profile.service";
 import { validateTransfer, confirmTransfer } from "@/services/tokenization.service";
-import { encodeTransfer } from "@/config/kadra-token-abi";
-import { ExplorerLink } from "@/components/kadra/ExplorerLink";
-import { TechnicalDetails } from "@/components/kadra/TechnicalDetails";
+import { encodeTransfer } from "@/config/angainor-token-abi";
+import { ExplorerLink } from "@/components/angainor/ExplorerLink";
+import { TechnicalDetails } from "@/components/angainor/TechnicalDetails";
 import { useWallet } from "@/hooks/useWallet";
 import type { InvestorTransferRequest } from "@/services/investor-portal.service";
-import { TableSkeleton } from "@/components/kadra/Skeleton";
-import { Shield, Search, AlertCircle, CheckCircle } from "lucide-react";
+import { TableSkeleton } from "@/components/angainor/Skeleton";
+import { Shield, AlertCircle, CheckCircle } from "lucide-react";
 import { useHighlightRow } from "@/hooks/useHighlightRow";
 import { cn } from "@/lib/utils";
+import { isAddress } from "viem";
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n);
@@ -69,8 +70,8 @@ function TransferEligibilityPanel() {
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Accreditation Status</span>
-            <span className={`inline-flex items-center rounded-full ${badgeStyle(isVerified)}`}>
-              {isVerified ? "Accredited" : "Pending"}
+            <span className={`inline-flex items-center rounded-full ${badgeStyle(false)}`}>
+              Pending
             </span>
           </div>
         </div>
@@ -87,12 +88,6 @@ function TransferEligibilityPanel() {
 
 // ── Section 2: Initiate Transfer ────────────────────────────
 
-interface RecipientSearch {
-  email: string;
-  name: string;
-  eligible: boolean;
-}
-
 function InitiateTransferSection({
   walletAddress,
   tokenBalance,
@@ -104,37 +99,16 @@ function InitiateTransferSection({
   const queryClient = useQueryClient();
   const wallet = useWallet();
 
-  const [recipientEmail, setRecipientEmail] = useState("");
-  const [recipientResult, setRecipientResult] = useState<RecipientSearch | null>(null);
+  const [recipientWalletAddress, setRecipientWalletAddress] = useState("");
   const [tokenAmount, setTokenAmount] = useState("");
   const [transferStep, setTransferStep] = useState<
     "idle" | "validating" | "signing" | "confirming" | "done" | "error"
   >("idle");
   const [transferError, setTransferError] = useState<string | null>(null);
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleRecipientSearch = useCallback((email: string) => {
-    setRecipientEmail(email);
-    setRecipientResult(null);
-
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-
-    if (email.length < 3) return;
-
-    // Simulate a recipient lookup with debounce
-    searchTimeout.current = setTimeout(() => {
-      // For demo: any valid-looking email is treated as eligible
-      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-      if (isValidEmail) {
-        setRecipientResult({
-          email,
-          name: email.split("@")[0].replace(/[^a-zA-Z]/g, " "),
-          eligible: true,
-        });
-      }
-    }, 500);
-  }, []);
+  const recipientAddress = recipientWalletAddress.trim();
+  const hasRecipientAddress = recipientAddress.length > 0;
+  const isRecipientAddressValid = isAddress(recipientAddress);
 
   const transferMutation = useMutation({
     mutationFn: async () => {
@@ -145,7 +119,7 @@ function InitiateTransferSection({
       setTransferStep("validating");
       const validation = await validateTransfer(fundId, {
         fromWalletAddress: activeAddr,
-        toWalletAddress: recipientEmail, // Backend resolves email -> wallet
+        toWalletAddress: recipientAddress,
         tokenAmount,
       });
 
@@ -161,7 +135,7 @@ function InitiateTransferSection({
       // Step 2: Sign
       setTransferStep("signing");
       const amount = BigInt(Math.round(parseFloat(tokenAmount) * 1e18));
-      const calldata = encodeTransfer(validation.data.precheck.recipientEligible ? recipientEmail : "", amount);
+      const calldata = encodeTransfer(recipientAddress, amount);
 
       const txHash = await wallet.sendTransaction({
         to: validation.data.contractAddress,
@@ -176,8 +150,7 @@ function InitiateTransferSection({
     },
     onSuccess: () => {
       setTransferStep("done");
-      setRecipientEmail("");
-      setRecipientResult(null);
+      setRecipientWalletAddress("");
       setTokenAmount("");
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.investorTransfers(fundId) });
     },
@@ -193,7 +166,12 @@ function InitiateTransferSection({
     setLastTxHash(null);
   };
 
-  const isReady = wallet.address && recipientEmail && tokenAmount && transferStep === "idle";
+  const isReady =
+    wallet.address &&
+    tokenAmount &&
+    hasRecipientAddress &&
+    isRecipientAddressValid &&
+    transferStep === "idle";
 
   return (
     <SectionCard title="Initiate Transfer">
@@ -244,31 +222,27 @@ function InitiateTransferSection({
             <h4 className="text-sm font-medium text-foreground mb-3">Recipient</h4>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">LP Email Address</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={recipientEmail}
-                    onChange={(e) => handleRecipientSearch(e.target.value)}
-                    placeholder="Search by email..."
-                    className="w-full pl-9 pr-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-ring focus:border-primary"
-                    disabled={transferStep !== "idle"}
-                  />
-                </div>
+                <label className="block text-sm font-medium text-foreground mb-1">Recipient Wallet Address</label>
+                <input
+                  type="text"
+                  value={recipientWalletAddress}
+                  onChange={(e) => setRecipientWalletAddress(e.target.value)}
+                  placeholder="0x..."
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-ring focus:border-primary"
+                  disabled={transferStep !== "idle"}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the recipient&apos;s verified wallet address. Eligibility is checked during transfer validation.
+                </p>
               </div>
-              {recipientResult && (
-                <div className={`p-3 rounded-lg border ${recipientResult.eligible ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+              {hasRecipientAddress && !isRecipientAddressValid && (
+                <div className="p-3 rounded-lg border bg-red-50 border-red-200">
                   <div className="flex items-center gap-2">
-                    {recipientResult.eligible ? (
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 text-red-600" />
-                    )}
-                    <span className={`text-sm ${recipientResult.eligible ? "text-green-800" : "text-red-800"}`}>
-                      {recipientResult.eligible
-                        ? "Recipient is eligible for this fund"
-                        : "Recipient is NOT eligible for this fund"}
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <span className="text-sm text-red-800">
+                      Enter a valid wallet address to continue.
                     </span>
                   </div>
                 </div>
@@ -323,8 +297,8 @@ function InitiateTransferSection({
         <div className="mt-4">
           <button
             onClick={() => transferMutation.mutate()}
-            disabled={!isReady || (recipientResult !== null && !recipientResult.eligible)}
-            className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!isReady}
+            className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Transfer
           </button>

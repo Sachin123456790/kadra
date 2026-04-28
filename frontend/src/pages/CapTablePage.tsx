@@ -1,5 +1,9 @@
 import { useMemo, useCallback, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { rebuildProjections } from '@/services/notices.service';
+import { toFriendlyMessage } from '@/lib/errorMessages';
+import { RefreshCw } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
@@ -10,16 +14,16 @@ import { getSubscriptions } from '@/services/subscriptions.service';
 import { createAuditExport } from '@/services/audit.service';
 import type { CapTableRow } from '@/services/ownership.service';
 import type { Subscription } from '@/services/subscriptions.service';
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { MetricCard } from "@/components/kadra/MetricCard";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
-import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
-import { ExplorerLink } from "@/components/kadra/ExplorerLink";
-import { HashDisplay } from "@/components/kadra/HashDisplay";
-import { CopyButton } from "@/components/kadra/CopyButton";
-import { DerivedAmount } from "@/components/kadra/DerivedAmount";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { MetricCard } from "@/components/angainor/MetricCard";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
+import { SkeletonCard, TableSkeleton } from "@/components/angainor/Skeleton";
+import { ExplorerLink } from "@/components/angainor/ExplorerLink";
+import { HashDisplay } from "@/components/angainor/HashDisplay";
+import { CopyButton } from "@/components/angainor/CopyButton";
+import { DerivedAmount } from "@/components/angainor/DerivedAmount";
 import { formatCompact } from "@/lib/format";
 
 const OWNERSHIP_COLORS = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#2563eb', '#c026d3'] as const;
@@ -308,6 +312,35 @@ function ExportCapTableButton({ fundId }: { readonly fundId: string }) {
   );
 }
 
+/* ── Rebuild Projection Button ── */
+
+function RebuildProjectionButton({ fundId }: { readonly fundId: string }) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: () => rebuildProjections(fundId).then((r) => r.data),
+    onSuccess: () => {
+      toast.success('Projection rebuilt from ownership history');
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.capTable(fundId) });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ownershipHistory(fundId) });
+    },
+    onError: (err: Error) => {
+      toast.error(toFriendlyMessage(err));
+    },
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={() => mutation.mutate()}
+      disabled={mutation.isPending}
+      className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+    >
+      <RefreshCw className={`h-4 w-4 ${mutation.isPending ? 'animate-spin' : ''}`} />
+      {mutation.isPending ? 'Rebuilding…' : 'Rebuild Projection'}
+    </button>
+  );
+}
+
 /* ── Page ── */
 
 export default function CapTablePage() {
@@ -371,7 +404,12 @@ export default function CapTablePage() {
       <PageHeader
         title="Cap Table"
         subtitle={`Last updated: ${lastUpdated}`}
-        action={<ExportCapTableButton fundId={fundId} />}
+        action={
+          <div className="flex items-center gap-2">
+            <RebuildProjectionButton fundId={fundId} />
+            <ExportCapTableButton fundId={fundId} />
+          </div>
+        }
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

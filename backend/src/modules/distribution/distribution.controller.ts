@@ -3,13 +3,13 @@ import { DistributionService } from './distribution.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/auth/roles.decorator';
 import { ADMIN_ROLES } from '../../common/auth/auth.types';
 
 @Controller('admin/funds')
-@UseGuards(SupabaseAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(...ADMIN_ROLES)
 export class DistributionController {
   constructor(

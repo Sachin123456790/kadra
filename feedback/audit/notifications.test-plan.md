@@ -5,7 +5,7 @@ Scope: verify that notifications route to the correct destination, highlight the
 Files under test:
 - `frontend/src/hooks/useNotifications.ts`
 - `frontend/src/hooks/useHighlightRow.ts`
-- `frontend/src/components/kadra/AppLayout.tsx` (dropdown)
+- `frontend/src/components/angainor/AppLayout.tsx` (dropdown)
 - `frontend/src/pages/NotificationsPage.tsx`
 - `frontend/src/pages/SubscriptionsPage.tsx`
 - `frontend/src/pages/TransfersPage.tsx`
@@ -49,7 +49,7 @@ Use `@testing-library/react-hooks` (or RTL `renderHook`) with a mock QueryClient
 - **Investor my-sub** always emitted per subscription.
 - **Investor my-transfer** emitted per transfer with `targetId === tx.id`.
 - Notifications sorted by timestamp descending.
-- `unreadCount` excludes items whose id is in `localStorage[kadra_read_notifications]`.
+- `unreadCount` excludes items whose id is in `localStorage[angainor_read_notifications]`.
 
 ## 3. AppLayout dropdown
 

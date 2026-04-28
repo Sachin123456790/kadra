@@ -141,24 +141,51 @@ export class SubscriptionsService {
       },
       include: {
         settlementRecords: { orderBy: { createdAt: 'desc' }, take: 1 },
+        tokenPositionEvents: {
+          where: { eventType: 'MINT', ingestStatus: 'CONFIRMED' },
+          orderBy: [{ blockTimestamp: 'desc' }, { createdAt: 'desc' }],
+          take: 1,
+        },
         investor: { select: { legalName: true } },
         governingHash: { select: { hashHex: true } },
       },
     });
 
-    return subscriptions.map((s) => ({
-      subscriptionId: s.id,
-      subscriptionRef: s.subscriptionRef,
-      investorId: s.investorId,
-      walletId: s.walletId,
-      allocationPct: Number(s.allocationPct),
-      committedAmount: s.committedAmount.toString(),
-      status: s.status,
-      settledAt: s.settledAt?.toISOString() ?? null,
-      latestSettlementStatus: s.settlementRecords[0]?.status ?? null,
-      investorName: s.investor?.legalName ?? null,
-      governingHashHex: s.governingHash?.hashHex ?? null,
-    }));
+    return subscriptions.map((s) => {
+      const latest = s.settlementRecords[0];
+      const latestMint = s.tokenPositionEvents[0];
+      const latestSettlement = latest
+        ? {
+            id: latest.id,
+            status: latest.status,
+            validation: {
+              checks: [
+                { name: 'Amount', passed: latest.checkAmountMatch },
+                { name: 'Identity', passed: latest.checkInvestorMatch },
+                { name: 'Reference', passed: latest.checkReferenceMatch },
+              ],
+              failureReasonCode: latest.failureReasonCode ?? null,
+            },
+          }
+        : null;
+      return {
+        subscriptionId: s.id,
+        subscriptionRef: s.subscriptionRef,
+        investorId: s.investorId,
+        walletId: s.walletId,
+        allocationPct: Number(s.allocationPct),
+        committedAmount: s.committedAmount.toString(),
+        status: s.status,
+        settledAt: s.settledAt?.toISOString() ?? null,
+        latestSettlementStatus: latest?.status ?? null,
+        latestSettlement,
+        investorName: s.investor?.legalName ?? null,
+        governingHashHex: s.governingHash?.hashHex ?? null,
+        mintTxHash: latestMint?.txHash ?? null,
+        mintedAt: latestMint?.blockTimestamp?.toISOString() ?? null,
+        mintEventId: latestMint?.id ?? null,
+      };
+    });
   }
 
   async getSubscription(subscriptionId: string) {

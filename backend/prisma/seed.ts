@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import * as bcrypt from 'bcrypt';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -8,14 +9,85 @@ if (!connectionString) {
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
+// Demo credentials — documented in CLAUDE.md. Keep in sync.
+const DEMO_CREDENTIALS: ReadonlyArray<{
+  email: string;
+  password: string;
+  role: 'admin' | 'investor';
+  fullName: string;
+}> = [
+  {
+    email: 'demo@angainor.io',
+    password: 'AngainorDemo2024',
+    role: 'admin',
+    fullName: 'Angainor Admin',
+  },
+  {
+    email: 'alpine@example.com',
+    password: 'AlpineLP2024',
+    role: 'investor',
+    fullName: 'Alpine Capital Partners',
+  },
+  {
+    email: 'bridge@example.com',
+    password: 'BridgewaterLP2024',
+    role: 'investor',
+    fullName: 'Bridgewater Associates',
+  },
+  {
+    email: 'cascade@example.com',
+    password: 'CascadeLP2024',
+    role: 'investor',
+    fullName: 'Cascade Investment LLC',
+  },
+  {
+    email: 'dominion@example.com',
+    password: 'DominionLP2024',
+    role: 'investor',
+    fullName: 'Dominion Capital Group',
+  },
+  {
+    email: 'evergreen@example.com',
+    password: 'EvergreenLP2024',
+    role: 'investor',
+    fullName: 'Evergreen Holdings Ltd',
+  },
+  {
+    email: 'foxglove@example.com',
+    password: 'FoxgloveLP2024',
+    role: 'investor',
+    fullName: 'Foxglove Ventures',
+  },
+];
+
+async function seedAuthUsers() {
+  for (const cred of DEMO_CREDENTIALS) {
+    const passwordHash = await bcrypt.hash(cred.password, 10);
+    await prisma.authUser.upsert({
+      where: { email: cred.email },
+      update: { passwordHash, role: cred.role, fullName: cred.fullName },
+      create: {
+        email: cred.email,
+        passwordHash,
+        role: cred.role,
+        fullName: cred.fullName,
+        emailVerified: true,
+      },
+    });
+  }
+  console.log(`Seeded ${DEMO_CREDENTIALS.length} auth users`);
+}
+
 async function main() {
+  await seedAuthUsers();
+
   // Create demo fund
   const fund = await prisma.fund.upsert({
-    where: { code: 'KADRA-DEMO-001' },
+    where: { code: 'ANGAINOR-DEMO-001' },
     update: {},
     create: {
-      code: 'KADRA-DEMO-001',
-      name: 'Kadra Demo Fund I',
+      code: 'ANGAINOR-DEMO-001',
+      name: 'Angainor Demo Fund I',
       legalForm: 'LP',
       jurisdictionCode: 'US-DE',
       baseCurrency: 'USD',
@@ -73,7 +145,9 @@ async function main() {
         email: inv.email,
         verificationStatus: isEligible ? 'VERIFIED' : 'UNKNOWN',
         verifiedAt: isEligible ? new Date() : null,
-        metadata: {},
+        kycStatus: isEligible ? 'APPROVED' : 'PENDING',
+        accreditationStatus: isEligible ? 'APPROVED' : 'PENDING',
+        metadata: isEligible ? { profileCompleted: true, country: 'US' } : {},
       },
     });
 
@@ -112,7 +186,8 @@ async function main() {
 
     const wallet = await prisma.wallet.upsert({
       where: {
-        chainId_addressNorm: {
+        investorId_chainId_addressNorm: {
+          investorId: investor.id,
           chainId,
           addressNorm: walletAddress.toLowerCase(),
         },
@@ -218,7 +293,7 @@ async function main() {
       currency: 'USD',
       dueDate,
       wireInstructions:
-        'Wire to Kadra Demo Fund I Trust Account, Chase Bank, Routing: 021000021, Account: 123456789',
+        'Wire to Angainor Demo Fund I Trust Account, Chase Bank, Routing: 021000021, Account: 123456789',
       status: 'ISSUED',
     },
   });

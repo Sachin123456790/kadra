@@ -1,6 +1,6 @@
 import { JobsService } from '../jobs.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { NotFoundError } from '../../../common/errors';
+import { NotFoundError, ConflictError } from '../../../common/errors';
 
 const mockPrisma = () => ({
   job: {
@@ -71,7 +71,10 @@ describe('JobsService', () => {
       };
 
       prisma.job.findMany.mockResolvedValue([mockJob]);
-      prisma.job.update.mockResolvedValue({ ...mockJob, status: 'FAILED' });
+      prisma.job.update.mockResolvedValue({
+        ...mockJob,
+        status: 'DEAD_LETTERED',
+      });
       prisma.jobDeadLetter.create.mockResolvedValue({
         id: 'dl-1',
         originalJobId: 'job-2',
@@ -90,6 +93,11 @@ describe('JobsService', () => {
             payload: { key: 'value' },
             attempts: 3,
           }),
+        }),
+      );
+      expect(prisma.job.update).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'DEAD_LETTERED' }),
         }),
       );
     });
@@ -156,10 +164,56 @@ describe('JobsService', () => {
       expect(result.status).toBe('FAILED');
       expect(result.error).toContain('Unknown job type');
     });
+
+    it('dead-letters terminal failures instead of returning FAILED forever', async () => {
+      const mockJob = {
+        id: 'job-5',
+        jobType: 'bogus.type',
+        payload: {},
+        status: 'FAILED',
+        attempts: 2,
+        maxAttempts: 3,
+      };
+
+      prisma.job.findUnique.mockResolvedValue(mockJob);
+      prisma.job.update.mockResolvedValue({
+        ...mockJob,
+        status: 'DEAD_LETTERED',
+      });
+      prisma.jobDeadLetter.create.mockResolvedValue({
+        id: 'dl-5',
+        originalJobId: 'job-5',
+      });
+
+      const result = await service.runSingleJob('job-5');
+
+      expect(result.status).toBe('DEAD_LETTERED');
+      expect(prisma.jobDeadLetter.create).toHaveBeenCalledTimes(1);
+      expect(prisma.job.update).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'DEAD_LETTERED' }),
+        }),
+      );
+    });
+
+    it('rejects retrying a FAILED job that already exhausted attempts', async () => {
+      prisma.job.findUnique.mockResolvedValue({
+        id: 'job-6',
+        jobType: 'document.parse',
+        payload: {},
+        status: 'FAILED',
+        attempts: 3,
+        maxAttempts: 3,
+      });
+
+      await expect(service.runSingleJob('job-6')).rejects.toThrow(
+        ConflictError,
+      );
+    });
   });
 
   describe('retryDeadLetter', () => {
-    it('creates new job from dead letter', async () => {
+    it('rejects retrying dead-lettered jobs', async () => {
       const mockDeadLetter = {
         id: 'dl-1',
         originalJobId: 'job-old',
@@ -170,29 +224,12 @@ describe('JobsService', () => {
         failedAt: new Date(),
       };
 
-      const newJob = {
-        id: 'job-new',
-        jobType: 'document.parse',
-        payload: { docId: '123' },
-        status: 'QUEUED',
-      };
-
       prisma.jobDeadLetter.findUnique.mockResolvedValue(mockDeadLetter);
-      prisma.job.create.mockResolvedValue(newJob);
 
-      const result = await service.retryDeadLetter('dl-1');
-
-      expect(result.id).toBe('job-new');
-      expect(result.jobType).toBe('document.parse');
-      expect(prisma.job.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            jobType: 'document.parse',
-            payload: { docId: '123' },
-            status: 'QUEUED',
-          }),
-        }),
+      await expect(service.retryDeadLetter('dl-1')).rejects.toThrow(
+        ConflictError,
       );
+      expect(prisma.job.create).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundError for missing dead letter', async () => {

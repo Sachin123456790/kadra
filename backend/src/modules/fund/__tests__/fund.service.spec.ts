@@ -4,13 +4,12 @@ import { NotFoundError } from '../../../common/errors';
 
 const mockPrisma = () => ({
   fund: {
+    create: jest.fn(),
     findUnique: jest.fn(),
-  },
-  investor: {
-    count: jest.fn(),
   },
   investorFundEligibility: {
     count: jest.fn(),
+    findMany: jest.fn(),
   },
   subscription: {
     count: jest.fn(),
@@ -29,7 +28,7 @@ describe('FundService', () => {
   let prisma: ReturnType<typeof mockPrisma>;
 
   const fundId = 'fund-1';
-  const mockFund = { id: fundId, name: 'Kadra Demo Fund I', status: 'ACTIVE' };
+  const mockFund = { id: fundId, name: 'Angainor Demo Fund I', status: 'ACTIVE' };
 
   beforeEach(() => {
     prisma = mockPrisma();
@@ -39,7 +38,13 @@ describe('FundService', () => {
   describe('getFundOverview', () => {
     it('returns correct counts and totals', async () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
-      prisma.investor.count.mockResolvedValue(5);
+      prisma.investorFundEligibility.findMany.mockResolvedValue([
+        { investorId: 'inv-1' },
+        { investorId: 'inv-2' },
+        { investorId: 'inv-3' },
+        { investorId: 'inv-4' },
+        { investorId: 'inv-5' },
+      ]);
       prisma.investorFundEligibility.count.mockResolvedValue(5);
       prisma.subscription.count
         .mockResolvedValueOnce(1) // pending
@@ -56,7 +61,7 @@ describe('FundService', () => {
       const result = await service.getFundOverview(fundId);
 
       expect(result.fundId).toBe(fundId);
-      expect(result.fundName).toBe('Kadra Demo Fund I');
+      expect(result.fundName).toBe('Angainor Demo Fund I');
       expect(result.status).toBe('ACTIVE');
       expect(result.lpCount).toBe(5);
       expect(result.eligibleWalletCount).toBe(5);
@@ -73,7 +78,7 @@ describe('FundService', () => {
 
     it('returns null tokenContract when none exists', async () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
-      prisma.investor.count.mockResolvedValue(0);
+      prisma.investorFundEligibility.findMany.mockResolvedValue([]);
       prisma.investorFundEligibility.count.mockResolvedValue(0);
       prisma.subscription.count.mockResolvedValue(0);
       prisma.tokenContract.findFirst.mockResolvedValue(null);
@@ -94,6 +99,33 @@ describe('FundService', () => {
       await expect(service.getFundOverview('nonexistent')).rejects.toThrow(
         NotFoundError,
       );
+    });
+  });
+
+  describe('createFund', () => {
+    it('uses schema defaults for new fund status', async () => {
+      prisma.fund.create.mockResolvedValue({
+        id: fundId,
+        code: 'NEW-FUND',
+        status: 'DRAFT',
+      });
+
+      const result = await service.createFund({
+        code: 'NEW-FUND',
+        name: 'New Fund',
+      });
+
+      expect(prisma.fund.create).toHaveBeenCalledWith({
+        data: {
+          code: 'NEW-FUND',
+          name: 'New Fund',
+          legalForm: 'LP',
+          jurisdictionCode: null,
+          baseCurrency: 'USD',
+          metadata: {},
+        },
+      });
+      expect(result.status).toBe('DRAFT');
     });
   });
 

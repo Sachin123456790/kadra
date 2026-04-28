@@ -6,6 +6,7 @@ export interface FundOverview {
   fundId: string;
   fundName: string;
   status: string;
+  legalForm?: string;
   lpCount: number;
   eligibleWalletCount: number;
   pendingSubscriptions: number;

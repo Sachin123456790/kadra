@@ -12,7 +12,7 @@ Replaced `MockTokenContractAdapter` and `SepoliaTokenContractAdapter` (both full
 ### Created
 - `backend/src/adapters/blockchain/viem-client.provider.ts` -- Central viem client factory (publicClient, deployerWalletClient, investor wallet clients)
 - `backend/src/adapters/blockchain/viem-token-contract.adapter.ts` -- Real adapter: deploy returns pre-deployed address, mint/transfer/getBalance call real contracts
-- `backend/src/adapters/blockchain/abi/kadra-token.abi.ts` -- KadraToken ABI extracted from Hardhat artifacts
+- `backend/src/adapters/blockchain/abi/angainor-token.abi.ts` -- AngainorToken ABI extracted from Hardhat artifacts
 - `backend/src/adapters/blockchain/abi/identity-registry.abi.ts` -- IdentityRegistry ABI
 - `backend/src/adapters/blockchain/abi/document-registry.abi.ts` -- DocumentRegistry ABI
 
@@ -28,7 +28,7 @@ Replaced `MockTokenContractAdapter` and `SepoliaTokenContractAdapter` (both full
 |----------|---------|-----------------|
 | IdentityRegistry | `0x55822888507cac67bE5C11516e00C4597E7c78fb` | 10411784 |
 | DocumentRegistry | `0x09BFB275f27FEB8b89A20844b84af2Fa68ba13a9` | 10411785 |
-| KadraToken (KDRA) | `0x4bFe48Fe5A126f6A4f53BF95d82cF4881A1101Ef` | 10411786 |
+| AngainorToken (KDRA) | `0x4bFe48Fe5A126f6A4f53BF95d82cF4881A1101Ef` | 10411786 |
 
 ## Wallets Generated
 
@@ -46,7 +46,7 @@ All 5 eligible investors verified on-chain via IdentityRegistry.setEligibleLP().
 
 ## How It Works Now
 
-- **deploy()**: Returns the pre-deployed KadraToken address from `KADRA_TOKEN_ADDRESS` env var
-- **mint()**: Deployer wallet calls `kadraToken.write.mint(toAddress, amount)` -- real on-chain mint
+- **deploy()**: Returns the pre-deployed AngainorToken address from `ANGAINOR_TOKEN_ADDRESS` env var
+- **mint()**: Deployer wallet calls `angainorToken.write.mint(toAddress, amount)` -- real on-chain mint
 - **transfer()**: Looks up investor private key from env, signs real ERC-20 transfer
-- **getBalance()**: Calls `kadraToken.read.balanceOf(address)` on real contract
+- **getBalance()**: Calls `angainorToken.read.balanceOf(address)` on real contract

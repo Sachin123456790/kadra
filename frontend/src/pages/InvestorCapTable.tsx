@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from "recharts";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { MetricCard } from "@/components/kadra/MetricCard";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { DataTable, Column } from "@/components/kadra/DataTable";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
-import { TableSkeleton } from "@/components/kadra/Skeleton";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { MetricCard } from "@/components/angainor/MetricCard";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { DataTable, Column } from "@/components/angainor/DataTable";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
+import { TableSkeleton } from "@/components/angainor/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getInvestorCapTable } from "@/services";
-import { ExplorerLink } from "@/components/kadra/ExplorerLink";
+import { ExplorerLink } from "@/components/angainor/ExplorerLink";
 import type { InvestorCapTableRow } from "@/services/investor-portal.service";
 
 const PIE_COLORS = ["#4338ca", "#6366f1", "#818cf8", "#a5b4fc", "#c7d2fe", "#e0e7ff"];

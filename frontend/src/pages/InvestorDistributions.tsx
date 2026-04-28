@@ -1,17 +1,17 @@
 import { useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { SectionCard } from "@/components/kadra/SectionCard";
-import { DataTable, Column } from "@/components/kadra/DataTable";
-import { StatusBadge } from "@/components/kadra/StatusBadge";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { EmptyState } from "@/components/kadra/EmptyState";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { SectionCard } from "@/components/angainor/SectionCard";
+import { DataTable, Column } from "@/components/angainor/DataTable";
+import { StatusBadge } from "@/components/angainor/StatusBadge";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { EmptyState } from "@/components/angainor/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMyDistributions, getInvestorWaterfallBreakdown } from "@/services";
 import type { InvestorDistributionLineItem, WaterfallBreakdown } from "@/services/investor-portal.service";
-import { DerivedAmount } from "@/components/kadra/DerivedAmount";
-import type { DerivationStep } from "@/components/kadra/DerivedAmount";
-import { SkeletonCard, TableSkeleton } from "@/components/kadra/Skeleton";
+import { DerivedAmount } from "@/components/angainor/DerivedAmount";
+import type { DerivationStep } from "@/components/angainor/DerivedAmount";
+import { SkeletonCard, TableSkeleton } from "@/components/angainor/Skeleton";
 import { Info } from "lucide-react";
 
 const fmt = (n: number) =>
@@ -29,12 +29,28 @@ interface WaterfallTier {
   gpShare: string;
 }
 
-const WATERFALL_TIERS: WaterfallTier[] = [
-  { tier: 1, name: "Return of Capital", description: "100% of distributions to LPs until contributed capital is returned", lpShare: "100%", gpShare: "0%" },
-  { tier: 2, name: "Preferred Return", description: "8% simple annual preferred return to LPs", lpShare: "100%", gpShare: "0%" },
-  { tier: 3, name: "GP Catch-up", description: "100% to GP until GP has received 20% of total profits", lpShare: "0%", gpShare: "100%" },
-  { tier: 4, name: "Carried Interest", description: "Remaining profits split 80/20", lpShare: "80%", gpShare: "20%" },
-];
+interface InvestorWaterfallConfig {
+  version?: string;
+  prefReturnPct?: number | null;
+  rulesJson?: {
+    tiers?: Array<{
+      name: string;
+      hurdle?: string;
+      lpShare: number;
+      gpShare: number;
+    }>;
+  };
+}
+
+function buildTiersFromConfig(config: InvestorWaterfallConfig): WaterfallTier[] {
+  return (config.rulesJson?.tiers ?? []).map((tier, idx) => ({
+    tier: idx + 1,
+    name: tier.name,
+    description: tier.hurdle ?? "",
+    lpShare: `${tier.lpShare}%`,
+    gpShare: `${tier.gpShare}%`,
+  }));
+}
 
 // ── Derived amount shortcut ──────────────────────────────────
 
@@ -77,18 +93,21 @@ function WaterfallBreakdownSection({
   distributions,
   selectedRunId,
   onSelectRun,
+  waterfallConfig,
 }: {
   breakdown: WaterfallBreakdown | null;
   distributions: InvestorDistributionLineItem[];
   selectedRunId: string | null;
   onSelectRun: (id: string) => void;
+  waterfallConfig: InvestorWaterfallConfig | null;
 }) {
   const selectedItem = distributions.find((d) => d.run.id === selectedRunId) ?? distributions[0] ?? null;
 
-  const waterfallConfig = breakdown?.waterfallConfig as Record<string, unknown> | undefined;
-  const prefRate = waterfallConfig?.preferredReturnRate
-    ? `${waterfallConfig.preferredReturnRate}%`
-    : "8%";
+  const prefRate =
+    typeof waterfallConfig?.prefReturnPct === "number"
+      ? `${waterfallConfig.prefReturnPct}%`
+      : "—";
+  const tiers = waterfallConfig ? buildTiersFromConfig(waterfallConfig) : [];
 
   return (
     <SectionCard title="Waterfall Breakdown">
@@ -112,8 +131,16 @@ function WaterfallBreakdownSection({
       )}
 
       {/* Tier cards */}
+      {!waterfallConfig ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {WATERFALL_TIERS.map((tier) => (
+        {tiers.map((tier) => (
           <div
             key={tier.tier}
             className="border border-border rounded-lg p-4 bg-muted"
@@ -138,6 +165,7 @@ function WaterfallBreakdownSection({
           </div>
         ))}
       </div>
+      )}
 
       {/* Investor-specific numbers from selected distribution */}
       {selectedItem ? (
@@ -302,9 +330,11 @@ function WaterfallBreakdownSection({
 function DistributionHistoryTable({
   items,
   onRowClick,
+  waterfallVersion,
 }: {
   items: InvestorDistributionLineItem[];
   onRowClick: (item: InvestorDistributionLineItem) => void;
+  waterfallVersion: string | null;
 }) {
   const columns: Column<InvestorDistributionLineItem>[] = [
     {
@@ -355,7 +385,7 @@ function DistributionHistoryTable({
       key: "waterfallVersion",
       header: "Waterfall Version",
       render: () => (
-        <span className="text-sm text-muted-foreground">1.0</span>
+        <span className="text-sm text-muted-foreground">{waterfallVersion ?? "—"}</span>
       ),
     },
     {
@@ -421,33 +451,50 @@ export default function InvestorDistributionsPage() {
   if (distError) return <ErrorAlert title="Failed to load distributions" message={(distError as Error).message} />;
 
   const hasDistributions = distributions && distributions.length > 0;
+  const hasFundDistributionContext = Boolean(
+    breakdown?.waterfallConfig || breakdown?.distributionRun,
+  );
+  const waterfallConfig = (breakdown?.waterfallConfig ?? null) as InvestorWaterfallConfig | null;
 
   return (
     <div>
       <PageHeader title="My Distributions" subtitle="Waterfall breakdown and distribution history" />
 
-      {!hasDistributions ? (
+      {!hasDistributions && !hasFundDistributionContext ? (
         <EmptyState
           title="No distributions yet"
           message="No distributions have been issued to your account yet. Distributions will appear here once the fund begins making payouts."
         />
       ) : (
         <div className="space-y-6">
-          {/* Section 1: Waterfall Breakdown */}
           <div ref={waterfallRef}>
             <WaterfallBreakdownSection
               breakdown={breakdown ?? null}
-              distributions={distributions}
+              distributions={distributions ?? []}
               selectedRunId={selectedRunId}
               onSelectRun={handleSelectRun}
+              waterfallConfig={waterfallConfig}
             />
           </div>
 
-          {/* Section 2: Distribution History */}
-          <DistributionHistoryTable
-            items={distributions}
-            onRowClick={handleRowClick}
-          />
+          {!hasDistributions ? (
+            <SectionCard title="Distribution History">
+              <EmptyState
+                title="No investor distributions yet"
+                message={
+                  breakdown?.distributionRun
+                    ? "The fund has a completed distribution run, but no payout line item was issued to your account in that run."
+                    : "The waterfall is configured, but no distribution run has produced a payout for your account yet."
+                }
+              />
+            </SectionCard>
+          ) : (
+            <DistributionHistoryTable
+              items={distributions}
+              onRowClick={handleRowClick}
+              waterfallVersion={waterfallConfig?.version ?? null}
+            />
+          )}
         </div>
       )}
     </div>

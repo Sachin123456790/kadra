@@ -1,4 +1,4 @@
-# Kadra Backend -- Database Schema Reference
+# Angainor Backend -- Database Schema Reference
 
 All models are defined in `prisma/schema.prisma`. The database is PostgreSQL, accessed via Prisma v7 with the `@prisma/adapter-pg` driver adapter.
 
@@ -20,7 +20,7 @@ Table: `funds`
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID | PK |
-| `code` | String | Unique fund code (e.g., `KADRA-DEMO-001`) |
+| `code` | String | Unique fund code (e.g., `ANGAINOR-DEMO-001`) |
 | `name` | String | Display name |
 | `legalForm` | String | `LP` / `LLC` / `OTHER` |
 | `jurisdictionCode` | String? | ISO jurisdiction (e.g., `US-DE`) |
@@ -635,7 +635,7 @@ The seed script (`prisma/seed.ts`) creates the following demo data:
 
 | Entity | Count | Details |
 |---|---|---|
-| Fund | 1 | "Kadra Demo Fund I", code `KADRA-DEMO-001`, LP form, `US-DE` jurisdiction, `ACTIVE` status |
+| Fund | 1 | "Angainor Demo Fund I", code `ANGAINOR-DEMO-001`, LP form, `US-DE` jurisdiction, `ACTIVE` status |
 | Investors | 6 | Alpine Capital Partners, Bridgewater Associates, Cascade Investment LLC, Dominion Capital Group, Evergreen Holdings Ltd (all `VERIFIED`), Foxglove Ventures (`UNKNOWN`) |
 | Wallets | 6 | One per investor, chain `31337` (Hardhat local), deterministic addresses `0x0000...0001` through `0x0000...0006` |
 | Eligibility records | 5 | First 5 investors marked `ELIGIBLE` for the demo fund; Foxglove Ventures has no eligibility record |

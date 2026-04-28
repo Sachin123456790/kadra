@@ -122,10 +122,14 @@ describe('TokenizationService – Transfer Enforcement', () => {
     const mockEventLog = {
       log: jest.fn().mockResolvedValue({}),
     } as unknown as EventLogService;
+    const mockNotices = {
+      generateNotice: jest.fn().mockResolvedValue({ id: 'notice-1' }),
+    };
     service = new TokenizationService(
       prisma as unknown as PrismaService,
       adapter,
       mockEventLog,
+      mockNotices as any,
     );
   });
 
@@ -162,18 +166,19 @@ describe('TokenizationService – Transfer Enforcement', () => {
   }
 
   describe('validateTransfer', () => {
-    it('returns PENDING_SIGNATURE for eligible wallets with sufficient balance', async () => {
+    it('returns REQUESTED for eligible wallets with sufficient balance', async () => {
       setupSuccessfulTransfer();
 
       const result = await service.validateTransfer(fundId, transferInput);
 
-      expect(result.requestStatus).toBe('PENDING_SIGNATURE');
+      expect(result.requestStatus).toBe('REQUESTED');
       expect(result.txHash).toBeNull();
       expect(result.precheck.senderEligible).toBe(true);
       expect(result.precheck.recipientEligible).toBe(true);
       expect(result.precheck.sufficientBalance).toBe(true);
       expect(result.contractAddress).toBe(contractAddress);
       expect(prisma.transferRequest.create).toHaveBeenCalledTimes(1);
+      expect(prisma.transferRequest.update).not.toHaveBeenCalled();
       // No chain submission — that happens via confirmTransfer after frontend signs
       expect(adapter.transfer).not.toHaveBeenCalled();
     });
@@ -264,15 +269,75 @@ describe('TokenizationService – Transfer Enforcement', () => {
       expect(result.txHash).toBeNull();
     });
 
-    it('returns contractAddress in PENDING_SIGNATURE response', async () => {
+    it('returns contractAddress in REQUESTED response', async () => {
       setupSuccessfulTransfer();
 
       const result = await service.validateTransfer(fundId, transferInput);
 
-      expect(result.requestStatus).toBe('PENDING_SIGNATURE');
+      expect(result.requestStatus).toBe('REQUESTED');
       expect(result.contractAddress).toBe(contractAddress);
       // Adapter transfer is never called — frontend signs the tx
       expect(adapter.transfer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('confirmTransfer', () => {
+    it('accepts a REQUESTED transfer and records a SUBMITTED transition before MINED', async () => {
+      prisma.transferRequest.findUnique.mockResolvedValue({
+        id: 'tr-confirm',
+        fundId,
+        tokenContractId: contractId,
+        fromWalletAddress: senderWallet.address,
+        toWalletAddress: recipientWallet.address,
+        tokenAmount: 500,
+        requestStatus: 'REQUESTED',
+      });
+      prisma.tokenContract.findFirst.mockResolvedValue(deployedContract);
+      prisma.transferRequest.update
+        .mockResolvedValueOnce({ id: 'tr-confirm', requestStatus: 'SUBMITTED' })
+        .mockResolvedValueOnce({ id: 'tr-confirm', requestStatus: 'MINED' });
+      prisma.transferEvent.create
+        .mockResolvedValueOnce({ id: 'te-submitted' })
+        .mockResolvedValueOnce({ id: 'te-mined' });
+      prisma.tokenPositionEvent.create.mockResolvedValue({ id: 'tpe-confirm' });
+      prisma.wallet.findFirst
+        .mockResolvedValueOnce({ ...senderWallet, investorId: 'inv-1' })
+        .mockResolvedValueOnce({ ...recipientWallet, investorId: 'inv-2' });
+      prisma.tokenPosition.findFirst.mockResolvedValue(senderPosition);
+      prisma._tx.tokenPosition.findFirst.mockResolvedValue({
+        id: 'pos-recipient',
+        settledTokenBalance: 1000,
+      });
+      prisma._tx.tokenPosition.update.mockResolvedValue({});
+      prisma._tx.capitalAccount.findFirst
+        .mockResolvedValueOnce({
+          id: 'ca-sender',
+          endingCapitalBalance: 1000,
+        })
+        .mockResolvedValueOnce(null);
+      prisma._tx.capitalAccount.update.mockResolvedValue({});
+      prisma._tx.capitalAccount.create.mockResolvedValue({});
+      adapter.verifyTransferTx = jest.fn().mockResolvedValue({
+        txHash: '0x' + 'b'.repeat(64),
+        blockNumber: 101,
+        status: 'SUCCESS',
+      });
+
+      const result = await service.confirmTransfer(
+        'tr-confirm',
+        '0x' + 'b'.repeat(64),
+      );
+
+      expect(result.requestStatus).toBe('MINED');
+      expect(prisma.transferRequest.update).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          data: expect.objectContaining({
+            requestStatus: 'SUBMITTED',
+            submittedTxHash: '0x' + 'b'.repeat(64),
+          }),
+        }),
+      );
     });
   });
 

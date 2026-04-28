@@ -23,12 +23,6 @@ export class ManualExtractedFieldDto {
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
-  @Max(1)
-  confidence?: number;
-
-  @IsOptional()
-  @IsNumber()
   sourcePage?: number;
 }
 

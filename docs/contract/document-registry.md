@@ -138,7 +138,7 @@ event DocumentRegistered(
 
 ## Hash Format
 
-The `docHash` parameter is `bytes32`. In the Kadra system, documents are hashed using SHA-256 (via `lib/document-hasher.js`), which produces a 256-bit (32-byte) hash that maps directly to `bytes32`.
+The `docHash` parameter is `bytes32`. In the Angainor system, documents are hashed using SHA-256 (via `lib/document-hasher.js`), which produces a 256-bit (32-byte) hash that maps directly to `bytes32`.
 
 Example from the deployment script:
 

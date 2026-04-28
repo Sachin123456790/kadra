@@ -1,4 +1,5 @@
-import { get } from './api-client';
+import { get, upload } from './api-client';
+import { downloadBlob } from '@/lib/downloadBlob';
 
 // ── Types (match actual backend response shapes) ────────
 
@@ -31,6 +32,9 @@ export interface InvestorSubscription {
   committedAmount: string; currency: string; status: string;
   settledAt: string | null; createdAt: string;
   latestSettlementStatus: string | null;
+  mintTxHash: string | null;
+  mintedAt: string | null;
+  mintEventId: string | null;
   governingDocument: { id: string; originalFilename: string; documentType: string } | null;
 }
 
@@ -71,7 +75,7 @@ export interface InvestorCapTable {
 
 // ── API calls ──────────────────────────────────────────────
 
-const DEFAULT_FUND = 'KADRA-DEMO-001';
+const DEFAULT_FUND = 'ANGAINOR-DEMO-001';
 
 export function getMyDashboard(fundId = DEFAULT_FUND) {
   return get<InvestorDashboard>(`/investor/me/dashboard?fundId=${fundId}`);
@@ -113,11 +117,12 @@ export interface InvestorDocument {
   createdAt: string;
   status: string;
   downloadable: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export interface WaterfallBreakdown {
   waterfallConfig: unknown;
-  distributionLineItem: unknown;
+  lineItem?: unknown;
   distributionRun: unknown;
 }
 
@@ -135,4 +140,77 @@ export function getInvestorActivityFeed(fundId: string, limit = 50) {
 
 export function getInvestorWaterfallBreakdown(fundId: string) {
   return get<WaterfallBreakdown | null>(`/investor/me/waterfall-breakdown?fundId=${fundId}`);
+}
+
+// ── Uploads, exports, GP reports ───────────────────────────
+
+export interface InvestorUploadResult {
+  documentId: string;
+  fileName: string;
+  byteSize: number;
+  uploadedAt: string;
+}
+
+export interface InvestorGpReport {
+  documentId: string;
+  title: string;
+  period: string | null;
+  fileName: string;
+  byteSize: number;
+  uploadedAt: string;
+}
+
+export interface TaxPackagePreview {
+  available: boolean;
+  taxYear: number;
+  reason?: string;
+  report?: {
+    taxYear: number;
+    taxEntityName: string | null;
+    ordinaryIncome: string;
+    returnOfCapital: string;
+    ltcg: string;
+    stcg: string;
+    totalDistributions: string;
+    generatedAt: string;
+    source?: 'TAX_REPORT' | 'DERIVED_LEDGER_PREVIEW';
+  };
+}
+
+export function uploadInvestorDocument(file: File, fundId = DEFAULT_FUND) {
+  return upload<InvestorUploadResult>(
+    `/investor/me/documents/upload?fundId=${fundId}`,
+    file,
+  );
+}
+
+export function getInvestorGpReports(fundId = DEFAULT_FUND) {
+  return get<InvestorGpReport[]>(`/investor/me/gp-reports?fundId=${fundId}`);
+}
+
+export function getInvestorTaxPackagePreview(taxYear: number, fundId = DEFAULT_FUND) {
+  return get<TaxPackagePreview>(
+    `/investor/me/tax-package/preview?fundId=${fundId}&taxYear=${taxYear}`,
+  );
+}
+
+export async function exportInvestorTaxPackage(
+  taxYear: number,
+  format: 'csv' | 'pdf' = 'csv',
+  fundId = DEFAULT_FUND,
+): Promise<void> {
+  await downloadBlob(
+    `/investor/me/tax-package/export?fundId=${fundId}&taxYear=${taxYear}&format=${format}`,
+    `tax-package-${fundId}-${taxYear}.${format}`,
+  );
+}
+
+export async function exportCapitalAccount(
+  format: 'csv' = 'csv',
+  fundId = DEFAULT_FUND,
+): Promise<void> {
+  await downloadBlob(
+    `/investor/me/capital-account/export?fundId=${fundId}&format=${format}`,
+    `capital-account-${fundId}-${Date.now()}.${format}`,
+  );
 }

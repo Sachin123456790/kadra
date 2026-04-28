@@ -7,7 +7,7 @@
 
 ## Purpose
 
-The IdentityRegistry contract manages investor identity verification and Limited Partner (LP) eligibility for a single fund. It acts as the on-chain whitelist that the KadraToken contract queries before allowing any token transfer.
+The IdentityRegistry contract manages investor identity verification and Limited Partner (LP) eligibility for a single fund. It acts as the on-chain whitelist that the AngainorToken contract queries before allowing any token transfer.
 
 An investor must satisfy two conditions to be considered an eligible LP:
 
@@ -86,7 +86,7 @@ Grants or revokes LP eligibility for an address. The investor must also be verif
 function isEligibleLP(address investor) external view returns (bool)
 ```
 
-Returns `true` only if the address is both verified and eligible. This is the function that KadraToken calls in its `_update()` hook to enforce transfer restrictions.
+Returns `true` only if the address is both verified and eligible. This is the function that AngainorToken calls in its `_update()` hook to enforce transfer restrictions.
 
 - **Access**: Public (view)
 - **Returns**: `isVerified[investor] && isEligible[investor]`
@@ -111,12 +111,12 @@ event EligibilityChanged(address indexed investor, bool eligible);
 1. owner calls addInvestor(walletAddress)      -> isVerified = true
 2. owner calls setEligibility(walletAddress, true) -> isEligible = true
 3. isEligibleLP(walletAddress) now returns true
-4. KadraToken transfers to/from this address are permitted
+4. AngainorToken transfers to/from this address are permitted
 ```
 
-## Integration with KadraToken
+## Integration with AngainorToken
 
-KadraToken holds a reference to the IdentityRegistry via the `IIdentityRegistry` interface:
+AngainorToken holds a reference to the IdentityRegistry via the `IIdentityRegistry` interface:
 
 ```solidity
 interface IIdentityRegistry {

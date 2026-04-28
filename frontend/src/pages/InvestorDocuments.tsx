@@ -1,38 +1,60 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { Download, Eye, FileText, Upload, X } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/kadra/PageHeader";
-import { DataTable, Column } from "@/components/kadra/DataTable";
-import { ErrorAlert } from "@/components/kadra/ErrorAlert";
-import { TableSkeleton } from "@/components/kadra/Skeleton";
-import { DocumentViewerModal } from "@/components/kadra/DocumentViewerModal";
+import { PageHeader } from "@/components/angainor/PageHeader";
+import { DataTable, Column } from "@/components/angainor/DataTable";
+import { ErrorAlert } from "@/components/angainor/ErrorAlert";
+import { TableSkeleton } from "@/components/angainor/Skeleton";
+import { DocumentViewerModal } from "@/components/angainor/DocumentViewerModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import {
   getInvestorDocuments,
+  uploadInvestorDocument,
+  getInvestorGpReports,
+  getInvestorTaxPackagePreview,
+  exportInvestorTaxPackage,
   type InvestorDocument,
+  type InvestorGpReport,
+  type TaxPackagePreview,
 } from "@/services/investor-portal.service";
+import { getInvestorNotices, type Notice } from "@/services/notices.service";
+import { toFriendlyMessage } from "@/lib/errorMessages";
 
 /* ── Document type badge colors ── */
 
 const TYPE_BADGE_STYLES: Record<string, string> = {
   SUBSCRIPTION_AGREEMENT: "bg-muted text-foreground",
   PAYMENT_CONFIRMATION: "bg-green-50 text-green-700",
+  WIRE_CONFIRMATION: "bg-green-50 text-green-700",
   CAPITAL_CALL_NOTICE: "bg-amber-50 text-amber-700",
   DISTRIBUTION_NOTICE: "bg-blue-50 text-blue-700",
+  CAPITAL_CALL: "bg-amber-50 text-amber-700",
+  DISTRIBUTION: "bg-blue-50 text-blue-700",
+  TRANSFER: "bg-indigo-50 text-indigo-700",
+  GENERAL: "bg-gray-100 text-gray-700",
+  TOKEN_MINTED: "bg-green-50 text-green-700",
   QUARTERLY_STATEMENT: "bg-purple-50 text-purple-700",
   MASTER_LPA: "bg-muted text-foreground",
+  INVESTOR_UPLOAD: "bg-indigo-50 text-indigo-700",
 };
 
 const TYPE_LABELS: Record<string, string> = {
   SUBSCRIPTION_AGREEMENT: "Subscription Agreement",
   PAYMENT_CONFIRMATION: "Payment Confirmation",
+  WIRE_CONFIRMATION: "Wire Confirmation",
   CAPITAL_CALL_NOTICE: "Capital Call Notice",
   DISTRIBUTION_NOTICE: "Distribution Notice",
+  CAPITAL_CALL: "Capital Call Notice",
+  DISTRIBUTION: "Distribution Notice",
+  TRANSFER: "Transfer Notice",
+  GENERAL: "General Notice",
+  TOKEN_MINTED: "Token Minted Notice",
   QUARTERLY_STATEMENT: "Quarterly Statement",
   MASTER_LPA: "Master LPA",
+  INVESTOR_UPLOAD: "Your upload",
 };
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
@@ -127,8 +149,22 @@ function RowActions({
 
 /* ── Column definitions ── */
 
-const LEGAL_TYPES = new Set(["SUBSCRIPTION_AGREEMENT", "PAYMENT_CONFIRMATION", "MASTER_LPA"]);
-const NOTICE_TYPES = new Set(["CAPITAL_CALL_NOTICE", "DISTRIBUTION_NOTICE"]);
+const LEGAL_TYPES = new Set([
+  "SUBSCRIPTION_AGREEMENT",
+  "PAYMENT_CONFIRMATION",
+  "WIRE_CONFIRMATION",
+  "MASTER_LPA",
+  "INVESTOR_UPLOAD",
+]);
+const NOTICE_TYPES = new Set([
+  "CAPITAL_CALL_NOTICE",
+  "DISTRIBUTION_NOTICE",
+  "CAPITAL_CALL",
+  "DISTRIBUTION",
+  "TRANSFER",
+  "GENERAL",
+  "TOKEN_MINTED",
+]);
 
 const buildLegalColumns = (
   onView: (doc: InvestorDocument) => void,
@@ -215,35 +251,24 @@ const buildNoticeColumns = (
   },
 ];
 
-/* ── Mock GP Reports ── */
+/* ── GP Reports ── */
 
-interface GpReport {
-  id: string;
-  name: string;
-  type: string;
-  uploadedAt: string;
-}
-
-// TODO: Replace with real API call to GET /investor/me/gp-reports
-const MOCK_GP_REPORTS: GpReport[] = [
-  { id: "gpr-1", name: "Q1 2027 Quarterly Investor Report", type: "Quarterly Report", uploadedAt: "2027-03-31" },
-  { id: "gpr-2", name: "2026 Annual Investor Update", type: "Annual Report", uploadedAt: "2027-01-15" },
-];
-
-const gpReportColumns: Column<GpReport>[] = [
+const buildGpReportColumns = (
+  onView: (report: InvestorGpReport) => void,
+): Column<InvestorGpReport>[] => [
   {
-    key: "name",
+    key: "title",
     header: "Document Name",
     render: (row) => (
-      <span className="text-sm font-medium text-foreground">{row.name}</span>
+      <span className="text-sm font-medium text-foreground">{row.title}</span>
     ),
   },
   {
-    key: "type",
-    header: "Type",
+    key: "period",
+    header: "Period",
     render: (row) => (
       <span className="inline-flex items-center rounded-full bg-purple-50 text-purple-700 px-2.5 py-0.5 text-xs font-medium">
-        {row.type}
+        {row.period ?? "—"}
       </span>
     ),
   },
@@ -256,17 +281,17 @@ const gpReportColumns: Column<GpReport>[] = [
   },
   {
     key: "download",
-    header: "Download",
-    render: () => (
+    header: "View",
+    render: (row) => (
       <button
         onClick={(e) => {
           e.stopPropagation();
-          toast.info("Download feature coming soon");
+          onView(row);
         }}
-        className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors text-foreground bg-muted hover:bg-gray-200"
+        className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors text-indigo-600 hover:bg-indigo-50"
       >
-        <Download className="h-3.5 w-3.5" />
-        Download
+        <Eye className="h-3.5 w-3.5" />
+        View
       </button>
     ),
   },
@@ -274,7 +299,13 @@ const gpReportColumns: Column<GpReport>[] = [
 
 /* ── Upload Tab ── */
 
-function UploadTab() {
+function UploadTab({
+  onUpload,
+  isUploading,
+}: {
+  readonly onUpload: (files: FileList) => void;
+  readonly isUploading: boolean;
+}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAreaClick = () => {
@@ -284,10 +315,8 @@ function UploadTab() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      // TODO: Wire up to POST /investor/me/documents/upload
-      toast.info(`Selected ${files.length} file(s) — upload coming soon`);
+      onUpload(files);
     }
-    // Reset input so the same file can be selected again
     e.target.value = "";
   };
 
@@ -295,8 +324,7 @@ function UploadTab() {
     e.preventDefault();
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      // TODO: Wire up to POST /investor/me/documents/upload
-      toast.info(`Dropped ${files.length} file(s) — upload coming soon`);
+      onUpload(files);
     }
   };
 
@@ -311,10 +339,11 @@ function UploadTab() {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         className="border-2 border-dashed border-border rounded-lg p-12 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+        aria-busy={isUploading}
       >
         <Upload className="h-10 w-10 text-muted-foreground mb-4" strokeWidth={1.5} />
         <p className="text-sm font-medium text-foreground mb-1">
-          Drag files here or click to browse
+          {isUploading ? "Uploading…" : "Drag files here or click to browse"}
         </p>
         <p className="text-xs text-muted-foreground">
           Accepted file types: PDF, DOCX
@@ -338,24 +367,77 @@ export default function InvestorDocuments() {
   const fundId = DEFAULT_FUND_CODE;
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get("tab") || "legal";
-  const [viewerDoc, setViewerDoc] = useState<{ id: string; filename: string } | null>(null);
+  const [viewerDoc, setViewerDoc] = useState<{
+    contentPath: string;
+    filename: string;
+  } | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: documents, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.investorDocuments(fundId),
     queryFn: () => getInvestorDocuments(fundId).then((r) => r.data),
   });
 
-  const handleViewDocument = (doc: InvestorDocument) => {
-    setViewerDoc({ id: doc.id, filename: doc.name });
+  const { data: gpReports } = useQuery({
+    queryKey: QUERY_KEYS.investorGpReports(fundId),
+    queryFn: () => getInvestorGpReports(fundId).then((r) => r.data),
+  });
+
+  const { data: notices } = useQuery({
+    queryKey: QUERY_KEYS.investorNotices(),
+    queryFn: () => getInvestorNotices().then((r) => r.data),
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) =>
+      uploadInvestorDocument(file, fundId).then((r) => r.data),
+    onSuccess: (result) => {
+      toast.success(`Uploaded ${result.fileName}`);
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.investorDocuments(fundId),
+      });
+    },
+    onError: (err) => {
+      toast.error(toFriendlyMessage(err));
+    },
+  });
+
+  const handleUploadFiles = (files: FileList) => {
+    Array.from(files).forEach((file) => uploadMutation.mutate(file));
   };
+
+  const handleViewDocument = (doc: InvestorDocument) => {
+    if (NOTICE_TYPES.has(doc.type)) {
+      setViewerDoc({
+        contentPath: `/investor/me/notices/${doc.id}/pdf`,
+        filename: `${doc.name}.pdf`,
+      });
+      return;
+    }
+    setViewerDoc({
+      contentPath: `/investor/me/documents/${doc.id}/content?fundId=${encodeURIComponent(fundId)}`,
+      filename: doc.name,
+    });
+  };
+
+  const handleViewGpReport = (report: InvestorGpReport) => {
+    setViewerDoc({
+      contentPath: `/investor/me/documents/${report.documentId}/content?fundId=${encodeURIComponent(fundId)}`,
+      filename: report.fileName,
+    });
+  };
+
+  const gpReportColumns = buildGpReportColumns(handleViewGpReport);
 
   const legalColumns = buildLegalColumns(handleViewDocument);
   const noticeColumns = buildNoticeColumns(handleViewDocument);
 
   const [isTaxPreviewOpen, setIsTaxPreviewOpen] = useState(false);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [taxPreview, setTaxPreview] = useState<TaxPackagePreview | null>(null);
   const previewButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const taxYear = new Date().getFullYear();
 
   // Close preview on Escape and restore focus to the Preview button on close.
   useEffect(() => {
@@ -375,19 +457,25 @@ export default function InvestorDocuments() {
     };
   }, [isTaxPreviewOpen]);
 
-  const handlePreviewTaxPackage = () => {
-    // TODO: Wire to GET /investor/me/tax-package/preview — for now, open modal preview
+  const handlePreviewTaxPackage = async () => {
     setIsGeneratingPreview(true);
-    // Simulate brief generate delay so the aria-live message is meaningful
-    setTimeout(() => {
-      setIsGeneratingPreview(false);
+    try {
+      const res = await getInvestorTaxPackagePreview(taxYear, fundId);
+      setTaxPreview(res.data);
       setIsTaxPreviewOpen(true);
-    }, 400);
+    } catch (err) {
+      toast.error(toFriendlyMessage(err));
+    } finally {
+      setIsGeneratingPreview(false);
+    }
   };
 
-  const handleDownloadTaxPackage = () => {
-    // TODO: Implement tax package download via GET /investor/me/tax-package/export
-    toast.info("Tax package download coming soon");
+  const handleDownloadTaxPackage = async (format: 'csv' | 'pdf' = 'pdf') => {
+    try {
+      await exportInvestorTaxPackage(taxYear, format, fundId);
+    } catch (err) {
+      toast.error(toFriendlyMessage(err));
+    }
   };
 
   if (isLoading) return (
@@ -404,8 +492,24 @@ export default function InvestorDocuments() {
     );
 
   const docs = documents ?? [];
-  const legalDocs = docs.filter((d) => LEGAL_TYPES.has(d.type));
-  const noticeDocs = docs.filter((d) => NOTICE_TYPES.has(d.type));
+  const mappedNotices: InvestorDocument[] = (notices ?? []).map((notice: Notice) => ({
+    id: notice.id,
+    name: TYPE_LABELS[notice.type] ?? notice.type.replace(/_/g, " "),
+    type: notice.type,
+    createdAt: notice.generatedAt,
+    status: notice.deliveries[0]?.status ?? "GENERATED",
+    downloadable: true,
+    metadata: {
+      anchorTxHash: notice.anchorTxHash,
+      distributionRunId: notice.distributionRunId,
+      capitalCallId: notice.capitalCallId,
+    },
+  }));
+  const mergedDocs = [...docs, ...mappedNotices].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+  const legalDocs = mergedDocs.filter((d) => LEGAL_TYPES.has(d.type));
+  const noticeDocs = mergedDocs.filter((d) => NOTICE_TYPES.has(d.type));
 
   return (
     <div>
@@ -425,11 +529,18 @@ export default function InvestorDocuments() {
               {isGeneratingPreview ? "Generating preview…" : "Preview Tax Package"}
             </button>
             <button
-              onClick={handleDownloadTaxPackage}
+              onClick={() => handleDownloadTaxPackage('pdf')}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
             >
               <Download className="h-4 w-4" />
-              Download
+              Download PDF
+            </button>
+            <button
+              onClick={() => handleDownloadTaxPackage('csv')}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              CSV
             </button>
             <span className="sr-only" aria-live="polite">
               {isGeneratingPreview ? "Generating preview…" : ""}
@@ -468,20 +579,55 @@ export default function InvestorDocuments() {
               </button>
             </div>
             <div className="max-h-[60vh] overflow-y-auto px-6 py-6">
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-6">
-                <div className="flex items-start gap-3">
-                  <FileText className="h-5 w-5 text-gray-400 mt-0.5" strokeWidth={1.5} />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      Tax package rendering is not wired yet
-                    </p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Once backend endpoint <code className="font-mono text-[11px]">GET /investor/me/tax-package/preview</code> is available,
-                      this dialog will embed the generated PDF via an iframe.
-                    </p>
-                  </div>
+              {taxPreview && !taxPreview.available && (
+                <div className="rounded-md border border-gray-200 bg-gray-50 p-6 text-sm text-gray-700">
+                  <p className="font-medium text-gray-900 mb-1">
+                    No tax data for {taxPreview.taxYear}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {taxPreview.reason ?? "A tax report has not been generated for this year yet."}
+                  </p>
                 </div>
-              </div>
+              )}
+              {taxPreview?.available && taxPreview.report && (
+                <div className="space-y-4">
+                  {taxPreview.report.source === "DERIVED_LEDGER_PREVIEW" && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                      This is a provisional preview derived from your current ledger activity for {taxPreview.report.taxYear}. A finalized tax report has not been generated yet.
+                    </div>
+                  )}
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                    <div className="flex justify-between border-b border-gray-100 py-2">
+                      <dt className="text-gray-500">Tax Year</dt>
+                      <dd className="font-medium text-gray-900">{taxPreview.report.taxYear}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-100 py-2">
+                      <dt className="text-gray-500">Entity</dt>
+                      <dd className="font-medium text-gray-900">{taxPreview.report.taxEntityName ?? "—"}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-100 py-2">
+                      <dt className="text-gray-500">Ordinary Income</dt>
+                      <dd className="font-mono text-gray-900">{taxPreview.report.ordinaryIncome}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-100 py-2">
+                      <dt className="text-gray-500">Return of Capital</dt>
+                      <dd className="font-mono text-gray-900">{taxPreview.report.returnOfCapital}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-100 py-2">
+                      <dt className="text-gray-500">Long-Term Capital Gains</dt>
+                      <dd className="font-mono text-gray-900">{taxPreview.report.ltcg}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-100 py-2">
+                      <dt className="text-gray-500">Short-Term Capital Gains</dt>
+                      <dd className="font-mono text-gray-900">{taxPreview.report.stcg}</dd>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-100 py-2 sm:col-span-2">
+                      <dt className="text-gray-500">Total Distributions</dt>
+                      <dd className="font-mono text-gray-900">{taxPreview.report.totalDistributions}</dd>
+                    </div>
+                  </dl>
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4">
               <button
@@ -491,7 +637,7 @@ export default function InvestorDocuments() {
                 Close
               </button>
               <button
-                onClick={handleDownloadTaxPackage}
+                onClick={() => handleDownloadTaxPackage('pdf')}
                 className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
               >
                 <Download className="h-4 w-4" />
@@ -544,14 +690,14 @@ export default function InvestorDocuments() {
 
         {/* Tab 3: GP Reports */}
         <TabsContent value="gp-reports">
-          {MOCK_GP_REPORTS.length === 0 ? (
+          {!gpReports || gpReports.length === 0 ? (
             <EmptyDocuments message="No GP reports available yet" />
           ) : (
             <div className="rounded-lg border border-border bg-card overflow-hidden">
               <DataTable
                 columns={gpReportColumns}
-                data={MOCK_GP_REPORTS}
-                getRowId={(r) => r.id}
+                data={gpReports}
+                getRowId={(r) => r.documentId}
                 emptyMessage="No GP reports available"
               />
             </div>
@@ -560,7 +706,7 @@ export default function InvestorDocuments() {
 
         {/* Tab 4: Upload */}
         <TabsContent value="upload">
-          <UploadTab />
+          <UploadTab onUpload={handleUploadFiles} isUploading={uploadMutation.isPending} />
         </TabsContent>
       </Tabs>
 
@@ -570,7 +716,7 @@ export default function InvestorDocuments() {
           onOpenChange={(open) => {
             if (!open) setViewerDoc(null);
           }}
-          contentPath={`/investor/me/documents/${viewerDoc.id}/content?fundId=${encodeURIComponent(fundId)}`}
+          contentPath={viewerDoc.contentPath}
           filename={viewerDoc.filename}
         />
       )}

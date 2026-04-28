@@ -47,7 +47,7 @@ Settlement confirmed (off-chain)
     |   settledAt timestamp recorded
     |
     v
-KadraToken.mint(investorWallet, tokenAmount)                <-- ON-CHAIN
+AngainorToken.mint(investorWallet, tokenAmount)                <-- ON-CHAIN
     |   Emits: Transfer(address(0), investorWallet, amount)
     |   Only callable by contract owner (deployer)
     |
@@ -70,10 +70,10 @@ Transfer attempt (LP-to-LP)
     +-- Backend pre-check (off-chain):
     |       - IdentityRegistry.isEligibleLP(sender) == true?
     |       - IdentityRegistry.isEligibleLP(recipient) == true?
-    |       - KadraToken.balanceOf(sender) >= amount?
+    |       - AngainorToken.balanceOf(sender) >= amount?
     |       - If any fail: PRECHECK_FAILED, no chain tx submitted
     |
-    +-- KadraToken.transfer(recipient, amount)              <-- ON-CHAIN
+    +-- AngainorToken.transfer(recipient, amount)              <-- ON-CHAIN
     |       _update() override checks:
     |         - isEligibleLP(from) --> revert if false
     |         - isEligibleLP(to)   --> revert if false
@@ -165,7 +165,7 @@ Wire Confirmation
 
 All four checks must pass. If any fail, the settlement is rejected with specific error messages.
 
-**Payments are settled OFF-CHAIN.** The wire confirmation is a parsed document (mock bank wire in demo). Kadra does not claim on-chain payment settlement.
+**Payments are settled OFF-CHAIN.** The wire confirmation is a parsed document (mock bank wire in demo). Angainor does not claim on-chain payment settlement.
 
 ### 5. Token Minting (On-Chain)
 
@@ -176,7 +176,7 @@ After settlement validation passes, the subscription status flips to `settled` a
 updateStatus(subscriptionId, "settled");
 
 // On-chain: mint tokens
-await kadraToken.mint(investorWallet, tokensToMint);
+await angainorToken.mint(investorWallet, tokensToMint);
 ```
 
 Token amounts use 18 decimals (standard ERC-20):
@@ -190,8 +190,8 @@ Token amounts use 18 decimals (standard ERC-20):
 The cap table is derived directly from on-chain token balances:
 
 ```javascript
-const balance = await kadraToken.balanceOf(investorAddress);
-const totalSupply = await kadraToken.totalSupply();
+const balance = await angainorToken.balanceOf(investorAddress);
+const totalSupply = await angainorToken.totalSupply();
 const ownershipPercent = (balance * 10000n) / totalSupply / 100;
 ```
 
@@ -208,7 +208,7 @@ Transfers between LPs follow the pre-check then execute pattern:
    - balanceOf(sender) >= amount?
 
 2. If pre-check passes, submit to chain:
-   - KadraToken.transfer(recipient, amount)
+   - AngainorToken.transfer(recipient, amount)
    - Contract enforces eligibility in _update() override
 
 3. Record outcome:
