@@ -27,3 +27,12 @@ frontend/.next
 .vercel
 feedback/
 demo-docs/
+hackathon/
+data/
+.npm/
+.remember/
+feedback/
+.claude/
+*.pdf
+*.csv
+run.md

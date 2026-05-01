@@ -1,9 +1,0 @@
-{
-  "wires": [
-    { "id": "wire-001", "investorId": "investor-A", "amount": "1000000", "bankRef": "WIRE-2026-001", "date": "2026-02-27" },
-    { "id": "wire-002", "investorId": "investor-B", "amount": "1000000", "bankRef": "WIRE-2026-002", "date": "2026-02-27" },
-    { "id": "wire-003", "investorId": "investor-C", "amount": "1000000", "bankRef": "WIRE-2026-003", "date": "2026-02-27" },
-    { "id": "wire-004", "investorId": "investor-D", "amount": "1000000", "bankRef": "WIRE-2026-004", "date": "2026-02-27" },
-    { "id": "wire-005", "investorId": "investor-E", "amount": "1000000", "bankRef": "WIRE-2026-005", "date": "2026-02-27" }
-  ]
-}
