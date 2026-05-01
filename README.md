@@ -6,16 +6,18 @@ Programmable infrastructure layer for private real estate funds. Replaces manual
 
 - **Node.js** >= 20
 - **npm** >= 9
+- **PostgreSQL** (local or Supabase) for backend
 
 ## Project Structure
 
 ```
-contracts/          Solidity smart contracts (IdentityRegistry, AngainorToken, DocumentRegistry)
-lib/                Off-chain business logic (settlement validator, subscription ledger, etc.)
+contracts/          Solidity smart contracts (IdentityRegistry, AngainorToken, DocumentRegistry, FundTermsRegistry)
+lib/                Off-chain helpers used by Hardhat scripts
 scripts/            Deployment and utility scripts
-test/               123 tests across 11 files
-data/               Mock data (investors, fund config, wire confirmations, sample LPA)
-frontend/           Next.js dashboard for demo workflow
+test/               123 contract tests across 11 files
+backend/            NestJS 11 + Fastify + Prisma v7 + PostgreSQL API
+frontend/           React 18 + Vite + Tailwind + shadcn/ui dashboard
+docs/               Public spec documents
 ```
 
 ## Quick Start
@@ -23,99 +25,100 @@ frontend/           Next.js dashboard for demo workflow
 ### 1. Install dependencies
 
 ```bash
-# Root (Hardhat + contracts)
-npm install
-
-# Frontend
+npm install                       # root: Hardhat + contracts
+cd backend  && npm install && cd ..
 cd frontend && npm install && cd ..
 ```
 
-### 2. Compile contracts
+### 2. Compile contracts and run tests
 
 ```bash
 npm run compile
-```
-
-### 3. Run tests
-
-```bash
 npm test
 ```
 
-All 123 tests run on an in-memory Hardhat EVM — no external services needed.
+All 123 contract tests run on an in-memory Hardhat EVM. No external services required.
 
-### 4. Start the Hardhat node
+### 3. Run the local stack
+
+In three terminals:
 
 ```bash
+# Terminal 1 — Hardhat node
 npx hardhat node
+
+# Terminal 2 — Backend API
+cd backend && npm run start:dev      # http://localhost:3000
+
+# Terminal 3 — Frontend
+cd frontend && npm run dev           # http://localhost:8080
 ```
 
-This starts a persistent local blockchain at `http://127.0.0.1:8545` with 20 pre-funded accounts. Keep this terminal open.
+### 4. Demo flow
 
-### 5. Start the frontend
+Log in at `http://localhost:8080` (admin: `demo@angainor.io` / `AngainorDemo2024`) and walk through:
 
-In a second terminal:
-
-```bash
-cd frontend
-npm run dev
-```
-
-The dashboard is available at **http://localhost:3000**.
-
-### 6. Walk through the demo
-
-Open `http://localhost:3000` and click through the steps in order:
-
-1. **Deploy Infrastructure** — deploys IdentityRegistry, AngainorToken, and DocumentRegistry contracts to the local chain, then registers 5 investors as eligible LPs
-2. **Upload Master LPA** — drag-and-drop (or click to select) a PDF; the file is SHA-256 hashed and the hash is anchored on-chain in DocumentRegistry
-3. **Settle Wires** — processes 5 mock wire confirmations through the 3-way match validator (investor + amount + document reference), flips subscriptions from Pending to Settled, and mints 2,000 KDRA tokens per investor
-4. **Test Illegal Transfer** — attempts a transfer to a non-LP wallet; the on-chain transfer hook reverts immediately
-5. **Execute Legal Transfer** — LP-to-LP transfer of 500 KDRA succeeds; cap table updates instantly
-
-The cap table, contract addresses, document provenance, and activity log update in real time.
+1. **Upload Master LPA** — PDF is SHA-256 hashed, anchored on-chain in DocumentRegistry.
+2. **Settle Wires** — 3-way match (investor + amount + document ref) flips Pending → Settled and mints ANGN tokens.
+3. **Bulk import investors** — CSV/XLSX upload from the Investors tab.
+4. **Test illegal transfer** — non-LP wallet attempt reverts on-chain.
+5. **Execute legal transfer** — LP-to-LP transfer succeeds; cap table updates instantly.
 
 ## Environment Variables
 
-Only needed for Sepolia testnet deployment or Coinbase SDK integration. Copy the template:
+Copy templates and fill in secrets:
 
 ```bash
-cp .env.example .env
+cp .env.example .env                 # root (Sepolia RPC, deployer key)
+cp backend/.env.example backend/.env # DATABASE_URL, JWT_SECRET, etc.
 ```
 
-The local demo (Hardhat node + frontend) works without any `.env` configuration.
+The local Hardhat demo (no backend) works without any `.env` configuration.
 
 ## Key Commands
 
 | Command | Description |
 |---|---|
-| `npm test` | Run all 123 tests on local Hardhat EVM |
+| `npm test` | Run all 123 contract tests on local Hardhat EVM |
 | `npm run compile` | Compile Solidity contracts |
 | `npx hardhat node` | Start persistent local blockchain on port 8545 |
-| `npx hardhat run scripts/deploy-angainor.js --network localhost` | Run full 9-step deployment script against local node |
+| `npx hardhat run scripts/deploy-angainor.js --network localhost` | Deploy full Angainor stack to local node |
 | `npx hardhat run scripts/cap-table.js --network localhost` | Print cap table from deployed contracts |
-| `npm run deploy:sepolia` | Deploy to Sepolia testnet |
+| `npm run deploy:sepolia` | Deploy contracts to Sepolia testnet |
 
 ## Architecture
 
-### Smart Contracts
+### Smart Contracts (Sepolia)
 
-- **IdentityRegistry** — investor whitelist with two-flag verification (isVerified + isEligible). Only the deployer can add/remove investors.
-- **AngainorToken** — ERC-20 security token (OpenZeppelin v5) with transfer restrictions. Overrides `_update()` to query IdentityRegistry before every transfer. Both sender and recipient must be eligible LPs.
-- **DocumentRegistry** — immutable on-chain document hash anchoring. Each document hash can only be registered once with a timestamp and document type.
+- **IdentityRegistry** (`0x55822888...c78fb`) — investor whitelist with two-flag verification (isVerified + isEligible).
+- **AngainorToken** / `ANGN` (`0x821A004B...cbdAc`) — ERC-20 security token with transfer restrictions. Overrides `_update()` to query IdentityRegistry; both sender and recipient must be eligible LPs.
+- **DocumentRegistry** (`0x09BFB275...a13a9`) — immutable document hash anchoring with timestamps and document types.
+- **FundTermsRegistry** (`0xD1e6625A...84f1e`) — on-chain fund term storage.
 
-### Off-Chain Libraries
+### Backend (NestJS 11 + Fastify + Prisma v7)
 
-- **settlement-validator** — 3-way match: checks investor identity, wire amount, and document reference before settling
-- **subscription-ledger** — in-memory subscription records with Pending/Settled lifecycle
-- **document-hasher** — SHA-256 hashing for uploaded documents
-- **fund-manager** — fund entity creation and waterfall configuration (display-only)
-- **capital-accounts** — per-investor capital account tracking
+14 modules: auth, fund, identity, documents, subscriptions, settlements, tokenization, ownership, distribution, capital-calls, notices, audit, investor-portal, jobs. JWT auth with role guards (admin / platform_admin / fund_admin / operations_analyst / investor). Non-custodial transfers (frontend-signed via viem). See `backend/README.md`.
+
+### Frontend (React 18 + Vite)
+
+Public marketing surface (`/`, `/privacy`) under dark Angainor brand, plus admin and investor product surfaces under light institutional banking aesthetic. EIP-6963 wallet detection (MetaMask, Phantom). See `frontend/README.md`.
 
 ### Token Details
 
-- Name: Angainor Demo Fund I
-- Symbol: KDRA
-- Total supply: 10,000 tokens (2,000 per investor at 20% each)
-- Decimals: 18
-- Transfer enforcement: both parties must be `isEligibleLP()` in IdentityRegistry
+- **Name**: Angainor Demo Fund I
+- **Symbol**: ANGN
+- **Total supply**: minted on settlement (2,000 ANGN per investor at 20% each in the demo)
+- **Decimals**: 18
+- **Transfer enforcement**: both parties must be `isEligibleLP()` in IdentityRegistry
+
+## Production
+
+- **Backend**: https://backend-kappa-olive-96.vercel.app
+- **Frontend**: https://frontend-nine-woad-28.vercel.app
+- **DB**: Supabase PostgreSQL
+
+## Founder Constraints
+
+- Payments are settled OFF-CHAIN. Mock bank wires are uploaded and parsed.
+- No automated payouts or on-chain distributions in the demo. Waterfall configuration is display-only.
+- All blockchain operations target Sepolia testnet only. A mainnet guard in deploy scripts blocks execution on non-allowlisted networks.

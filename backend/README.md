@@ -1,98 +1,84 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Angainor Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS 11 + Fastify + Prisma v7 + PostgreSQL API for the Angainor fund settlement platform.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Stack
 
-## Description
+- NestJS 11 (Fastify adapter locally, Express on Vercel)
+- Prisma v7 with `@prisma/adapter-pg`
+- PostgreSQL (Supabase in production, local Postgres for dev)
+- Local bcrypt + JWT auth (no Supabase Auth)
+- viem for on-chain reads + admin-side mints
+- pdfmake + marked for notice / GP-admin export PDFs
+- Multer (Vercel) / `@fastify/multipart` (local) for file uploads
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Modules
 
-## Project setup
+| Module | Purpose |
+|---|---|
+| `auth` | Signup, login, JWT validation, role guards |
+| `fund` | Fund CRUD, waterfall config, activity feed |
+| `identity` | Investor registry, KYC/accreditation, wallet linking, **bulk CSV/XLSX import** |
+| `documents` | Upload, SHA-256 hashing, parse status, hash verification |
+| `subscriptions` | Subscription lifecycle |
+| `settlements` | 3-way wire match + auto-mint with retries |
+| `tokenization` | ERC-3643 deploy / mint (server-side) + transfer (frontend-signed) |
+| `ownership` | Cap table, ownership snapshots, capital accounts |
+| `distribution` | Waterfall distribution calculation + line items |
+| `capital-calls` | Capital call issuance + payment response tracking |
+| `notices` | Markdown-driven notice generation, pdfmake renderer, delivery tracking |
+| `audit` | Audit export, event log, document provenance, GP/Admin export PDF |
+| `investor-portal` | Investor self-service: dashboard, profile, wallet link, documents |
+| `jobs` | Background job scheduling |
 
-```bash
-$ npm install
-```
-
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
+## Setup
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
+cp .env.example .env       # set DATABASE_URL, JWT_SECRET, RPC_URL, deployer key, etc.
+npm run prisma:migrate     # apply migrations against local DB
+npm run start:dev          # http://localhost:3000
 ```
 
-## Deployment
+## Scripts
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+| Command | Description |
+|---|---|
+| `npm run start:dev` | Start API in watch mode |
+| `npm run start:prod` | Production mode |
+| `npm test` | Run Jest unit tests |
+| `npm run test:e2e` | Run e2e tests |
+| `npm run test:cov` | Coverage report |
+| `npx prisma migrate dev --config prisma/prisma.config.ts --name <name>` | Create + apply a migration |
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Auth & Roles
+
+- Roles: `admin`, `platform_admin`, `fund_admin`, `operations_analyst`, `investor`.
+- Admin routes: `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(...ADMIN_ROLES)`.
+- Investor routes: `@UseGuards(JwtAuthGuard)` with email-scoped data; unauthorized access returns `NotFoundError` (no existence oracle).
+- Public endpoints: marked with `@Public()`.
+
+## Vercel Gotcha (Important)
+
+The Vercel build uses Express + Multer (not Fastify). Every upload endpoint MUST be registered in `src/vercel.ts`:
+
+```ts
+server.post(/.*\/admin\/<route>.*/, upload.single('file'));
+```
+
+Otherwise `req.file` is undefined and uploads fail silently.
+
+## Prisma Migrate Against Supabase
+
+Use port **5432** (session pooler), not 6543 (transaction pooler). The transaction pooler does not support advisory locks and migrations hang indefinitely.
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+DATABASE_URL='postgresql://...@aws-0-us-west-2.pooler.supabase.com:5432/postgres' \
+  npx prisma migrate deploy --config prisma/prisma.config.ts
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Production
 
-## Resources
+Deployed to Vercel serverless: https://backend-kappa-olive-96.vercel.app
 
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+See the project root `README.md` for full architecture context.
