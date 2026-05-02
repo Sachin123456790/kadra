@@ -15,7 +15,6 @@ import {
   getEventLog,
   getDocumentProvenance,
   downloadGpAdminExportPdf,
-  resetDemoFund,
 } from "@/services/audit.service";
 import type {
   AuditExportDetail,
@@ -40,21 +39,8 @@ import {
   ScrollText,
   FileSearch,
   PackageCheck,
-  RotateCcw,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { useQueryClient } from "@tanstack/react-query";
 import { CopyButton } from "@/components/angainor/CopyButton";
 import { formatEventType } from "@/lib/format";
 
@@ -656,7 +642,6 @@ export default function AuditPage() {
       <PageHeader
         title="Audit & Exports"
         subtitle="Review the event log, verify document provenance, and generate compliance packages"
-        action={<ResetDemoButton fundId={fundId} />}
       />
 
       <Tabs defaultValue="event-log" className="w-full">
@@ -688,74 +673,5 @@ export default function AuditPage() {
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-// ── Reset Demo (admin destructive action) ──────────────────
-
-function ResetDemoButton({ fundId }: { readonly fundId: string }) {
-  const [open, setOpen] = useState(false);
-  const queryClient = useQueryClient();
-
-  const mutation = useMutation({
-    mutationFn: () => resetDemoFund(fundId).then((r) => r.data),
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      setOpen(false);
-    },
-  });
-
-  return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 rounded-md border border-destructive/30 bg-white px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
-        >
-          <RotateCcw className="h-4 w-4" />
-          Reset Demo
-        </button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Reset demo data?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will permanently delete <strong>all</strong> investors, subscriptions,
-            settlements, ownership, transfers, distributions, capital calls, notices,
-            documents, audit logs, and audit exports for this fund. The fund itself
-            and the active waterfall config will be re-created from scratch. Login
-            accounts (auth users) are preserved.
-            <br />
-            <br />
-            This cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        {mutation.isError && (
-          <p className="text-sm text-destructive">
-            {(mutation.error as Error).message}
-          </p>
-        )}
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={mutation.isPending}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={mutation.isPending}
-            onClick={(e) => {
-              e.preventDefault();
-              mutation.mutate();
-            }}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            {mutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Resetting...
-              </>
-            ) : (
-              "Reset demo"
-            )}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   );
 }

@@ -1,12 +1,24 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, FileText, ClipboardList, CheckCircle, ArrowLeftRight,
   PieChart, Table, Shield, Menu, X,
-  Sun, Moon, Bell, LogOut, User, HelpCircle, ChevronDown, Wallet,
+  Sun, Moon, Bell, LogOut, User, HelpCircle, ChevronDown, Wallet, RotateCcw, Loader2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { resetDemoFund } from "@/services/audit.service";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,6 +110,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
           >
             {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
           </button>
+
+          {/* Reset demo (admin only) */}
+          {isAdmin && <ResetDemoButton />}
 
           {/* Notifications */}
           <DropdownMenu>
@@ -244,5 +259,71 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <main className="flex-1 overflow-y-auto p-6 animate-fade-in motion-reduce:animate-none">{children}</main>
       </div>
     </div>
+  );
+}
+
+function ResetDemoButton() {
+  const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: () => resetDemoFund(DEFAULT_FUND_CODE).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setOpen(false);
+    },
+  });
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <button
+          className="p-2 rounded-md text-topbar-foreground/70 hover:text-topbar-foreground hover:bg-topbar-foreground/10 transition-colors"
+          title="Reset demo data"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Reset demo data?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete <strong>all</strong> investors, subscriptions,
+            settlements, ownership, transfers, distributions, capital calls, notices,
+            documents, audit logs, and audit exports for this fund. The fund itself
+            and the active waterfall config will be re-created from scratch. Login
+            accounts (auth users) are preserved.
+            <br />
+            <br />
+            This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {mutation.isError && (
+          <p className="text-sm text-destructive">
+            {(mutation.error as Error).message}
+          </p>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={mutation.isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={mutation.isPending}
+            onClick={(e) => {
+              e.preventDefault();
+              mutation.mutate();
+            }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Resetting...
+              </>
+            ) : (
+              "Reset demo"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
