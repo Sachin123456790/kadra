@@ -22,6 +22,17 @@ export function createAuditExport(fundId: string) {
   return post<AuditExportSummary>(`/admin/funds/${fundId}/audit-exports`, {});
 }
 
+export interface ResetDemoResult {
+  fundId: string;
+  fundCode: string;
+  fundName: string;
+  resetAt: string;
+}
+
+export function resetDemoFund(fundId: string) {
+  return post<ResetDemoResult>(`/admin/funds/${fundId}/reset-demo`, {});
+}
+
 export function getAuditExport(auditExportId: string) {
   return get<AuditExportDetail>(`/admin/audit-exports/${auditExportId}`);
 }
@@ -68,4 +79,33 @@ export function getEventLog(fundId: string, limit = 100, offset = 0) {
 
 export function getDocumentProvenance(fundId: string) {
   return get<DocumentProvenance[]>(`/admin/funds/${fundId}/document-provenance`);
+}
+
+export async function downloadGpAdminExportPdf(fundId: string): Promise<void> {
+  const { API_BASE_URL, AUTH_TOKEN_KEY } = await import('@/config/constants');
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const res = await fetch(
+    `${API_BASE_URL}/admin/funds/${fundId}/gp-admin-export.pdf`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Export failed (${res.status}): ${text}`);
+  }
+  const cd = res.headers.get('content-disposition') ?? '';
+  const filenameMatch = /filename="([^"]+)"/.exec(cd);
+  const filename =
+    filenameMatch?.[1] ??
+    `gp-admin-export-${new Date().toISOString().slice(0, 10)}.pdf`;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

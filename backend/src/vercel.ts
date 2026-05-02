@@ -20,6 +20,7 @@ async function bootstrap() {
     server.post(/.*documents\/wire-confirmation$/, upload.single('file'));
     server.post(/.*investor\/me\/documents\/upload.*/, upload.single('file'));
     server.post(/.*\/reporting-documents.*/, upload.single('file'));
+    server.post(/.*\/admin\/investors\/bulk-import.*/, upload.single('file'));
   } catch (e) {
     console.warn('Multer setup failed:', e);
   }

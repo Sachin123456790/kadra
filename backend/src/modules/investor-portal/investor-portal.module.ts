@@ -6,9 +6,11 @@ import {
 import { InvestorPortalService } from './investor-portal.service';
 import { SignatureVerificationService } from './signature-verification.service';
 import { DocumentsModule } from '../documents/documents.module';
+import { DistributionModule } from '../distribution/distribution.module';
+import { NoticesModule } from '../notices/notices.module';
 
 @Module({
-  imports: [DocumentsModule],
+  imports: [DocumentsModule, DistributionModule, NoticesModule],
   controllers: [InvestorPortalController, AdminReportingDocumentsController],
   providers: [InvestorPortalService, SignatureVerificationService],
   exports: [InvestorPortalService],

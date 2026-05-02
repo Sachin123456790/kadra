@@ -1,4 +1,4 @@
-import { get, post, put } from './api-client';
+import { get, post, put, upload } from './api-client';
 import type { ApiResponse } from './api-client';
 
 export interface InvestorWallet {
@@ -120,4 +120,31 @@ export function updateInvestorEligibility(
   body: { investorId: string; walletId: string; status: string; reason?: string },
 ) {
   return updateEligibility(fundId, body);
+}
+
+export interface BulkImportRowResult {
+  rowNumber: number;
+  legalName?: string;
+  email?: string;
+  status: 'CREATED' | 'SKIPPED_DUPLICATE' | 'FAILED';
+  investorId?: string;
+  message?: string;
+}
+
+export interface BulkImportResult {
+  total: number;
+  succeeded: number;
+  skipped: number;
+  failed: number;
+  rows: BulkImportRowResult[];
+}
+
+export function bulkImportInvestors(
+  fundId: string,
+  file: File,
+): Promise<ApiResponse<BulkImportResult>> {
+  return upload<BulkImportResult>(
+    `/admin/investors/bulk-import?fundId=${encodeURIComponent(fundId)}`,
+    file,
+  );
 }

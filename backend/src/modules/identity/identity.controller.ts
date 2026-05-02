@@ -1,14 +1,17 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
+  Param,
   Post,
   Put,
-  Param,
-  Body,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { IdentityService } from './identity.service';
+import { BulkImportService } from './bulk-import.service';
 import {
   CreateInvestorDto,
   LinkWalletDto,
@@ -23,6 +26,28 @@ import { Roles } from '../../common/auth/roles.decorator';
 import { ADMIN_ROLES } from '../../common/auth/auth.types';
 import type { AuthenticatedUser } from '../../common/auth/auth.types';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
+
+async function extractUploadedFile(
+  req: any,
+): Promise<{ buffer: Buffer; filename: string; mimetype: string } | null> {
+  if (req.file && req.file.buffer) {
+    return {
+      buffer: req.file.buffer,
+      filename: req.file.originalname,
+      mimetype: req.file.mimetype,
+    };
+  }
+  if (typeof req.file === 'function') {
+    const data = await req.file();
+    if (!data) return null;
+    return {
+      buffer: await data.toBuffer(),
+      filename: data.filename,
+      mimetype: data.mimetype,
+    };
+  }
+  return null;
+}
 
 @Controller('admin/funds')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -96,7 +121,36 @@ export class IdentityController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(...ADMIN_ROLES)
 export class InvestorController {
-  constructor(private readonly identityService: IdentityService) {}
+  constructor(
+    private readonly identityService: IdentityService,
+    private readonly bulkImportService: BulkImportService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @Post('bulk-import')
+  async bulkImport(
+    @Query('fundId') fundIdOrCode: string | undefined,
+    @Req() req: any,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    const file = await extractUploadedFile(req);
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+    const fundId = await resolveFundId(
+      this.prisma,
+      fundIdOrCode || 'ANGAINOR-DEMO-001',
+    );
+    const data = await this.bulkImportService.importInvestors(
+      fundId,
+      file.buffer,
+      user?.email,
+    );
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
 
   @Post()
   async createInvestor(@Body() body: CreateInvestorDto) {

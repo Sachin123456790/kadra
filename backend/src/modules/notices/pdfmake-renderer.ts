@@ -15,6 +15,7 @@ import type {
   TDocumentDefinitions,
 } from 'pdfmake/interfaces';
 import type { Token, Tokens } from 'marked';
+import { createPdfBuffer } from '../../common/pdfmake-printer';
 
 let markedLexer: ((src: string) => Token[]) | null = null;
 async function getLexer(): Promise<(src: string) => Token[]> {
@@ -22,34 +23,6 @@ async function getLexer(): Promise<(src: string) => Token[]> {
   const marked = await import('marked');
   markedLexer = marked.lexer;
   return markedLexer;
-}
-
-// Lazy-init pdfmake. Resolving pdfkit's .afm font metrics via require.resolve
-// at module load time crashes on Vercel cold starts when the asset isn't
-// bundled. Defer construction until the first PDF render so the rest of the
-// app can boot even if pdfmake assets are missing in the deploy bundle.
-let cachedPrinter: unknown = null;
-
-function getPrinter() {
-  if (cachedPrinter) return cachedPrinter as { createPdfKitDocument: Function };
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-  const PdfPrinter = require('pdfmake/js/Printer').default;
-  const fonts = {
-    Helvetica: {
-      normal: require.resolve('pdfkit/js/data/Helvetica.afm'),
-      bold: require.resolve('pdfkit/js/data/Helvetica-Bold.afm'),
-      italics: require.resolve('pdfkit/js/data/Helvetica-Oblique.afm'),
-      bolditalics: require.resolve('pdfkit/js/data/Helvetica-BoldOblique.afm'),
-    },
-    Courier: {
-      normal: require.resolve('pdfkit/js/data/Courier.afm'),
-      bold: require.resolve('pdfkit/js/data/Courier-Bold.afm'),
-      italics: require.resolve('pdfkit/js/data/Courier-Oblique.afm'),
-      bolditalics: require.resolve('pdfkit/js/data/Courier-BoldOblique.afm'),
-    },
-  };
-  cachedPrinter = new PdfPrinter(fonts);
-  return cachedPrinter as { createPdfKitDocument: Function };
 }
 
 const STYLES: StyleDictionary = {
@@ -118,14 +91,7 @@ export async function renderMarkdownPdf(input: RenderInput): Promise<Buffer> {
     content,
   };
 
-  const pdfDoc = getPrinter().createPdfKitDocument(docDefinition);
-  const chunks: Buffer[] = [];
-  return new Promise<Buffer>((resolve, reject) => {
-    pdfDoc.on('data', (c: Buffer) => chunks.push(c));
-    pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-    pdfDoc.on('error', reject);
-    pdfDoc.end();
-  });
+  return createPdfBuffer(docDefinition);
 }
 
 function tokenToContent(token: Token): Content[] {

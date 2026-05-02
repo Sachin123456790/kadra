@@ -690,6 +690,7 @@ model DistributionRun {
   waterfallConfigId   String    @map("waterfall_config_id")
   ownershipSnapshotId String    @map("ownership_snapshot_id")
   runStatus           String    @default("QUEUED") @map("run_status") // QUEUED | RUNNING | COMPLETED | FAILED
+  chainStatus         String    @default("ONCHAIN") @map("chain_status") // ONCHAIN | SIMULATED
   asOfTimestamp       DateTime  @map("as_of_timestamp") @db.Timestamptz()
   triggeredBy         String?   @map("triggered_by")
   startedAt           DateTime? @map("started_at") @db.Timestamptz()

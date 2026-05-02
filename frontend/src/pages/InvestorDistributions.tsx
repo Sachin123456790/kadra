@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/angainor/PageHeader";
 import { SectionCard } from "@/components/angainor/SectionCard";
 import { DataTable, Column } from "@/components/angainor/DataTable";
@@ -8,7 +9,29 @@ import { ErrorAlert } from "@/components/angainor/ErrorAlert";
 import { EmptyState } from "@/components/angainor/EmptyState";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getMyDistributions, getInvestorWaterfallBreakdown } from "@/services";
-import type { InvestorDistributionLineItem, WaterfallBreakdown } from "@/services/investor-portal.service";
+import {
+  simulateMyDistribution,
+  recordMyDemoDistribution,
+} from "@/services/investor-portal.service";
+import type {
+  InvestorDistributionLineItem,
+  WaterfallBreakdown,
+  DistributionSimulationResult,
+} from "@/services/investor-portal.service";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { MetricCard } from "@/components/angainor/MetricCard";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 import { DerivedAmount } from "@/components/angainor/DerivedAmount";
 import type { DerivationStep } from "@/components/angainor/DerivedAmount";
 import { SkeletonCard, TableSkeleton } from "@/components/angainor/Skeleton";
@@ -345,7 +368,19 @@ function DistributionHistoryTable({
     {
       key: "runStatus",
       header: "Event Type",
-      render: (r) => <StatusBadge status={r.run.runStatus} />,
+      render: (r) => (
+        <div className="inline-flex items-center gap-1.5">
+          <StatusBadge status={r.run.runStatus} />
+          {r.run.chainStatus === "SIMULATED" && (
+            <span
+              className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800 ring-1 ring-amber-200"
+              title="Simulated / off-chain — no GP approval, no batch wire"
+            >
+              Simulated
+            </span>
+          )}
+        </div>
+      ),
     },
     {
       key: "returnOfCapitalAmount",
@@ -412,6 +447,314 @@ function DistributionHistoryTable({
   );
 }
 
+// ── Distribution Simulator (LP-side, off-chain) ──────────────
+
+const DEFAULT_SIM_AMOUNT = 8_000_000;
+
+function SimulatorResultPanel({
+  result,
+  onRecord,
+  recording,
+}: {
+  readonly result: DistributionSimulationResult;
+  readonly onRecord: () => void;
+  readonly recording: boolean;
+}) {
+  const roc = result.breakdown.returnOfCapitalAmount;
+  const pref = result.breakdown.prefAmount;
+  const gpCatchUp = Number(result.breakdown.tierBreakdown.gpCatchUp);
+  const carry = Number(result.breakdown.tierBreakdown.carriedInterest);
+  const promote = result.breakdown.promoteAmount;
+  const net = Number(result.breakdown.netAmount);
+  const gross = Number(result.breakdown.grossAmount);
+  const residual = Math.max(0, net - roc - pref);
+
+  const tiers = [
+    {
+      label: "Tier 1",
+      name: "Return of Capital",
+      hurdle: "Up to LP contribution",
+      lp: 100,
+      gp: 0,
+      amount: roc,
+    },
+    {
+      label: "Tier 2",
+      name: "Preferred Return",
+      hurdle: `${result.waterfall.prefReturnPct ?? "—"}% IRR on contribution`,
+      lp: 100,
+      gp: 0,
+      amount: pref,
+    },
+    {
+      label: "Tier 3",
+      name: "GP Catch-up",
+      hurdle: result.waterfall.catchUpEnabled ? "Enabled" : "Disabled",
+      lp: 0,
+      gp: 100,
+      amount: gpCatchUp,
+    },
+    {
+      label: "Tier 4",
+      name: "Carried Interest",
+      hurdle: `${100 - (result.waterfall.gpPromotePct ?? 0)}% LP / ${result.waterfall.gpPromotePct ?? 0}% GP`,
+      lp: 100 - (result.waterfall.gpPromotePct ?? 0),
+      gp: result.waterfall.gpPromotePct ?? 0,
+      amount: carry,
+    },
+  ];
+
+  const chartData = [
+    {
+      name: "Your allocation",
+      "Return of Capital": roc,
+      "Preferred Return": pref,
+      "Residual to LP": residual,
+      "GP Catch-up": gpCatchUp,
+      "GP Carry": carry,
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Headline metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <MetricCard
+          label="Total Distribution"
+          value={fmt(result.totalAmount)}
+          subtitle="Hypothetical fund-level"
+        />
+        <MetricCard
+          label="Your Ownership"
+          value={`${result.fundOwnershipPct.toFixed(2)}%`}
+          subtitle="Settled token balance"
+        />
+        <MetricCard
+          label="Gross Allocation"
+          value={fmt(gross)}
+          subtitle="Pro-rata before promote"
+        />
+        <MetricCard
+          label="Your Net Take"
+          value={fmt(net)}
+          subtitle={`After ${fmt(promote)} GP promote`}
+        />
+      </div>
+
+      {/* Waterfall tier cards (admin-style) */}
+      <SectionCard title="Waterfall Tiers">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {tiers.map((tier) => (
+            <div
+              key={tier.name}
+              className="rounded-md border border-border bg-card p-4"
+            >
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                {tier.label}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {tier.name}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {tier.hurdle}
+              </p>
+              <p className="mt-3 text-xs text-muted-foreground">
+                {tier.lp}% LP · {tier.gp}% GP
+              </p>
+              <p className="mt-2 text-lg font-semibold tabular-nums">
+                {fmt(tier.amount)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* Per-tier breakdown for this LP */}
+      <SectionCard title="Your Per-Tier Breakdown">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <MetricCard
+            label="Return of Capital"
+            value={fmt(roc)}
+            subtitle={`Of ${fmt(result.contribution)} contribution`}
+          />
+          <MetricCard
+            label="Preferred Return"
+            value={fmt(pref)}
+            subtitle={`${result.waterfall.prefReturnPct ?? "—"}% on contribution`}
+          />
+          <MetricCard
+            label="Residual to LP"
+            value={fmt(residual)}
+            subtitle="After pref + ROC"
+          />
+          <MetricCard
+            label="GP Promote"
+            value={fmt(promote)}
+            subtitle="Catch-up + carry"
+          />
+        </div>
+
+        {/* Stacked bar chart */}
+        <div>
+          <h4 className="text-sm font-medium text-foreground mb-3">
+            Allocation Composition
+          </h4>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{ top: 8, right: 24, left: 100, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis
+                type="number"
+                tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                tick={{ fontSize: 12, fill: "#6b7280" }}
+              />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fontSize: 12, fill: "#6b7280" }}
+              />
+              <Tooltip
+                formatter={(value: number) => fmt(value)}
+                contentStyle={{
+                  borderRadius: 6,
+                  borderColor: "#e5e7eb",
+                  fontSize: 13,
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 13 }} />
+              <Bar
+                dataKey="Return of Capital"
+                stackId="a"
+                fill="#4338ca"
+              />
+              <Bar
+                dataKey="Preferred Return"
+                stackId="a"
+                fill="#7c3aed"
+              />
+              <Bar
+                dataKey="Residual to LP"
+                stackId="a"
+                fill="#a5b4fc"
+              />
+              <Bar
+                dataKey="GP Catch-up"
+                stackId="a"
+                fill="#f59e0b"
+              />
+              <Bar
+                dataKey="GP Carry"
+                stackId="a"
+                fill="#ef4444"
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </SectionCard>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs text-muted-foreground">
+          Waterfall: pref {result.waterfall.prefReturnPct ?? "—"}% · GP promote{" "}
+          {result.waterfall.gpPromotePct ?? "—"}% · catch-up{" "}
+          {result.waterfall.catchUpEnabled ? "on" : "off"}
+        </div>
+        <Button onClick={onRecord} disabled={recording}>
+          {recording ? "Recording…" : "Record this as a demo distribution"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function DistributionSimulator({ fundId }: { readonly fundId: string }) {
+  const queryClient = useQueryClient();
+  const [amountInput, setAmountInput] = useState<string>(
+    String(DEFAULT_SIM_AMOUNT),
+  );
+  const [result, setResult] = useState<DistributionSimulationResult | null>(
+    null,
+  );
+
+  const simMutation = useMutation({
+    mutationFn: (amount: number) =>
+      simulateMyDistribution(amount, fundId).then((r) => r.data),
+    onSuccess: (data) => setResult(data),
+    onError: (err: Error) =>
+      toast.error(`Simulation failed: ${err.message}`),
+  });
+
+  const recordMutation = useMutation({
+    mutationFn: (amount: number) =>
+      recordMyDemoDistribution(amount, fundId).then((r) => r.data),
+    onSuccess: () => {
+      toast.success(
+        "Demo distribution recorded. It now appears in your history (off-chain).",
+      );
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.investorDistributions(fundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.waterfallBreakdown(fundId),
+      });
+      setResult(null);
+    },
+    onError: (err: Error) =>
+      toast.error(`Could not record demo: ${err.message}`),
+  });
+
+  const handleRun = () => {
+    const amount = Number(amountInput.replace(/,/g, ""));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Enter a positive amount");
+      return;
+    }
+    simMutation.mutate(amount);
+  };
+
+  const handleRecord = () => {
+    if (!result) return;
+    recordMutation.mutate(result.totalAmount);
+  };
+
+  return (
+    <SectionCard title="Distribution Simulator">
+      <div className="space-y-4">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Off-chain simulation. Real distributions require GP approval, an
+          allocation schedule, a batch wire file, and a waterfall run file.
+          This view models how the documented 2027.02.15 first distribution
+          ($8.0M operating distribution) would be split for your account.
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="flex-1">
+            <Label htmlFor="sim-amount">Hypothetical distribution (USD)</Label>
+            <Input
+              id="sim-amount"
+              inputMode="decimal"
+              value={amountInput}
+              onChange={(e) => setAmountInput(e.target.value)}
+              placeholder="8000000"
+            />
+          </div>
+          <Button
+            onClick={handleRun}
+            disabled={simMutation.isPending}
+            className="sm:self-end"
+          >
+            {simMutation.isPending ? "Running…" : "Run simulation"}
+          </Button>
+        </div>
+
+        {result && <SimulatorResultPanel result={result} onRecord={handleRecord} recording={recordMutation.isPending} />}
+      </div>
+    </SectionCard>
+  );
+}
+
 // ── Main Page Component ──────────────────────────────────────
 
 export default function InvestorDistributionsPage() {
@@ -459,6 +802,10 @@ export default function InvestorDistributionsPage() {
   return (
     <div>
       <PageHeader title="My Distributions" subtitle="Waterfall breakdown and distribution history" />
+
+      <div className="mb-6">
+        <DistributionSimulator fundId={fundId} />
+      </div>
 
       {!hasDistributions && !hasFundDistributionContext ? (
         <EmptyState

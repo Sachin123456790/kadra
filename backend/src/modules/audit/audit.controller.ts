@@ -5,6 +5,7 @@ import {
   Param,
   Body,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuditService } from './audit.service';
@@ -96,4 +97,44 @@ export class AuditController {
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
     };
   }
+
+  @Post('funds/:fundId/reset-demo')
+  async resetDemo(@Param('fundId') fundIdOrCode: string) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
+    const data = await this.auditService.resetDemoFund(fundId);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Get('funds/:fundId/gp-admin-export.pdf')
+  async getGpAdminExportPdf(
+    @Param('fundId') fundIdOrCode: string,
+    @Query('asOf') asOfParam: string | undefined,
+    @Res() res: any,
+  ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
+    const asOf = asOfParam ? new Date(asOfParam) : new Date();
+    const result = await this.auditService.renderGpAdminExportPdf(fundId, asOf);
+    sendBinary(res, result);
+  }
+}
+
+function sendBinary(
+  res: any,
+  result: { buffer: Buffer; filename: string; mimeType: string },
+): void {
+  const disposition = `inline; filename="${result.filename.replace(/"/g, '')}"`;
+  if (typeof res.header === 'function' && typeof res.send === 'function') {
+    res.header('Content-Type', result.mimeType);
+    res.header('Content-Disposition', disposition);
+    res.header('Content-Length', String(result.buffer.length));
+    res.send(result.buffer);
+    return;
+  }
+  res.setHeader('Content-Type', result.mimeType);
+  res.setHeader('Content-Disposition', disposition);
+  res.setHeader('Content-Length', String(result.buffer.length));
+  res.end(result.buffer);
 }

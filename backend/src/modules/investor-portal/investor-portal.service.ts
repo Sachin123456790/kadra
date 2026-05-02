@@ -300,6 +300,7 @@ export class InvestorPortalService {
             id: true,
             fundId: true,
             runStatus: true,
+            chainStatus: true,
             asOfTimestamp: true,
             completedAt: true,
             totalGrossAmount: true,
@@ -327,6 +328,7 @@ export class InvestorPortalService {
       run: {
         id: li.distributionRun.id,
         runStatus: li.distributionRun.runStatus,
+        chainStatus: li.distributionRun.chainStatus,
         asOfTimestamp: li.distributionRun.asOfTimestamp.toISOString(),
         completedAt: li.distributionRun.completedAt?.toISOString() ?? null,
         totalGrossAmount:

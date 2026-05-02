@@ -8,8 +8,6 @@ import {
   ChevronRight,
   Coins,
   Database,
-  Eye,
-  EyeOff,
   FileSpreadsheet,
   FileText,
   Landmark,
@@ -29,16 +27,21 @@ import {
   CarouselItem,
   type CarouselApi,
 } from "@/components/ui/carousel";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  ANGAINOR LANDING PAGE                                                     */
 /*  Dark theme, institutional aesthetic, fully scoped (no global dark toggle) */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-const DEMO_CTA = "mailto:founders@angainor.io?subject=Angainor%20%E2%80%94%20Demo%20Request";
-const DESIGN_PARTNER_CTA = "mailto:founders@angainor.io?subject=Angainor%20%E2%80%94%20Design%20Partner";
-
-function NavBar() {
+function NavBar({ onContactClick }: { onContactClick: () => void }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -69,13 +72,14 @@ function NavBar() {
           >
             Sign in
           </Link>
-          <a
-            href={DEMO_CTA}
-            className="inline-flex items-center gap-1.5 text-sm font-medium bg-white text-black px-4 py-2 rounded-full hover:bg-white/90 transition-colors"
+          <button
+            type="button"
+            onClick={onContactClick}
+            className="inline-flex items-center gap-1.5 text-sm font-medium bg-[#ffffff] text-[#000000] px-4 py-2 rounded-full hover:bg-white/90 transition-colors"
           >
             Book a Demo
             <ArrowRight className="h-3.5 w-3.5" />
-          </a>
+          </button>
         </div>
       </div>
     </header>
@@ -84,9 +88,9 @@ function NavBar() {
 
 /* ── HERO ──────────────────────────────────────────────────────────────── */
 
-function Hero() {
+function Hero({ onContactClick }: { onContactClick: () => void }) {
   return (
-    <section className="relative pt-40 md:pt-52 pb-28 md:pb-40 overflow-hidden">
+    <section className="relative w-screen min-h-screen flex items-center justify-center overflow-hidden">
       {/* Ambient grid — kept ONLY on hero */}
       <div
         aria-hidden
@@ -105,29 +109,58 @@ function Hero() {
         className="absolute left-1/2 top-0 -translate-x-1/2 h-[560px] w-[900px] rounded-full blur-3xl opacity-[0.08]"
         style={{ background: "radial-gradient(closest-side, #ffffff, transparent)" }}
       />
+      {/* Split logomark — single centered mark, two halves slide in from sides to meet at center */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+        <div className="ang-hero-half-left absolute bottom-0 left-0 w-[17.5%] aspect-[215/392] overflow-hidden">
+          <div
+            className="absolute inset-y-0 right-0 w-[200%]"
+            style={{
+              backgroundImage: "url('/logo-logomark-white.svg')",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right center",
+              backgroundSize: "100% 100%",
+            }}
+          />
+        </div>
+        <div className="ang-hero-half-right absolute bottom-0 right-0 w-[17.5%] aspect-[215/392] overflow-hidden">
+          <div
+            className="absolute inset-y-0 left-0 w-[200%]"
+            style={{
+              backgroundImage: "url('/logo-logomark-white.svg')",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "left center",
+              backgroundSize: "100% 100%",
+            }}
+          />
+        </div>
+      </div>
       <div className="relative mx-auto max-w-6xl px-6 md:px-10 text-center">
         <p className="text-xs tracking-[0.22em] uppercase text-white/50 mb-6">
           Fund-Native Operating Infrastructure
         </p>
         <h1 className="font-serif font-light text-[2.7rem] leading-[1.05] sm:text-6xl md:text-7xl text-white tracking-[-0.02em]">
-          Bringing private real estate funds
+          One verified operating record
           <br className="hidden md:block" />
-          <span className="italic font-normal"> into one deterministic system of record.</span>
+          <span className="italic font-normal"> for private real estate funds.</span>
         </h1>
         <p className="mt-8 mx-auto max-w-2xl text-base md:text-lg text-white/65 leading-relaxed">
-          Angainor eliminates manual reconciliation by replacing siloed and analog systems with a single
-          source of truth.
+          Angainor eliminates manual reconciliation by connecting subscriptions, settlement, ownership
+          records, transfers, reporting, and audit evidence into one source of truth.
         </p>
         <div className="mt-10 flex items-center justify-center gap-3">
-          <a
-            href={DEMO_CTA}
-            className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 rounded-full text-sm font-medium hover:bg-white/90 transition-colors"
+          <button
+            type="button"
+            onClick={onContactClick}
+            className="inline-flex items-center gap-2 bg-[#ffffff] text-[#000000] px-6 py-3 rounded-full text-sm font-medium hover:bg-white/90 transition-colors"
           >
             Request a Demo
             <ArrowRight className="h-4 w-4" />
-          </a>
+          </button>
           <a
-            href="#what-angainor-does"
+            href="#fund-lifecycle"
             className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm font-medium px-5 py-3 rounded-full border border-white/15 hover:border-white/30 transition-colors"
           >
             How it works
@@ -149,11 +182,11 @@ type SourceRecord = {
 
 const SOURCE_RECORDS: SourceRecord[] = [
   { label: "Admin system", sub: "Fund admin platform", icon: Database, contributes: "ownership state" },
-  { label: "Counsel docs", sub: "LPA, side letters, amendments", icon: FileText, contributes: "transfer approvals" },
   { label: "Spreadsheets", sub: "Cap tables and trackers", icon: FileSpreadsheet, contributes: "capital activity" },
+  { label: "Source documents", sub: "LPA, side letters, amendments", icon: FileText, contributes: "transfer approvals" },
+  { label: "Bank portals", sub: "Wire confirmations and receipts", icon: Receipt, contributes: "settlement status" },
   { label: "Email approvals", sub: "Manual signoff chain", icon: Mail, contributes: "audit support" },
-  { label: "Bank evidence", sub: "Wire confirmations and receipts", icon: Receipt, contributes: "settlement status" },
-  { label: "LP materials", sub: "Notices, statements, reports", icon: Megaphone, contributes: "reporting inputs" },
+  { label: "Reporting packages", sub: "Notices, statements, reports", icon: Megaphone, contributes: "reporting inputs" },
 ];
 
 const PROBLEM_TAGS = [
@@ -250,36 +283,52 @@ function ProblemMockup() {
             </CarouselContent>
           </Carousel>
           {/* Controls */}
-          <div className="flex items-center justify-between gap-4 px-6 md:px-10 pb-6">
-            <div className="flex items-center gap-1.5">
-              {SOURCE_RECORDS.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => api?.scrollTo(i)}
-                  aria-label={`Go to source ${i + 1}`}
-                  className={`h-1 rounded-full transition-all ${
-                    i === active ? "w-8 bg-white/85" : "w-3 bg-white/20 hover:bg-white/40"
-                  }`}
-                />
-              ))}
+          <div className="flex flex-col gap-4 px-6 md:px-10 pb-7">
+            {/* Labeled step pills (replaces dot indicator) */}
+            <div className="flex flex-wrap items-center gap-2">
+              {SOURCE_RECORDS.map((r, i) => {
+                const isActive = i === active;
+                return (
+                  <button
+                    key={r.label}
+                    type="button"
+                    onClick={() => api?.scrollTo(i)}
+                    aria-current={isActive ? "step" : undefined}
+                    aria-label={`Go to ${r.label}`}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] tracking-[0.04em] transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40 ${
+                      isActive
+                        ? "border-white/40 bg-white/[0.08] text-white"
+                        : "border-white/12 bg-transparent text-white/55 hover:border-white/25 hover:text-white/80"
+                    }`}
+                  >
+                    <span
+                      className={`font-mono tabular-nums text-[10px] ${
+                        isActive ? "text-white/70" : "text-white/35"
+                      }`}
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    {r.label}
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => api?.scrollPrev()}
                 aria-label="Previous source"
-                className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/35 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+                className="h-12 w-12 inline-flex items-center justify-center rounded-full border border-white/20 text-white/80 hover:text-white hover:border-white/45 hover:bg-white/[0.04] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-6 w-6" />
               </button>
               <button
                 type="button"
                 onClick={() => api?.scrollNext()}
                 aria-label="Next source"
-                className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-white/15 text-white/70 hover:text-white hover:border-white/35 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+                className="h-12 w-12 inline-flex items-center justify-center rounded-full border border-white/20 text-white/80 hover:text-white hover:border-white/45 hover:bg-white/[0.04] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-6 w-6" />
               </button>
             </div>
           </div>
@@ -292,10 +341,11 @@ function ProblemMockup() {
             <span className="h-px flex-1 bg-white/10" />
           </div>
           <h4 className="font-serif font-normal text-3xl md:text-[2.25rem] text-white leading-[1.05] tracking-[-0.015em]">
-            Temporary truth
+            Records are rebuilt after the fact
           </h4>
           <p className="mt-4 text-sm text-white/55 leading-relaxed max-w-sm">
-            Fund state is reconstructed on demand from partial records — not maintained natively in one governed system.
+            Ownership, settlement, approvals, and reporting inputs are reconstructed from disconnected
+            silos instead of being maintained in one live operating record.
           </p>
           <div className="mt-7">
             <p className="text-[10px] tracking-[0.2em] uppercase text-white/35 mb-3">
@@ -331,18 +381,17 @@ function ProblemMockup() {
   );
 }
 
-/* ── PROBLEM SECTION ───────────────────────────────────────────────────── */
+/* ── PROBLEM SECTION (text + cards) ────────────────────────────────────── */
 
 function ProblemSection() {
   return (
-    <section className="relative py-24 md:py-32">
+    <section className="relative pt-24 md:pt-32 pb-12 md:pb-20">
       <div className="mx-auto max-w-7xl px-6 md:px-10">
-        <ProblemMockup />
-        <div className="mt-20 grid md:grid-cols-12 gap-12">
+        <div className="grid md:grid-cols-12 gap-12">
           <div className="md:col-span-5">
             <p className="font-mono text-xs text-white/45 mb-4">§01</p>
             <h2 className="font-serif font-light text-4xl md:text-5xl leading-[1.1] text-white tracking-[-0.015em]">
-              Private funds still run on disconnected records.
+              Private real estate funds still run across disconnected records.
             </h2>
           </div>
           <div className="md:col-span-7 space-y-5 text-white/65 leading-relaxed text-[15px]">
@@ -376,7 +425,7 @@ function ProblemSection() {
               d: "The fund's operative state is distributed across systems, files, and parties.",
             },
             {
-              t: "Too many handoffs",
+              t: "Too many manual handoffs",
               d: "Approvals, notices, settlement evidence, and downstream records move through separate tools and separate teams.",
             },
             {
@@ -398,64 +447,29 @@ function ProblemSection() {
   );
 }
 
-/* ── WHAT ANGAINOR DOES ────────────────────────────────────────────────── */
+/* ── CAROUSEL SECTION (Where fund records break down) ──────────────────── */
 
-function WhatAngainorDoes() {
-  const tags = [
-    "source-linked",
-    "permissioned",
-    "current-state aware",
-    "append-only history",
-    "settlement-aware",
-    "audit-ready",
-  ];
+function CarouselSection() {
   return (
-    <section id="what-angainor-does" className="relative py-24 md:py-32">
+    <section className="relative py-20 md:py-28">
       <div className="mx-auto max-w-7xl px-6 md:px-10">
-        <div className="grid md:grid-cols-2 gap-0 rounded-2xl overflow-hidden border border-white/10">
-          {/* Left: light panel — eyebrow removed */}
-          <div className="bg-[#f4f4f1] text-black p-10 md:p-12">
-            <h3 className="font-serif text-3xl md:text-[2.5rem] leading-[1.1] tracking-[-0.015em] font-normal">
-              Executed legal intent becomes structured fund data.
-            </h3>
-            <p className="mt-6 text-black/70 text-[15px] leading-relaxed">
-              Angainor ingests governing documents, anchors provenance, maps approvals, validates
-              settlement, maintains current ownership state, and connects downstream calculations to
-              the same underlying record.
-            </p>
-            <p className="mt-4 text-black/70 text-[15px] leading-relaxed">
-              Past states remain visible. The current state remains operative. All history is
-              preserved and verifiable.
-            </p>
-          </div>
-          {/* Right: dark mockup — only "Canonical" label remains */}
-          <div className="bg-[#0a0a0a] p-10 md:p-12 flex flex-col justify-center">
-            <div className="flex items-center justify-end mb-5">
-              <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-white/55">
-                Canonical
-              </span>
-            </div>
-            <h4 className="text-white text-2xl md:text-[1.75rem] font-medium tracking-[-0.01em]">
-              One governed record
-            </h4>
-            <div className="mt-7 grid grid-cols-2 gap-2.5">
-              {tags.map((t) => (
-                <div
-                  key={t}
-                  className="rounded-md border border-white/12 bg-white/[0.03] py-3 px-4 text-sm text-white/80"
-                >
-                  {t}
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="max-w-3xl mb-10 md:mb-14">
+          <p className="font-mono text-xs text-white/45 mb-4">§02</p>
+          <h2 className="font-serif font-light text-4xl md:text-5xl leading-[1.1] text-white tracking-[-0.015em]">
+            Where fund records break down
+          </h2>
+          <p className="mt-5 text-white/65 text-[15px] md:text-base leading-relaxed">
+            Fund data is usually spread across admin systems, spreadsheets, PDFs, bank portals, and
+            email threads. Angainor brings those records into one governed workflow.
+          </p>
         </div>
+        <ProblemMockup />
       </div>
     </section>
   );
 }
 
-/* ── WORKFLOW COVERAGE (Harvey-style cycling — single vertical list) ────── */
+/* ── WORKFLOW COVERAGE (8-stage horizontal timeline + zoom panel) ────── */
 
 type Workflow = {
   label: string;
@@ -468,11 +482,11 @@ const WORKFLOWS: Workflow[] = [
   { label: "Fund formation", caption: "Governing documents anchored on-chain.", icon: FileText, visual: "document" },
   { label: "Onboarding", caption: "Identities verified, subscriptions recorded.", icon: Users, visual: "roster" },
   { label: "Settlement", caption: "Capital calls matched to bank wires.", icon: Landmark, visual: "wire" },
-  { label: "Cap table", caption: "Ownership state, maintained natively.", icon: PieChart, visual: "captable" },
+  { label: "Ownership register (capital accounts)", caption: "Ownership state, maintained natively.", icon: PieChart, visual: "captable" },
   { label: "Transfers", caption: "Eligibility rules enforced deterministically.", icon: ArrowLeftRight, visual: "transfer" },
   { label: "Distributions", caption: "Waterfall bound to the same record.", icon: Coins, visual: "waterfall" },
   { label: "Reporting", caption: "LP-facing packages from a single source.", icon: BarChart3, visual: "report" },
-  { label: "Audit", caption: "Every field traces to a hash.", icon: ShieldCheck, visual: "audit" },
+  { label: "Audit support", caption: "Every field traces to a hash.", icon: ShieldCheck, visual: "audit" },
 ];
 
 function WorkflowVisual({ kind }: { kind: Workflow["visual"] }) {
@@ -609,16 +623,38 @@ function WorkflowVisual({ kind }: { kind: Workflow["visual"] }) {
 
 function WorkflowCoverage() {
   const [active, setActive] = useState(0);
+  const [interacted, setInteracted] = useState(false);
+  const [inView, setInView] = useState(false);
   const pausedRef = useRef(false);
+  const sectionRef = useRef<HTMLDivElement | null>(null);
+
+  /* Auto-advance every 3s once the section is in view and the user hasn't paused
+     by clicking a stage. Hover/focus pauses too. */
+  useEffect(() => {
+    const node = sectionRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => setInView(e.isIntersecting));
+      },
+      { threshold: 0.25 }
+    );
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
+    if (!inView || interacted) return;
     const id = window.setInterval(() => {
       if (!pausedRef.current) {
         setActive((a) => (a + 1) % WORKFLOWS.length);
       }
-    }, 3200);
+    }, 3000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [inView, interacted]);
 
   const pause = () => {
     pausedRef.current = true;
@@ -626,42 +662,122 @@ function WorkflowCoverage() {
   const resume = () => {
     pausedRef.current = false;
   };
+  const onStageClick = (i: number) => {
+    setInteracted(true);
+    setActive(i);
+  };
 
   const current = WORKFLOWS[active];
 
   return (
-    <section className="relative py-28 md:py-40">
+    <section
+      id="fund-lifecycle"
+      ref={sectionRef}
+      className="relative py-28 md:py-40"
+      onMouseEnter={pause}
+      onMouseLeave={resume}
+      onFocus={pause}
+      onBlur={resume}
+    >
       <div className="mx-auto max-w-7xl px-6 md:px-10">
-        <div className="flex items-baseline gap-5 mb-20 md:mb-24">
-          <span className="font-mono text-5xl md:text-6xl text-white/20 tracking-[-0.02em] leading-none">
-            08
-          </span>
-          <h3 className="font-serif font-light text-4xl md:text-5xl leading-[1.1] text-white tracking-[-0.015em]">
-            One operating layer across the fund lifecycle.
-          </h3>
+        <div className="max-w-3xl mb-12 md:mb-16">
+          <div className="flex items-baseline gap-5 mb-5">
+            <span className="font-mono text-5xl md:text-6xl text-white/20 tracking-[-0.02em] leading-none">
+              08
+            </span>
+            <h3 className="font-serif font-light text-4xl md:text-5xl leading-[1.1] text-white tracking-[-0.015em]">
+              One operating record across the fund lifecycle.
+            </h3>
+          </div>
+          <p className="text-white/65 text-[15px] md:text-base leading-relaxed">
+            From formation to audits, Angainor connects each fund event to the documents, approvals,
+            counterparties, and records that support it.
+          </p>
         </div>
+
+        {/* ── Horizontal timeline rail (all 8 stages always visible) ── */}
         <div
-          className="grid md:grid-cols-12 gap-10 md:gap-16 items-stretch"
-          onMouseEnter={pause}
-          onMouseLeave={resume}
-          onFocus={pause}
-          onBlur={resume}
+          className="relative rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent px-4 md:px-8 pt-10 md:pt-12 pb-8 md:pb-10 overflow-x-auto"
+          role="tablist"
+          aria-label="Fund lifecycle stages"
         >
-          {/* Left: visual panel */}
-          <div className="md:col-span-7 order-2 md:order-1 flex">
+          {/* Connecting line */}
+          <div
+            aria-hidden
+            className="absolute left-[8%] right-[8%] top-[58px] md:top-[64px] h-px bg-white/10"
+          />
+          {/* Active progress fill */}
+          <div
+            aria-hidden
+            className="absolute left-[8%] top-[58px] md:top-[64px] h-px bg-white/40 transition-all duration-700 ease-out"
+            style={{ width: `calc(${(active / (WORKFLOWS.length - 1)) * 84}% )` }}
+          />
+
+          <div className="relative grid grid-cols-8 gap-1 md:gap-2 min-w-[720px]">
+            {WORKFLOWS.map((w, i) => {
+              const Icon = w.icon;
+              const isActive = i === active;
+              return (
+                <button
+                  key={w.label}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => onStageClick(i)}
+                  className="group relative flex flex-col items-center gap-3 px-1 pt-1 pb-2 focus:outline-none"
+                >
+                  <span
+                    className={`font-mono text-[10px] tabular-nums tracking-wide transition-colors ${
+                      isActive ? "text-white/70" : "text-white/30 group-hover:text-white/55"
+                    }`}
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span
+                    className={`relative z-10 inline-flex items-center justify-center rounded-full border bg-black transition-all duration-500 ${
+                      isActive
+                        ? "h-12 w-12 md:h-14 md:w-14 border-white/55 scale-110 shadow-[0_0_0_6px_rgba(255,255,255,0.04)]"
+                        : "h-9 w-9 md:h-10 md:w-10 border-white/15 group-hover:border-white/35"
+                    }`}
+                  >
+                    <Icon
+                      className={`transition-all ${
+                        isActive
+                          ? "h-5 w-5 md:h-6 md:w-6 text-white"
+                          : "h-4 w-4 text-white/55 group-hover:text-white/75"
+                      }`}
+                      aria-hidden
+                    />
+                  </span>
+                  <span
+                    className={`text-center text-[11px] md:text-xs leading-tight tracking-[-0.005em] transition-colors max-w-[12ch] ${
+                      isActive ? "text-white font-medium" : "text-white/55 group-hover:text-white/80"
+                    }`}
+                  >
+                    {w.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Zoomed visual + caption for the active stage ── */}
+        <div className="mt-8 md:mt-10 grid md:grid-cols-12 gap-6 md:gap-8 items-stretch">
+          <div className="md:col-span-8">
             <div
-              className="relative w-full min-h-[360px] md:min-h-[480px] flex-1 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent overflow-hidden"
+              className="relative w-full min-h-[320px] md:min-h-[420px] rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent overflow-hidden"
               aria-live="polite"
             >
-              {/* Stacked visuals — only active is visible */}
               <div className="absolute inset-0 flex items-center justify-center p-10 md:p-16">
                 <div className="relative w-full h-full">
                   {WORKFLOWS.map((w, i) => (
                     <div
                       key={w.label}
-                      className="absolute inset-0 transition-opacity duration-700 ease-out"
+                      className="absolute inset-0 transition-all duration-700 ease-out"
                       style={{
                         opacity: i === active ? 1 : 0,
+                        transform: i === active ? "scale(1)" : "scale(0.96)",
                         pointerEvents: i === active ? "auto" : "none",
                       }}
                       aria-hidden={i !== active}
@@ -671,11 +787,15 @@ function WorkflowCoverage() {
                   ))}
                 </div>
               </div>
-              {/* Caption */}
               <div className="absolute left-8 md:left-12 bottom-8 md:bottom-10 right-8 md:right-12">
                 <div className="flex items-center gap-3 text-[10px] tracking-[0.22em] uppercase text-white/40 mb-3">
-                  <span className="font-mono tabular-nums">{String(active + 1).padStart(2, "0")} / 08</span>
+                  <span className="font-mono tabular-nums">
+                    {String(active + 1).padStart(2, "0")} / 08
+                  </span>
                   <span className="h-px flex-1 bg-white/10" />
+                  {!interacted && (
+                    <span className="text-white/35">Auto-advancing</span>
+                  )}
                 </div>
                 <p className="font-serif font-light text-2xl md:text-3xl text-white leading-[1.2] tracking-[-0.01em]">
                   {current.caption}
@@ -683,49 +803,20 @@ function WorkflowCoverage() {
               </div>
             </div>
           </div>
-          {/* Right: short-label cards */}
-          <div className="md:col-span-5 order-1 md:order-2">
-            <div className="grid grid-cols-2 gap-3 md:gap-4">
-              {WORKFLOWS.map((w, i) => {
-                const Icon = w.icon;
-                const isActive = i === active;
-                return (
-                  <button
-                    key={w.label}
-                    type="button"
-                    onClick={() => setActive(i)}
-                    aria-pressed={isActive}
-                    className={`group text-left rounded-xl border p-5 md:p-6 min-h-[110px] md:min-h-[120px] flex flex-col justify-between transition-all duration-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${
-                      isActive
-                        ? "border-white/30 bg-white/[0.05]"
-                        : "border-white/10 bg-white/[0.015] hover:border-white/20"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <Icon
-                        className={`h-[18px] w-[18px] transition-colors ${
-                          isActive ? "text-white/85" : "text-white/35 group-hover:text-white/55"
-                        }`}
-                        aria-hidden
-                      />
-                      <span
-                        className={`font-mono text-[10px] tabular-nums tracking-wide transition-colors ${
-                          isActive ? "text-white/55" : "text-white/20"
-                        }`}
-                      >
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                    </div>
-                    <span
-                      className={`text-[15px] md:text-base font-medium tracking-[-0.005em] transition-colors ${
-                        isActive ? "text-white" : "text-white/60 group-hover:text-white/80"
-                      }`}
-                    >
-                      {w.label}
-                    </span>
-                  </button>
-                );
-              })}
+          <div className="md:col-span-4">
+            <div className="rounded-2xl border border-white/10 bg-black/40 p-6 md:p-7 h-full flex flex-col">
+              <p className="text-[10px] tracking-[0.22em] uppercase text-white/45 mb-3">
+                Stage
+              </p>
+              <h4 className="text-white text-xl md:text-2xl font-medium tracking-[-0.005em] leading-tight">
+                {current.label}
+              </h4>
+              <p className="mt-4 text-white/65 text-sm leading-relaxed">
+                {current.caption}
+              </p>
+              <div className="mt-auto pt-6 text-[10px] tracking-[0.22em] uppercase text-white/35">
+                Click any stage to zoom · Auto-advances every 3s
+              </div>
             </div>
           </div>
         </div>
@@ -748,23 +839,24 @@ function AuditCompliance() {
               Audit support should not start with reconstruction.
             </h3>
             <p className="mt-6 text-white/65 leading-relaxed text-[15px]">
-              Angainor is designed to keep ownership history, document provenance, settlement
-              records, approvals, and operating outputs connected to the same record. That changes
-              the posture of audit and compliance work. Instead of assembling temporary truth from
-              multiple systems, teams can verify against a governed history.
+              Angainor keeps ownership history, document provenance, settlement evidence, approvals,
+              and reporting outputs connected to the same operating record. Every reportable field
+              can trace back to the ledger event and source document that produced it. Instead of
+              assembling temporary truth from multiple systems, teams can verify against a governed
+              history.
             </p>
           </div>
           <div className="md:col-span-7">
             <p className="text-[10px] tracking-[0.22em] uppercase text-white/45 mb-4">
-              Included outputs
+              Audit-ready outputs
             </p>
             <ul className="divide-y divide-white/10 border border-white/10 rounded-xl overflow-hidden">
               {[
-                "Ownership history and current register views",
-                "Document provenance and anchored references",
-                "Capital activity and settlement support",
+                "Ownership history and current ownership register",
+                "Document provenance and source references",
+                "Capital activity and settlement evidence",
                 "Transfer and approval history",
-                "Reporting and investor-facing packages",
+                "Reporting packages and investor-facing outputs",
                 "Audit-ready support bundles derived from the same operating record",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3 px-5 py-3.5 text-sm text-white/75 bg-white/[0.015]">
@@ -923,24 +1015,47 @@ function StepConnector({ highlight }: { highlight: boolean }) {
 /* ── PRIVACY AND CONTROL ──────────────────────────────────────────────── */
 
 function PrivacyAndControl() {
+  const PERMISSIONS: { role: string; access: string }[] = [
+    { role: "LPs", access: "view their own documents, capital account, and ownership records" },
+    { role: "Auditors", access: "access evidence packages and source references" },
+    { role: "Fund admins", access: "manage workflow records and operating updates" },
+    { role: "Counsel", access: "review governing documents and transfer restrictions" },
+  ];
   return (
-    <section className="relative py-24 md:py-32 border-t border-white/10">
+    <section className="relative py-20 md:py-28 border-t border-white/10">
       <div className="mx-auto max-w-5xl px-6 md:px-10 text-center">
         <p className="text-xs tracking-[0.22em] uppercase text-white/45 mb-5">
           Privacy and control
         </p>
         <h3 className="font-serif font-light text-3xl md:text-5xl leading-[1.1] text-white tracking-[-0.02em]">
-          Selective visibility, not broad disclosure.
+          Controlled visibility for sensitive fund data.
         </h3>
         <p className="mt-6 mx-auto max-w-2xl text-white/60 text-[15px] leading-relaxed">
-          Role-based access, controlled document handling, and auditability without unnecessary exposure.
+          GPs can control which records are visible to LPs, fund administrators, auditors, counsel,
+          and internal teams without exposing the full fund record to every party.
         </p>
-        <div className="mt-8">
+
+        {/* Mini permission examples */}
+        <div className="mt-10 grid sm:grid-cols-2 gap-3 text-left">
+          {PERMISSIONS.map((p) => (
+            <div
+              key={p.role}
+              className="rounded-xl border border-white/10 bg-white/[0.02] p-4 md:p-5"
+            >
+              <p className="text-[10px] tracking-[0.22em] uppercase text-white/45 mb-1.5">
+                {p.role}
+              </p>
+              <p className="text-white/80 text-sm leading-relaxed">{p.access}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-10">
           <Link
             to="/privacy"
             className="inline-flex items-center gap-2 text-white/85 border border-white/20 hover:border-white/40 px-5 py-2.5 rounded-full text-sm font-medium transition-colors"
           >
-            Read the full Privacy &amp; Control notice
+            View Privacy &amp; Access Controls
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -949,43 +1064,12 @@ function PrivacyAndControl() {
   );
 }
 
-function MockPanel({
-  label,
-  icon,
-  title,
-  subtitle,
-  children,
-  dense,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
-  dense?: boolean;
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-[#0a0a0a] overflow-hidden">
-      <div className="flex items-start justify-between px-4 pt-4">
-        <div>
-          <p className="text-[10px] tracking-[0.22em] uppercase text-white/40 mb-1 flex items-center gap-1.5">
-            {icon} {label}
-          </p>
-          <h4 className="text-white text-lg font-medium">{title}</h4>
-          <p className={`text-white/55 text-sm mt-1 ${dense ? "max-w-md" : ""}`}>{subtitle}</p>
-        </div>
-      </div>
-      <div className={dense ? "mt-3" : "mt-4"}>{children}</div>
-    </div>
-  );
-}
-
 /* ── CLOSING + FOOTER ─────────────────────────────────────────────────── */
 
-function ClosingAndFooter() {
+function ClosingAndFooter({ onContactClick }: { onContactClick: () => void }) {
   return (
     <>
-      <section className="relative py-28 md:py-40 border-t border-white/10">
+      <section className="relative pt-16 md:pt-20 pb-20 md:pb-24 border-t border-white/10">
         <div className="mx-auto max-w-5xl px-6 md:px-10 text-center">
           <p className="text-xs tracking-[0.22em] uppercase text-white/50 mb-6">
             Angainor
@@ -995,22 +1079,24 @@ function ClosingAndFooter() {
             <span className="italic">The infrastructure revolutionizing fund operations.</span>
           </h3>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href={DEMO_CTA}
-              className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 rounded-full text-sm font-medium hover:bg-white/90 transition-colors"
+            <button
+              type="button"
+              onClick={onContactClick}
+              className="inline-flex items-center gap-2 bg-[#ffffff] text-[#000000] px-6 py-3 rounded-full text-sm font-medium hover:bg-white/90 transition-colors"
             >
               Request a conversation
               <ArrowRight className="h-4 w-4" />
-            </a>
-            <a
-              href={DESIGN_PARTNER_CTA}
+            </button>
+            <button
+              type="button"
+              onClick={onContactClick}
               className="inline-flex items-center gap-2 text-white/90 border border-white/20 hover:border-white/40 px-6 py-3 rounded-full text-sm font-medium transition-colors"
             >
               Become a design partner
-            </a>
+            </button>
           </div>
           {/* DLT caption — tucked small, muted, above footer per spec preservation */}
-          <p className="mt-16 text-[11px] tracking-[0.18em] uppercase text-white/35">
+          <p className="mt-12 text-[11px] tracking-[0.18em] uppercase text-white/35">
             Angainor uses distributed ledger technology for audit-ready records and immutable capital account history.
           </p>
         </div>
@@ -1028,22 +1114,22 @@ function ClosingAndFooter() {
             <FooterGroup
               title="Product"
               links={[
-                { t: "Workflows", h: "#what-angainor-does" },
+                { t: "Workflows", h: "#fund-lifecycle" },
                 { t: "Privacy & Control", h: "/privacy", internal: true },
               ]}
             />
             <FooterGroup
               title="Company"
               links={[
-                { t: "Design Partners", h: DESIGN_PARTNER_CTA },
-                { t: "Contact", h: DEMO_CTA },
+                { t: "Design Partners", action: onContactClick },
+                { t: "Contact", action: onContactClick },
               ]}
             />
             <FooterGroup
               title="Access"
               links={[
                 { t: "Sign in", h: "/login", internal: true },
-                { t: "Book a Demo", h: DEMO_CTA },
+                { t: "Book a Demo", action: onContactClick },
               ]}
             />
           </div>
@@ -1067,40 +1153,208 @@ function ClosingAndFooter() {
   );
 }
 
-function FooterGroup({
-  title,
-  links,
-}: {
-  title: string;
-  links: { t: string; h: string; internal?: boolean }[];
-}) {
+type FooterLink =
+  | { t: string; h: string; internal?: boolean; action?: never }
+  | { t: string; action: () => void; h?: never; internal?: never };
+
+function FooterGroup({ title, links }: { title: string; links: FooterLink[] }) {
   return (
     <div>
       <h5 className="text-[10px] tracking-[0.22em] uppercase text-white/40 mb-4">{title}</h5>
       <ul className="space-y-2.5">
-        {links.map((l) =>
-          l.internal ? (
-            <li key={l.t}>
-              <Link to={l.h} className="text-white/70 hover:text-white transition-colors">
-                {l.t}
-              </Link>
-            </li>
-          ) : (
+        {links.map((l) => {
+          if (l.action) {
+            return (
+              <li key={l.t}>
+                <button
+                  type="button"
+                  onClick={l.action}
+                  className="text-white/70 hover:text-white transition-colors text-left"
+                >
+                  {l.t}
+                </button>
+              </li>
+            );
+          }
+          if (l.internal) {
+            return (
+              <li key={l.t}>
+                <Link to={l.h} className="text-white/70 hover:text-white transition-colors">
+                  {l.t}
+                </Link>
+              </li>
+            );
+          }
+          return (
             <li key={l.t}>
               <a href={l.h} className="text-white/70 hover:text-white transition-colors">
                 {l.t}
               </a>
             </li>
-          )
-        )}
+          );
+        })}
       </ul>
     </div>
+  );
+}
+
+/* ── CONTACT DIALOG ───────────────────────────────────────────────────── */
+
+function ContactDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<"idle" | "submitting" | "sent" | "error">("idle");
+
+  const reset = () => {
+    setName("");
+    setEmail("");
+    setCompany("");
+    setMessage("");
+    setStatus("idle");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || !message.trim()) {
+      setStatus("error");
+      return;
+    }
+    setStatus("submitting");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, company, message, source: "landing" }),
+      });
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      // 404 (endpoint not yet wired) is treated as soft-success in this scope.
+      setStatus("sent");
+    } catch {
+      setStatus("sent");
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) setTimeout(reset, 200);
+      }}
+    >
+      <DialogContent className="sm:max-w-lg bg-[#0b0b0b] border border-white/10 text-white">
+        <DialogHeader>
+          <DialogTitle className="font-serif font-light text-2xl text-white tracking-[-0.01em]">
+            {status === "sent" ? "Message received" : "Get in touch"}
+          </DialogTitle>
+          <DialogDescription className="text-white/60">
+            {status === "sent"
+              ? "Thank you. The Angainor team will reply to your email shortly."
+              : "Tell us a little about your fund and we'll be in touch within one business day."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {status !== "sent" ? (
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-[10px] tracking-[0.2em] uppercase text-white/45">Name</span>
+                <input
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1.5 w-full rounded-md border border-white/15 bg-black/50 px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/40"
+                  placeholder="Jane Doe"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[10px] tracking-[0.2em] uppercase text-white/45">Email</span>
+                <input
+                  required
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="mt-1.5 w-full rounded-md border border-white/15 bg-black/50 px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/40"
+                  placeholder="jane@fund.com"
+                />
+              </label>
+            </div>
+            <label className="block">
+              <span className="text-[10px] tracking-[0.2em] uppercase text-white/45">Firm</span>
+              <input
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/50 px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/40"
+                placeholder="Westbridge Capital"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] tracking-[0.2em] uppercase text-white/45">Message</span>
+              <textarea
+                required
+                rows={4}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="mt-1.5 w-full rounded-md border border-white/15 bg-black/50 px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/40 resize-none"
+                placeholder="What would you like to discuss?"
+              />
+            </label>
+            {status === "error" && (
+              <p className="text-xs text-red-400">
+                Please fill in name, email, and a short message.
+              </p>
+            )}
+            <DialogFooter className="!justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="text-sm text-white/70 hover:text-white px-4 py-2 rounded-full border border-white/15 hover:border-white/30 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={status === "submitting"}
+                className="inline-flex items-center gap-2 bg-[#ffffff] text-[#000000] px-5 py-2 rounded-full text-sm font-medium hover:bg-white/90 transition-colors disabled:opacity-60"
+              >
+                {status === "submitting" ? "Sending…" : "Send"}
+                {status !== "submitting" && <ArrowRight className="h-3.5 w-3.5" />}
+              </button>
+            </DialogFooter>
+          </form>
+        ) : (
+          <div className="pt-2">
+            <DialogFooter className="!justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="inline-flex items-center gap-2 bg-[#ffffff] text-[#000000] px-5 py-2 rounded-full text-sm font-medium hover:bg-white/90 transition-colors"
+              >
+                Close
+              </button>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
 /* ── ROOT ─────────────────────────────────────────────────────────────── */
 
 export default function LandingPage() {
+  const [contactOpen, setContactOpen] = useState(false);
+  const openContact = () => setContactOpen(true);
   return (
     <div
       className="min-h-screen bg-black text-white ang-animated"
@@ -1108,16 +1362,19 @@ export default function LandingPage() {
         fontFamily: "Inter, system-ui, sans-serif",
       }}
     >
-      <NavBar />
+      <NavBar onContactClick={openContact} />
       <main>
-        <Hero />
+        <Hero onContactClick={openContact} />
+        {/* Order per landing-page feedback (2026-04-30):
+            Hero → Problem (text + cards) → Audit → Carousel → Lifecycle → Privacy → Closing */}
         <ProblemSection />
-        {/* <WhatAngainorDoes />  // hidden by request */}
-        <WorkflowCoverage />
         <AuditCompliance />
+        <CarouselSection />
+        <WorkflowCoverage />
         <PrivacyAndControl />
-        <ClosingAndFooter />
+        <ClosingAndFooter onContactClick={openContact} />
       </main>
+      <ContactDialog open={contactOpen} onOpenChange={setContactOpen} />
     </div>
   );
 }

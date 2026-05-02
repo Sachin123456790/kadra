@@ -1,4 +1,4 @@
-import { get, upload } from './api-client';
+import { get, post, upload } from './api-client';
 import { downloadBlob } from '@/lib/downloadBlob';
 
 // ── Types (match actual backend response shapes) ────────
@@ -44,7 +44,7 @@ export interface InvestorDistributionLineItem {
   prefAmount: string; returnOfCapitalAmount: string; promoteAmount: string;
   tierBreakdown: unknown; createdAt: string;
   run: {
-    id: string; runStatus: string; asOfTimestamp: string;
+    id: string; runStatus: string; chainStatus?: string; asOfTimestamp: string;
     completedAt: string | null; totalGrossAmount: string | null;
     totalNetAmount: string | null; currency: string;
   };
@@ -91,6 +91,63 @@ export function getMyDistributions(fundId = DEFAULT_FUND) {
 
 export function getMyTransfers(fundId = DEFAULT_FUND) {
   return get<InvestorTransferRequest[]>(`/investor/me/transfers?fundId=${fundId}`);
+}
+
+export interface DistributionSimulationBreakdown {
+  investorId: string | null;
+  investorName: string | null;
+  walletAddress: string;
+  ownershipPctUsed: number;
+  grossAmount: string;
+  netAmount: string;
+  returnOfCapitalAmount: number;
+  prefAmount: number;
+  promoteAmount: number;
+  tierBreakdown: {
+    returnOfCapital: string;
+    preferredReturn: string;
+    gpCatchUp: string;
+    carriedInterest: string;
+  };
+}
+
+export interface DistributionSimulationResult {
+  totalAmount: number;
+  breakdown: DistributionSimulationBreakdown;
+  waterfall: {
+    prefReturnPct: number | null;
+    gpPromotePct: number | null;
+    catchUpEnabled: boolean;
+  };
+  fundOwnershipPct: number;
+  contribution: number;
+}
+
+export function simulateMyDistribution(
+  totalAmount: number,
+  fundId = DEFAULT_FUND,
+) {
+  return post<DistributionSimulationResult>(
+    `/investor/me/distributions/simulate`,
+    { totalAmount, fundId },
+  );
+}
+
+export interface DistributionDemoRecord {
+  runId: string;
+  chainStatus: 'SIMULATED';
+  totalAmount: number;
+  breakdown: DistributionSimulationBreakdown;
+}
+
+export function recordMyDemoDistribution(
+  totalAmount: number,
+  fundId = DEFAULT_FUND,
+) {
+  return post<DistributionDemoRecord>(
+    `/investor/me/distributions/record-demo`,
+    { totalAmount, fundId },
+  );
 }
 
 export function getInvestorCapTable(fundId = DEFAULT_FUND) {

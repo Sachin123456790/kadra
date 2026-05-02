@@ -23,7 +23,7 @@ export interface WaterfallLineItem {
   readonly tierBreakdown: TierBreakdown;
 }
 
-interface WaterfallConfig {
+export interface WaterfallConfig {
   readonly prefReturnPct: number | null;
   readonly gpPromotePct: number | null;
   readonly catchUpEnabled: boolean;
@@ -141,6 +141,192 @@ export class DistributionService {
       where: { fundId, investorId, isCurrent: true, deletedAt: null },
     });
     return account ? Number(account.initialContribution) : 0;
+  }
+
+  /**
+   * Read-only simulation of how a hypothetical distribution would be split for
+   * a single LP. No DB writes. Uses the active waterfall config + the LP's
+   * current settled token balance + their initial capital contribution.
+   */
+  async simulateForInvestor(
+    fundId: string,
+    investorId: string,
+    totalAmount: number,
+  ): Promise<{
+    totalAmount: number;
+    breakdown: WaterfallLineItem;
+    waterfall: WaterfallConfig;
+    fundOwnershipPct: number;
+    contribution: number;
+  }> {
+    const config = await this.prisma.waterfallConfig.findFirst({
+      where: { fundId, isActive: true, deletedAt: null },
+    });
+    if (!config) throw new NotFoundError('WaterfallConfig', fundId);
+
+    const contract = await this.prisma.tokenContract.findFirst({
+      where: { fundId, deploymentStatus: 'DEPLOYED', deletedAt: null },
+    });
+
+    const positions = contract
+      ? await this.prisma.tokenPosition.findMany({
+          where: { tokenContractId: contract.id },
+          include: { wallet: { include: { investor: true } } },
+        })
+      : [];
+
+    const totalSupply = positions.reduce(
+      (sum, p) => sum + Number(p.settledTokenBalance),
+      0,
+    );
+    if (totalSupply === 0) {
+      throw new ConflictError(
+        'NO_SETTLED_OWNERSHIP',
+        'No settled ownership found for distribution',
+      );
+    }
+
+    const myPosition = positions.find(
+      (p) => p.wallet?.investor?.id === investorId,
+    );
+    if (!myPosition) {
+      throw new NotFoundError('TokenPosition', investorId);
+    }
+
+    const waterfallConfig: WaterfallConfig = {
+      prefReturnPct: config.prefReturnPct ? Number(config.prefReturnPct) : null,
+      gpPromotePct: config.gpPromotePct ? Number(config.gpPromotePct) : null,
+      catchUpEnabled: config.catchUpEnabled,
+    };
+    const contribution = await this.getInitialContribution(fundId, investorId);
+    const breakdown = this.computeWaterfallForPosition(
+      myPosition,
+      totalSupply,
+      totalAmount,
+      waterfallConfig,
+      contribution,
+    );
+
+    return {
+      totalAmount,
+      breakdown,
+      waterfall: waterfallConfig,
+      fundOwnershipPct:
+        (Number(myPosition.settledTokenBalance) / totalSupply) * 100,
+      contribution,
+    };
+  }
+
+  /**
+   * Persist a simulated distribution for a single LP. Creates a
+   * DistributionRun row marked chainStatus=SIMULATED with one
+   * DistributionLineItem and a Distribution notice. Does NOT mutate
+   * tokenPositions or fire any chain transaction.
+   */
+  async recordDemoForInvestor(
+    fundId: string,
+    investorId: string,
+    totalAmount: number,
+    notices: {
+      generateNotice: (input: {
+        fundId: string;
+        type: string;
+        recipientInvestorId: string;
+        distributionRunId?: string;
+      }) => Promise<unknown>;
+    },
+  ) {
+    const sim = await this.simulateForInvestor(fundId, investorId, totalAmount);
+
+    const config = await this.prisma.waterfallConfig.findFirst({
+      where: { fundId, isActive: true, deletedAt: null },
+    });
+    if (!config) throw new NotFoundError('WaterfallConfig', fundId);
+
+    const snapshot = await this.prisma.ownershipSnapshot.create({
+      data: {
+        fundId,
+        snapshotType: 'RUN_START',
+        asOfTimestamp: new Date(),
+        source: 'INVESTOR_SIMULATION',
+      },
+    });
+
+    const run = await this.prisma.distributionRun.create({
+      data: {
+        fundId,
+        waterfallConfigId: config.id,
+        ownershipSnapshotId: snapshot.id,
+        runStatus: 'COMPLETED',
+        chainStatus: 'SIMULATED',
+        asOfTimestamp: new Date(),
+        startedAt: new Date(),
+        completedAt: new Date(),
+        totalGrossAmount: totalAmount,
+        totalNetAmount: parseFloat(sim.breakdown.netAmount),
+        currency: 'USD',
+        triggeredBy: `investor:${investorId}`,
+        metadata: {
+          source: 'INVESTOR_SIMULATION',
+          note: 'LP-initiated demo distribution. Off-chain, no GP approval, no batch wire.',
+        },
+      },
+    });
+
+    const wallet = await this.prisma.wallet.findFirst({
+      where: { investorId, deletedAt: null },
+    });
+    const capitalAccount = await this.prisma.capitalAccount.findFirst({
+      where: { fundId, investorId, isCurrent: true, deletedAt: null },
+    });
+
+    await this.prisma.distributionLineItem.create({
+      data: {
+        distributionRunId: run.id,
+        investorId,
+        walletId: wallet?.id,
+        capitalAccountId: capitalAccount?.id,
+        grossAmount: parseFloat(sim.breakdown.grossAmount),
+        netAmount: parseFloat(sim.breakdown.netAmount),
+        currency: 'USD',
+        ownershipPctUsed: sim.breakdown.ownershipPctUsed,
+        prefAmount: sim.breakdown.prefAmount,
+        returnOfCapitalAmount: sim.breakdown.returnOfCapitalAmount,
+        promoteAmount: sim.breakdown.promoteAmount,
+        tierBreakdown: sim.breakdown.tierBreakdown as object,
+      },
+    });
+
+    await this.eventLog.log({
+      eventType: 'DISTRIBUTION_SIMULATED',
+      aggregateType: 'DISTRIBUTION_RUN',
+      aggregateId: run.id,
+      fundId,
+      payload: {
+        investorId,
+        totalAmount,
+        ownershipPct: sim.fundOwnershipPct,
+        netToLP: sim.breakdown.netAmount,
+      },
+    });
+
+    try {
+      await notices.generateNotice({
+        fundId,
+        type: 'DISTRIBUTION',
+        recipientInvestorId: investorId,
+        distributionRunId: run.id,
+      });
+    } catch {
+      // Notice generation failure shouldn't break the demo flow.
+    }
+
+    return {
+      runId: run.id,
+      chainStatus: 'SIMULATED' as const,
+      breakdown: sim.breakdown,
+      totalAmount,
+    };
   }
 
   async getActiveWaterfallConfig(fundId: string) {

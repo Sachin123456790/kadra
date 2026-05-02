@@ -1,0 +1,1 @@
+ALTER TABLE "distribution_runs" ADD COLUMN IF NOT EXISTS "chain_status" VARCHAR(32) NOT NULL DEFAULT 'ONCHAIN';

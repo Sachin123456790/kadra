@@ -10,9 +10,10 @@ import { TableSkeleton } from "@/components/angainor/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getInvestors, getSubscriptions } from "@/services";
 import { getCapTable } from "@/services/ownership.service";
-import { Search, UserPlus, Wallet } from "lucide-react";
+import { Search, Upload, UserPlus, Wallet } from "lucide-react";
 import type { Investor } from "@/services/investors.service";
 import { InviteInvestorModal } from "@/components/angainor/InviteInvestorModal";
+import { BulkImportInvestorsModal } from "@/components/angainor/BulkImportInvestorsModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -71,6 +72,7 @@ export default function InvestorsPage() {
   const navigate = useNavigate();
   const fundId = DEFAULT_FUND_CODE;
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: rawInvestors, isLoading, error } = useQuery({
@@ -260,13 +262,22 @@ export default function InvestorsPage() {
         title="Investors"
         subtitle="Manage fund investors and verification status"
         action={
-          <Button
-            onClick={() => setInviteOpen(true)}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <UserPlus className="mr-2 h-4 w-4" />
-            Invite Investor
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Import
+            </Button>
+            <Button
+              onClick={() => setInviteOpen(true)}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Invite Investor
+            </Button>
+          </div>
         }
       />
       <SectionCard>
@@ -297,6 +308,12 @@ export default function InvestorsPage() {
       <InviteInvestorModal
         open={inviteOpen}
         onOpenChange={setInviteOpen}
+        fundId={fundId}
+      />
+
+      <BulkImportInvestorsModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
         fundId={fundId}
       />
     </div>

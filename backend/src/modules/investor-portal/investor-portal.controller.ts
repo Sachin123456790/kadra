@@ -15,6 +15,8 @@ import { Roles } from '../../common/auth/roles.decorator';
 import { ADMIN_ROLES } from '../../common/auth/auth.types';
 import { InvestorPortalService } from './investor-portal.service';
 import { DocumentsService } from '../documents/documents.service';
+import { DistributionService } from '../distribution/distribution.service';
+import { NoticesService } from '../notices/notices.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -166,6 +168,8 @@ export class InvestorPortalController {
     private readonly portalService: InvestorPortalService,
     private readonly prisma: PrismaService,
     private readonly documentsService: DocumentsService,
+    private readonly distributionService: DistributionService,
+    private readonly noticesService: NoticesService,
   ) {}
 
   @Get('me/dashboard')
@@ -218,6 +222,57 @@ export class InvestorPortalController {
     const data = await this.portalService.getMyDistributions(
       investor.id,
       fundId,
+    );
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Post('me/distributions/simulate')
+  async simulateMyDistribution(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { totalAmount?: number | string; fundId?: string },
+  ) {
+    const investor = await this.portalService.resolveInvestor(user.email);
+    const fundId = await resolveFundId(
+      this.prisma,
+      body.fundId || DEFAULT_FUND_CODE,
+    );
+    const amount = Number(body.totalAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('totalAmount must be a positive number');
+    }
+    const data = await this.distributionService.simulateForInvestor(
+      fundId,
+      investor.id,
+      amount,
+    );
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Post('me/distributions/record-demo')
+  async recordMyDemoDistribution(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { totalAmount?: number | string; fundId?: string },
+  ) {
+    const investor = await this.portalService.resolveInvestor(user.email);
+    const fundId = await resolveFundId(
+      this.prisma,
+      body.fundId || DEFAULT_FUND_CODE,
+    );
+    const amount = Number(body.totalAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('totalAmount must be a positive number');
+    }
+    const data = await this.distributionService.recordDemoForInvestor(
+      fundId,
+      investor.id,
+      amount,
+      this.noticesService,
     );
     return {
       data,
