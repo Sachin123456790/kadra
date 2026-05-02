@@ -247,12 +247,66 @@ export default function InvestorsPage() {
     );
   }
 
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        onClick={() => setImportOpen(true)}
+      >
+        <Upload className="mr-2 h-4 w-4" />
+        Import
+      </Button>
+      <Button
+        onClick={() => setInviteOpen(true)}
+        className="bg-primary hover:bg-primary/90 text-primary-foreground"
+      >
+        <UserPlus className="mr-2 h-4 w-4" />
+        Invite Investor
+      </Button>
+    </div>
+  );
+
   if (!allInvestors || allInvestors.length === 0) {
     return (
-      <EmptyState
-        title="No investors registered"
-        message="Add investors to begin the onboarding process."
-      />
+      <div>
+        <PageHeader
+          title="Investors"
+          subtitle="Manage fund investors and verification status"
+          action={headerActions}
+        />
+        <EmptyState
+          title="No investors registered"
+          message="Add investors to begin the onboarding process."
+          action={
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setImportOpen(true)}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Import CSV / XLSX
+              </Button>
+              <Button
+                onClick={() => setInviteOpen(true)}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                Invite Investor
+              </Button>
+            </div>
+          }
+        />
+        <InviteInvestorModal
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+          fundId={fundId}
+        />
+        <BulkImportInvestorsModal
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          fundId={fundId}
+        />
+      </div>
     );
   }
 
@@ -261,24 +315,7 @@ export default function InvestorsPage() {
       <PageHeader
         title="Investors"
         subtitle="Manage fund investors and verification status"
-        action={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setImportOpen(true)}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-            <Button
-              onClick={() => setInviteOpen(true)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              <UserPlus className="mr-2 h-4 w-4" />
-              Invite Investor
-            </Button>
-          </div>
-        }
+        action={headerActions}
       />
       <SectionCard>
         <div className="mb-4 flex items-center gap-3">
