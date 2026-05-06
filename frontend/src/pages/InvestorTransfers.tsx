@@ -14,7 +14,9 @@ import { TechnicalDetails } from "@/components/angainor/TechnicalDetails";
 import { useWallet } from "@/hooks/useWallet";
 import type { InvestorTransferRequest } from "@/services/investor-portal.service";
 import { TableSkeleton } from "@/components/angainor/Skeleton";
-import { Shield, AlertCircle, CheckCircle } from "lucide-react";
+import { Shield, AlertCircle, CheckCircle, Upload } from "lucide-react";
+import { ImportOffChainTransferModal } from "@/components/angainor/ImportOffChainTransferModal";
+import { Button } from "@/components/ui/button";
 import { useHighlightRow } from "@/hooks/useHighlightRow";
 import { cn } from "@/lib/utils";
 import { isAddress } from "viem";
@@ -442,6 +444,7 @@ function TransferHistorySection({
 export default function InvestorTransfersPage() {
   const fundId = DEFAULT_FUND_CODE;
   const { highlightId, isPulsing } = useHighlightRow();
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const { data: transfers, isLoading: transfersLoading, error: transfersError } = useQuery({
     queryKey: QUERY_KEYS.investorTransfers(fundId),
@@ -489,10 +492,20 @@ export default function InvestorTransfersPage() {
 
   return (
     <div>
-      <PageHeader
-        title="My Transfers"
-        subtitle="Transfer ownership to other eligible investors"
-      />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeader
+          title="My Transfers"
+          subtitle="Transfer ownership to other eligible investors"
+        />
+        <Button
+          variant="outline"
+          onClick={() => setImportModalOpen(true)}
+          className="mt-1 shrink-0"
+        >
+          <Upload className="mr-2 h-4 w-4" />
+          Import off-chain transfer
+        </Button>
+      </div>
 
       <div className="space-y-6">
         {/* Section 1: Transfer Eligibility */}
@@ -513,6 +526,15 @@ export default function InvestorTransfersPage() {
           isPulsing={isPulsing}
         />
       </div>
+
+      <ImportOffChainTransferModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        fundId={fundId}
+        senderInvestorId={dashboard?.investor?.id ?? null}
+        senderTokenBalance={tokenBalance}
+        capTableRows={capTable?.rows ?? []}
+      />
     </div>
   );
 }

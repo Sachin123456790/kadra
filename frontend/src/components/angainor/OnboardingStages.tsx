@@ -97,7 +97,7 @@ export function OnboardingStages({
           <div className="text-sm font-semibold">
             {summary.completed
               ? "Fully onboarded"
-              : `Stuck on: ${stuckStage?.label ?? "—"}`}
+              : `In progress: ${stuckStage?.label ?? "—"}`}
           </div>
           <div className="text-xs opacity-80">
             {summary.completed

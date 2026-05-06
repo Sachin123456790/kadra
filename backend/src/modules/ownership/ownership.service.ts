@@ -40,7 +40,7 @@ export class OwnershipService {
       where: { fundId, deploymentStatus: 'DEPLOYED', deletedAt: null },
     });
 
-    // Get settled positions from token_positions
+    // Settled positions from token_positions (one row per wallet on chain)
     const positions = contract
       ? await this.prisma.tokenPosition.findMany({
           where: { tokenContractId: contract.id },
@@ -48,93 +48,143 @@ export class OwnershipService {
         })
       : [];
 
-    // Calculate total supply for ownership %
     const totalSupply = positions.reduce(
       (sum, p) => sum + Number(p.settledTokenBalance),
       0,
     );
 
-    // Fallback: if no token positions, build cap table from SETTLED subscriptions
-    if (positions.length === 0) {
-      const settledSubs = await this.prisma.subscription.findMany({
-        where: { fundId, status: 'SETTLED', deletedAt: null },
-        include: { investor: true, wallet: true },
-      });
+    type CapRow = {
+      investorId: string | null;
+      investorName: string | null;
+      walletAddress: string;
+      pendingAllocationPct: number;
+      settledTokenBalance: string;
+      ownershipPct: number;
+      subscriptionCount: number;
+    };
 
-      if (settledSubs.length > 0) {
-        const totalCommitted = settledSubs.reduce(
-          (sum, s) => sum + Number(s.committedAmount),
-          0,
-        );
-        const rows = settledSubs.map((s) => ({
-          investorId: s.investorId,
-          investorName: s.investor.legalName,
-          walletAddress: s.wallet?.address ?? '',
+    // Group by investor: an investor with multiple subscriptions / wallets
+    // collapses into ONE cap-table row whose values are the sums. This is
+    // the fix for the demo bug where top-up subs caused double-counting.
+    // Wallet address is rendered as the investor's primary wallet so the
+    // table stays one-to-one with investors.
+    const byInvestor = new Map<string, CapRow>();
+    const orphanRows: CapRow[] = []; // positions whose wallet is not linked to an investor
+
+    const upsert = (
+      investorId: string | null,
+      investorName: string | null,
+      walletAddress: string,
+      partial: Partial<CapRow>,
+    ) => {
+      if (!investorId) {
+        orphanRows.push({
+          investorId: null,
+          investorName,
+          walletAddress,
           pendingAllocationPct: 0,
-          settledTokenBalance: Number(s.committedAmount).toString(),
-          ownershipPct: Number(s.allocationPct),
-        }));
+          settledTokenBalance: '0',
+          ownershipPct: 0,
+          subscriptionCount: 0,
+          ...partial,
+        });
+        return;
+      }
+      const existing = byInvestor.get(investorId);
+      if (!existing) {
+        byInvestor.set(investorId, {
+          investorId,
+          investorName,
+          walletAddress,
+          pendingAllocationPct: 0,
+          settledTokenBalance: '0',
+          ownershipPct: 0,
+          subscriptionCount: 0,
+          ...partial,
+        });
+      } else {
+        const merged: CapRow = {
+          ...existing,
+          investorName: existing.investorName ?? investorName,
+          walletAddress: existing.walletAddress || walletAddress,
+          pendingAllocationPct:
+            existing.pendingAllocationPct + (partial.pendingAllocationPct ?? 0),
+          settledTokenBalance: (
+            Number(existing.settledTokenBalance) +
+            Number(partial.settledTokenBalance ?? 0)
+          ).toString(),
+          ownershipPct: existing.ownershipPct + (partial.ownershipPct ?? 0),
+          subscriptionCount:
+            existing.subscriptionCount + (partial.subscriptionCount ?? 0),
+        };
+        byInvestor.set(investorId, merged);
+      }
+    };
 
-        // Also add any PENDING subscriptions
+    if (positions.length > 0) {
+      // On-chain path: balances drive ownership %.
+      for (const p of positions) {
+        const investorId = p.wallet?.investor?.id ?? null;
+        const investorName = p.wallet?.investor?.legalName ?? null;
+        const balance = Number(p.settledTokenBalance);
+        const ownershipPct =
+          totalSupply > 0 ? (balance / totalSupply) * 100 : 0;
+        upsert(investorId, investorName, p.walletAddress, {
+          settledTokenBalance: balance.toString(),
+          ownershipPct,
+        });
+      }
+
+      if (options?.includePending !== false) {
         const pendingSubs = await this.prisma.subscription.findMany({
           where: { fundId, status: 'PENDING', deletedAt: null },
           include: { investor: true, wallet: true },
         });
         for (const sub of pendingSubs) {
-          rows.push({
-            investorId: sub.investorId,
-            investorName: sub.investor.legalName,
-            walletAddress: sub.wallet?.address ?? '',
-            pendingAllocationPct: Number(sub.allocationPct),
-            settledTokenBalance: '0',
-            ownershipPct: 0,
-          });
+          upsert(
+            sub.investorId,
+            sub.investor.legalName,
+            sub.wallet?.address ?? '',
+            {
+              pendingAllocationPct: Number(sub.allocationPct),
+              subscriptionCount: 1,
+            },
+          );
         }
-
-        return { fundId, asOfTimestamp: new Date().toISOString(), rows };
       }
-    }
-
-    // Get pending subscriptions if requested
-    let pendingSubs: any[] = [];
-    if (options?.includePending !== false) {
-      pendingSubs = await this.prisma.subscription.findMany({
-        where: { fundId, status: 'PENDING', deletedAt: null },
+    } else {
+      // Pre-mint fallback: build cap table from subscriptions.
+      // includePending defaults to true; only SETTLED subs are fetched
+      // when includePending is explicitly false.
+      const includePending = options?.includePending !== false;
+      const subs = await this.prisma.subscription.findMany({
+        where: {
+          fundId,
+          deletedAt: null,
+          status: includePending ? { in: ['SETTLED', 'PENDING'] } : 'SETTLED',
+        },
         include: { investor: true, wallet: true },
       });
-    }
 
-    const rows = positions.map((p) => ({
-      investorId: p.wallet?.investor?.id ?? null,
-      investorName: p.wallet?.investor?.legalName ?? null,
-      walletAddress: p.walletAddress,
-      pendingAllocationPct: 0,
-      settledTokenBalance: Number(p.settledTokenBalance).toString(),
-      ownershipPct:
-        totalSupply > 0
-          ? (Number(p.settledTokenBalance) / totalSupply) * 100
-          : 0,
-    }));
-
-    // Add pending entries
-    for (const sub of pendingSubs) {
-      const existingRow = rows.find(
-        (r) =>
-          r.walletAddress.toLowerCase() === sub.wallet?.address?.toLowerCase(),
-      );
-      if (existingRow) {
-        existingRow.pendingAllocationPct = Number(sub.allocationPct);
-      } else {
-        rows.push({
-          investorId: sub.investorId,
-          investorName: sub.investor.legalName,
-          walletAddress: sub.wallet?.address ?? '',
-          pendingAllocationPct: Number(sub.allocationPct),
-          settledTokenBalance: '0',
-          ownershipPct: 0,
-        });
+      for (const sub of subs) {
+        const isSettled = sub.status === 'SETTLED';
+        upsert(
+          sub.investorId,
+          sub.investor.legalName,
+          sub.wallet?.address ?? '',
+          {
+            ownershipPct: isSettled ? Number(sub.allocationPct) : 0,
+            pendingAllocationPct: isSettled ? 0 : Number(sub.allocationPct),
+            settledTokenBalance: isSettled
+              ? Number(sub.committedAmount).toString()
+              : '0',
+            subscriptionCount: 1,
+          },
+        );
       }
     }
+
+    const rows: CapRow[] = [...byInvestor.values(), ...orphanRows];
 
     return {
       fundId,

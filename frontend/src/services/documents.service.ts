@@ -42,6 +42,9 @@ export interface ParseStatus {
 export interface FundDocument {
   documentId: string;
   documentType: string;
+  parentDocumentId?: string | null;
+  version?: number;
+  effectiveDate?: string | null;
   originalFilename: string;
   mimeType: string;
   byteSize: number;
@@ -59,6 +62,45 @@ export interface FundDocument {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface LpaStack {
+  master: {
+    documentId: string;
+    documentType: string;
+    version: number;
+    originalFilename: string;
+    effectiveDate: string | null;
+    createdAt: string;
+  };
+  amendments: Array<{
+    documentId: string;
+    documentType: string;
+    version: number;
+    originalFilename: string;
+    effectiveDate: string | null;
+    createdAt: string;
+  }>;
+}
+
+/**
+ * Document types that govern fund terms. Used for the upload-type
+ * dropdown on the Documents page. Keep in sync with the backend's
+ * GOVERNING_DOCUMENT_TYPES set.
+ */
+export const GOVERNING_DOCUMENT_TYPE_OPTIONS = [
+  { value: 'MASTER_LPA', label: 'Master LPA', requiresParent: false },
+  { value: 'LPA_AMENDMENT', label: 'LPA Amendment', requiresParent: true },
+  { value: 'SIDE_LETTER', label: 'Side Letter', requiresParent: true },
+  { value: 'JOINDER', label: 'Joinder', requiresParent: true },
+  {
+    value: 'ASSIGNMENT_AND_ASSUMPTION',
+    label: 'Assignment & Assumption',
+    requiresParent: true,
+  },
+] as const;
+
+export type GoverningDocumentType =
+  (typeof GOVERNING_DOCUMENT_TYPE_OPTIONS)[number]['value'];
 
 export interface ExtractedField {
   fieldId: string;
@@ -93,6 +135,42 @@ export function uploadMasterLpa(fundId: string, file: File) {
     `/admin/funds/${fundId}/documents/master-lpa`,
     file,
   );
+}
+
+/**
+ * Upload a governing document of any type. For amendments / side letters /
+ * joinders, parentDocumentId is REQUIRED and must reference an existing
+ * Master LPA (or another governing document) for the same fund.
+ */
+export function uploadGoverningDocument(args: {
+  fundId: string;
+  file: File;
+  documentType: GoverningDocumentType;
+  parentDocumentId?: string;
+  effectiveDate?: string;
+}) {
+  const extraFields: Record<string, string> = {
+    documentType: args.documentType,
+  };
+  if (args.parentDocumentId) extraFields.parentDocumentId = args.parentDocumentId;
+  if (args.effectiveDate) extraFields.effectiveDate = args.effectiveDate;
+  return upload<{
+    documentId: string;
+    documentType: string;
+    parentDocumentId: string | null;
+    version: number;
+    parseStatus: string;
+    hashStatus: string;
+  }>(
+    `/admin/funds/${args.fundId}/documents/governing`,
+    args.file,
+    'file',
+    extraFields,
+  );
+}
+
+export function getLpaStack(fundId: string) {
+  return get<LpaStack | null>(`/admin/funds/${fundId}/lpa-stack`);
 }
 
 export function getDocumentHashes(documentId: string) {

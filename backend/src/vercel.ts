@@ -17,10 +17,15 @@ async function bootstrap() {
       limits: { fileSize: 50 * 1024 * 1024 },
     });
     server.post(/.*documents\/master-lpa$/, upload.single('file'));
+    server.post(/.*documents\/governing$/, upload.single('file'));
     server.post(/.*documents\/wire-confirmation$/, upload.single('file'));
     server.post(/.*investor\/me\/documents\/upload.*/, upload.single('file'));
     server.post(/.*\/reporting-documents.*/, upload.single('file'));
     server.post(/.*\/admin\/investors\/bulk-import.*/, upload.single('file'));
+    server.post(
+      /.*investor\/me\/transfers\/import-off-chain.*/,
+      upload.single('file'),
+    );
   } catch (e) {
     console.warn('Multer setup failed:', e);
   }

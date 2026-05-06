@@ -316,10 +316,52 @@ export class NoticesService {
             select: {
               asOfTimestamp: true,
               totalNetAmount: true,
+              chainStatus: true,
+              metadata: true,
+              lineItems: input.recipientInvestorId
+                ? {
+                    where: { investorId: input.recipientInvestorId },
+                    select: {
+                      grossAmount: true,
+                      netAmount: true,
+                      ownershipPctUsed: true,
+                      prefAmount: true,
+                      returnOfCapitalAmount: true,
+                      promoteAmount: true,
+                    },
+                    take: 1,
+                  }
+                : false,
             },
           })
         : Promise.resolve(null),
     ]);
+
+    const recipientLine = distributionRun?.lineItems?.[0] ?? null;
+
+    const lpGross = recipientLine?.grossAmount
+      ? Number(recipientLine.grossAmount)
+      : null;
+    const lpOwnershipPct = recipientLine?.ownershipPctUsed
+      ? Number(recipientLine.ownershipPctUsed)
+      : null;
+
+    const distributionAmountStr =
+      lpGross !== null
+        ? `$${lpGross.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+        : distributionRun?.totalNetAmount
+          ? `$${Number(distributionRun.totalNetAmount).toLocaleString()}`
+          : '';
+
+    const distributionSourceStr = (() => {
+      if (distributionRun?.chainStatus === 'SIMULATED') {
+        return 'Distribution Simulator (off-chain)';
+      }
+      const meta = distributionRun?.metadata as
+        | { source?: string; description?: string }
+        | undefined;
+      return meta?.source ?? meta?.description ?? 'Quarterly waterfall run';
+    })();
 
     return {
       'fund.name': fund?.name ?? '',
@@ -327,7 +369,8 @@ export class NoticesService {
       'fund.lpaDate': fund?.createdAt?.toISOString().slice(0, 10) ?? '',
       'investor.legalName': investor?.legalName ?? '',
       'investor.email': investor?.email ?? '',
-      'investor.ownershipPct': '',
+      'investor.ownershipPct':
+        lpOwnershipPct !== null ? `${lpOwnershipPct.toFixed(4)}%` : '',
       generatedAt: new Date().toISOString().slice(0, 10),
       'capitalCall.callNumber': capitalCall?.callNumber ?? '',
       'capitalCall.amountDue': capitalCall?.amountDue
@@ -335,12 +378,10 @@ export class NoticesService {
         : '',
       'capitalCall.dueDate':
         capitalCall?.dueDate?.toISOString().slice(0, 10) ?? '',
-      'distribution.amount': distributionRun?.totalNetAmount
-        ? `$${Number(distributionRun.totalNetAmount).toLocaleString()}`
-        : '',
+      'distribution.amount': distributionAmountStr,
       'distribution.date':
         distributionRun?.asOfTimestamp?.toISOString().slice(0, 10) ?? '',
-      'distribution.source': '',
+      'distribution.source': distributionSourceStr,
       documentHash: input.documentHash ?? '',
       anchorTxHash: input.anchorTxHash ?? '',
     };

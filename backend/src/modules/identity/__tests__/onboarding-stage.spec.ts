@@ -127,6 +127,20 @@ describe('computeOnboardingStage', () => {
     expect(result.stages[3].state).toBe('pending');
   });
 
+  it('CUSTODIAL wallet (auto-generated for the LP) satisfies wallet stage', () => {
+    const result = computeOnboardingStage({
+      investor: {
+        ...baseInvestor,
+        metadata: { profileCompleted: true },
+        kycStatus: 'APPROVED',
+        accreditationStatus: 'APPROVED',
+      },
+      wallets: [{ walletStatus: 'ACTIVE', walletSource: 'CUSTODIAL' }],
+      eligibilities: [],
+    });
+    expect(result.blockedOn).toBe('eligibility');
+  });
+
   it('SYSTEM_GENERATED wallet does not satisfy wallet stage', () => {
     const result = computeOnboardingStage({
       investor: {
@@ -192,7 +206,9 @@ describe('computeOnboardingStage', () => {
       wallets: [],
       eligibilities: [],
     });
-    const actors = Object.fromEntries(result.stages.map((s) => [s.key, s.actor]));
+    const actors = Object.fromEntries(
+      result.stages.map((s) => [s.key, s.actor]),
+    );
     expect(actors.account).toBe('system');
     expect(actors.profile).toBe('investor');
     expect(actors.kyc).toBe('admin');

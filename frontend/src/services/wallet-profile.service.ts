@@ -52,3 +52,20 @@ export function createWalletChallenge(body: { address: string; chainId: number }
 export function verifyWalletLink(body: { challengeId: string; address: string; chainId: number; signature: string }) {
   return post<WalletLinkResult>('/investor/me/wallets/verify', body);
 }
+
+export function autoGenerateMyWallet(body: { chainId?: number; label?: string } = {}) {
+  return post<WalletLinkResult & { walletSource: string }>(
+    '/investor/me/wallets/auto-generate',
+    body,
+  );
+}
+
+export function adminAutoGenerateWallet(
+  investorId: string,
+  body: { chainId?: number; label?: string } = {},
+) {
+  return post<WalletLinkResult & { walletSource: string }>(
+    `/admin/investors/${investorId}/wallets/auto-generate`,
+    body,
+  );
+}

@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/angainor/EmptyState";
 import { TableSkeleton } from "@/components/angainor/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getSubscriptions, getInvestors, getDocuments, createSubscriptions } from "@/services";
+import { getFundAllocation } from "@/services/subscriptions.service";
 import { createNotice } from "@/services/notices.service";
 import { toFriendlyMessage } from "@/lib/errorMessages";
 import {
@@ -124,6 +125,30 @@ export default function SubscriptionsPage() {
     queryFn: () => getDocuments(fundId).then(r => r.data),
   });
 
+  // Fund allocation: total committed pct, headroom, per-investor breakdown.
+  // Powers the "Top Up" detection in the create modal so the admin sees
+  // real-time validation BEFORE submitting.
+  const { data: allocationData } = useQuery({
+    queryKey: ["fund-allocation", fundId],
+    queryFn: () => getFundAllocation(fundId).then(r => r.data),
+  });
+
+  // Resolve the selected investor's existing allocation (if any) so the modal
+  // can frame the form as a top-up vs. a brand-new subscription.
+  const selectedInvestorAllocation = useMemo(() => {
+    if (!createLpId || !allocationData) return null;
+    return allocationData.investors.find(i => i.investorId === createLpId) ?? null;
+  }, [createLpId, allocationData]);
+
+  const proposedAllocationPct = Number(createAllocation) || 0;
+  const headroomPct = allocationData?.remainingHeadroomPct ?? 100;
+  const investorExistingPct = selectedInvestorAllocation?.totalAllocationPct ?? 0;
+  const investorAfterPct = investorExistingPct + proposedAllocationPct;
+  const fundAfterPct = (allocationData?.totalAllocationPct ?? 0) + proposedAllocationPct;
+  const exceedsFundCap = fundAfterPct > 100 + 0.000001;
+  const exceedsInvestorCap = investorAfterPct > 100 + 0.000001;
+  const allocationBlocked = exceedsFundCap || exceedsInvestorCap;
+
   const latestLpa = useMemo(() => {
     if (!documentsData) return null;
     const lpaDocs = documentsData.filter(d => d.documentType === "MASTER_LPA");
@@ -165,8 +190,14 @@ export default function SubscriptionsPage() {
       ]).then(r => r.data);
     },
     onSuccess: () => {
-      toast.success("Subscription created successfully");
+      toast.success(
+        selectedInvestorAllocation
+          ? "Top-up subscription created"
+          : "Subscription created successfully",
+      );
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.subscriptions(fundId) });
+      // Refresh fund headroom + per-investor allocation breakdown.
+      queryClient.invalidateQueries({ queryKey: ["fund-allocation", fundId] });
       setShowCreateModal(false);
     },
     onError: (err: Error) => {
@@ -513,11 +544,41 @@ export default function SubscriptionsPage() {
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Create Subscription</DialogTitle>
+            <DialogTitle className="text-foreground">
+              {selectedInvestorAllocation ? "Top Up Subscription" : "Create Subscription"}
+            </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Add a new subscription record for an investor.
+              {selectedInvestorAllocation
+                ? "This investor already holds capital in the fund. The new amount adds to their existing allocation."
+                : "Add a new subscription record for an investor."}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Fund headroom strip — always visible so the admin sees what's left. */}
+          {allocationData && (
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-medium text-foreground">Fund headroom</span>
+                <span className="text-muted-foreground">
+                  {(allocationData.totalAllocationPct ?? 0).toFixed(2)}% allocated · {headroomPct.toFixed(2)}% remaining
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                <div
+                  className={`h-full ${exceedsFundCap ? "bg-red-500" : "bg-primary"}`}
+                  style={{ width: `${Math.min(100, (allocationData.totalAllocationPct ?? 0) + (exceedsFundCap ? 0 : proposedAllocationPct))}%` }}
+                />
+              </div>
+              {proposedAllocationPct > 0 && (
+                <div className="mt-2 text-muted-foreground">
+                  After this subscription:{" "}
+                  <span className={exceedsFundCap ? "text-red-600 font-medium" : "text-foreground font-medium"}>
+                    {fundAfterPct.toFixed(2)}% of fund
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-4">
             <div>
@@ -531,12 +592,28 @@ export default function SubscriptionsPage() {
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">Select an investor...</option>
-                {(investorsData ?? []).map((inv: Investor) => (
-                  <option key={inv.investorId} value={inv.investorId}>
-                    {inv.legalName}
-                  </option>
-                ))}
+                {(investorsData ?? []).map((inv: Investor) => {
+                  const existing = allocationData?.investors.find(a => a.investorId === inv.investorId);
+                  const suffix = existing
+                    ? ` · ${existing.totalAllocationPct.toFixed(2)}% (${existing.subscriptionCount} sub${existing.subscriptionCount === 1 ? "" : "s"})`
+                    : "";
+                  return (
+                    <option key={inv.investorId} value={inv.investorId}>
+                      {inv.legalName}{suffix}
+                    </option>
+                  );
+                })}
               </select>
+              {selectedInvestorAllocation && (
+                <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md px-2 py-1.5 mt-2">
+                  Existing allocation:{" "}
+                  <span className="font-medium">
+                    {selectedInvestorAllocation.totalAllocationPct.toFixed(2)}%
+                  </span>{" "}
+                  across {selectedInvestorAllocation.subscriptionCount} subscription
+                  {selectedInvestorAllocation.subscriptionCount === 1 ? "" : "s"}.
+                </p>
+              )}
             </div>
 
             <div>
@@ -557,7 +634,12 @@ export default function SubscriptionsPage() {
 
             <div>
               <label htmlFor="allocation-pct" className="block text-sm font-medium text-muted-foreground mb-1">
-                Allocation %
+                Allocation %{" "}
+                {selectedInvestorAllocation && (
+                  <span className="font-normal text-xs text-muted-foreground">
+                    (additional)
+                  </span>
+                )}
               </label>
               <input
                 id="allocation-pct"
@@ -570,6 +652,24 @@ export default function SubscriptionsPage() {
                 placeholder="e.g. 20"
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
               />
+              {proposedAllocationPct > 0 && selectedInvestorAllocation && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Investor total after top-up:{" "}
+                  <span className={exceedsInvestorCap ? "text-red-600 font-medium" : "text-foreground font-medium"}>
+                    {investorAfterPct.toFixed(2)}%
+                  </span>
+                </p>
+              )}
+              {exceedsFundCap && (
+                <p className="text-xs text-red-600 mt-1">
+                  Fund total would be {fundAfterPct.toFixed(2)}%. Upload an LPA Amendment to expand the fund first.
+                </p>
+              )}
+              {exceedsInvestorCap && (
+                <p className="text-xs text-red-600 mt-1">
+                  This investor would hold more than 100% of the fund. Reduce the amount or split the top-up across investors.
+                </p>
+              )}
             </div>
 
             <div>
@@ -592,11 +692,22 @@ export default function SubscriptionsPage() {
               Cancel
             </Button>
             <Button
-              disabled={!createLpId || !createAmount || !createAllocation || !latestLpa || createMutation.isPending}
+              disabled={
+                !createLpId ||
+                !createAmount ||
+                !createAllocation ||
+                !latestLpa ||
+                allocationBlocked ||
+                createMutation.isPending
+              }
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
               onClick={() => createMutation.mutate()}
             >
-              {createMutation.isPending ? "Creating..." : "Create Subscription"}
+              {createMutation.isPending
+                ? "Creating..."
+                : selectedInvestorAllocation
+                  ? "Top Up Subscription"
+                  : "Create Subscription"}
             </Button>
           </DialogFooter>
         </DialogContent>

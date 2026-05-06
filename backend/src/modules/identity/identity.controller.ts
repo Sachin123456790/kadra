@@ -173,6 +173,21 @@ export class InvestorController {
     };
   }
 
+  @Post(':investorId/wallets/auto-generate')
+  async autoGenerateWallet(
+    @Param('investorId') investorId: string,
+    @Body() body: { chainId?: number; label?: string } = {},
+  ) {
+    const data = await this.identityService.autoGenerateWallet(investorId, {
+      chainId: body.chainId,
+      label: body.label,
+    });
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
   @Put(':investorId/verification')
   async updateVerification(
     @Param('investorId') investorId: string,

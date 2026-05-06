@@ -173,10 +173,20 @@ export async function put<T>(path: string, body?: unknown): Promise<ApiResponse<
   return handleResponse<ApiResponse<T>>(res, doFetch);
 }
 
-export async function upload<T>(path: string, file: File, fieldName = 'file'): Promise<ApiResponse<T>> {
+export async function upload<T>(
+  path: string,
+  file: File,
+  fieldName = 'file',
+  extraFields?: Record<string, string | number>,
+): Promise<ApiResponse<T>> {
   const doFetch = () => {
     const formData = new FormData();
     formData.append(fieldName, file);
+    if (extraFields) {
+      for (const [k, v] of Object.entries(extraFields)) {
+        formData.append(k, String(v));
+      }
+    }
     return fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
       headers: {

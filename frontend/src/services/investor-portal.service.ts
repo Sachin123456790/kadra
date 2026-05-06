@@ -154,6 +154,36 @@ export function getInvestorCapTable(fundId = DEFAULT_FUND) {
   return get<InvestorCapTable>(`/investor/funds/${fundId}/cap-table`);
 }
 
+export interface OffChainTransferImportResult {
+  transferRequestId: string;
+  evidenceDocumentId: string;
+  tokenAmount: number;
+  fromInvestor: { id: string; legalName: string };
+  toInvestor: { id: string; legalName: string };
+  chainStatus: 'SIMULATED';
+}
+
+export function importOffChainTransfer(input: {
+  toInvestorId: string;
+  tokenAmount: number;
+  note?: string;
+  file: File;
+  fundId?: string;
+}) {
+  const fundId = input.fundId ?? DEFAULT_FUND;
+  const extraFields: Record<string, string> = {
+    toInvestorId: input.toInvestorId,
+    tokenAmount: String(input.tokenAmount),
+  };
+  if (input.note) extraFields.note = input.note;
+  return upload<OffChainTransferImportResult>(
+    `/investor/me/transfers/import-off-chain?fundId=${encodeURIComponent(fundId)}`,
+    input.file,
+    'file',
+    extraFields,
+  );
+}
+
 // ── Capital Account, Documents, Activity, Waterfall ────────
 
 export interface CapitalAccountStatement {

@@ -112,8 +112,9 @@ model Wallet {
   addressNorm  String    @map("address_norm") // lower(address), set in application code
   isPrimary    Boolean   @default(false) @map("is_primary")
   walletStatus String    @default("ACTIVE") @map("wallet_status") // ACTIVE | INACTIVE | BLOCKED
-  walletSource String    @default("SEED") @map("wallet_source") // METAMASK | PHANTOM | SYSTEM_GENERATED | SEED | IMPORTED
+  walletSource String    @default("SEED") @map("wallet_source") // METAMASK | PHANTOM | SYSTEM_GENERATED | SEED | IMPORTED | CUSTODIAL
   label        String?
+  encryptedPrivateKey String? @map("encrypted_private_key") // AES-256-GCM(privKey) for CUSTODIAL wallets only; null otherwise
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz()
@@ -199,7 +200,10 @@ model InvestorFundEligibility {
 model Document {
   id               String    @id @default(uuid())
   fundId           String    @map("fund_id")
-  documentType     String    @map("document_type") // MASTER_LPA | SUBSCRIPTION_RECORD | PAYMENT_RECEIPT | OTHER
+  documentType     String    @map("document_type") // MASTER_LPA | LPA_AMENDMENT | SIDE_LETTER | JOINDER | ASSIGNMENT_AND_ASSUMPTION | SUBSCRIPTION_AGREEMENT | SUBSCRIPTION_RECORD | WIRE_CONFIRMATION | PAYMENT_RECEIPT | GP_REPORT | INVESTOR_UPLOAD | CAPITAL_CALL_NOTICE | DISTRIBUTION_NOTICE | OTHER
+  parentDocumentId String?   @map("parent_document_id")
+  version          Int       @default(1)
+  effectiveDate    DateTime? @map("effective_date") @db.Timestamptz()
   storageProvider  String    @default("LOCAL_FS") @map("storage_provider") // LOCAL_FS | S3
   storageKey       String    @map("storage_key")
   originalFilename String    @map("original_filename")
@@ -217,6 +221,8 @@ model Document {
 
   // Relations
   fund              Fund               @relation(fields: [fundId], references: [id])
+  parentDocument    Document?          @relation("DocumentAmendments", fields: [parentDocumentId], references: [id])
+  amendments        Document[]         @relation("DocumentAmendments")
   hashes            DocumentHash[]
   extractedFields   ExtractedDocumentField[]
   governedSubscriptions Subscription[] @relation("governingDocument")
@@ -224,6 +230,7 @@ model Document {
   capitalCallResponses CapitalCallResponse[]
 
   @@index([fundId, documentType, uploadedAt(sort: Desc)])
+  @@index([parentDocumentId])
   @@map("documents")
 }
 

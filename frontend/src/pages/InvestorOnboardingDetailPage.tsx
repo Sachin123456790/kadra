@@ -40,6 +40,7 @@ import {
   getInvestors,
   getSubscriptions,
   linkInvestorWallet,
+  adminAutoGenerateWallet,
   updateInvestorEligibility,
   updateInvestorVerification,
 } from "@/services";
@@ -154,6 +155,18 @@ export default function InvestorOnboardingDetailPage() {
     }) => linkInvestorWallet(id, address),
     onSuccess: () => {
       toast.success("Wallet linked to investor");
+      invalidate();
+      setLinkWalletOpen(false);
+      setWalletAddressInput("");
+    },
+    onError: (err) => toast.error(toFriendlyMessage(err)),
+  });
+
+  const autoGenerateWalletMutation = useMutation({
+    mutationFn: ({ investorId: id }: { investorId: string }) =>
+      adminAutoGenerateWallet(id, {}),
+    onSuccess: (res) => {
+      toast.success(`Custodial wallet created: ${res.data.address}`);
       invalidate();
       setLinkWalletOpen(false);
       setWalletAddressInput("");
@@ -619,28 +632,79 @@ export default function InvestorOnboardingDetailPage() {
           <DialogHeader>
             <DialogTitle>Link Wallet</DialogTitle>
             <DialogDescription>
-              Paste the investor&apos;s wallet address. This marks it as IMPORTED so
-              the onboarding stepper accepts it.
+              Generate a custodial wallet for the investor in one click, or
+              import an address they already control.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="walletAddress">Wallet address</Label>
-            <Input
-              id="walletAddress"
-              placeholder="0x…"
-              value={walletAddressInput}
-              onChange={(e) => setWalletAddressInput(e.target.value)}
-            />
+
+          <div className="space-y-3">
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+              <div className="text-sm font-semibold text-foreground">
+                Generate custodial wallet
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Angainor creates a Sepolia wallet and securely manages the
+                private key. Marks the wallet as CUSTODIAL and clears the
+                onboarding step.
+              </p>
+              <Button
+                onClick={() => {
+                  if (!investor) return;
+                  autoGenerateWalletMutation.mutate({
+                    investorId: investor.investorId,
+                  });
+                }}
+                disabled={
+                  autoGenerateWalletMutation.isPending ||
+                  linkWalletMutation.isPending
+                }
+                className="w-full"
+              >
+                {autoGenerateWalletMutation.isPending
+                  ? "Generating…"
+                  : "Generate wallet for investor"}
+              </Button>
+            </div>
+
+            <div className="relative my-1">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase tracking-wider">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or import existing
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="walletAddress">Wallet address</Label>
+              <Input
+                id="walletAddress"
+                placeholder="0x…"
+                value={walletAddressInput}
+                onChange={(e) => setWalletAddressInput(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste the address the investor already controls. Marked as
+                IMPORTED.
+              </p>
+            </div>
           </div>
+
           <DialogFooter>
             <Button
               variant="ghost"
               onClick={() => setLinkWalletOpen(false)}
-              disabled={linkWalletMutation.isPending}
+              disabled={
+                linkWalletMutation.isPending ||
+                autoGenerateWalletMutation.isPending
+              }
             >
               Cancel
             </Button>
             <Button
+              variant="outline"
               onClick={() => {
                 if (!investor) return;
                 const addr = walletAddressInput.trim();
@@ -653,9 +717,13 @@ export default function InvestorOnboardingDetailPage() {
                   address: addr,
                 });
               }}
-              disabled={linkWalletMutation.isPending || !walletAddressInput.trim()}
+              disabled={
+                linkWalletMutation.isPending ||
+                autoGenerateWalletMutation.isPending ||
+                !walletAddressInput.trim()
+              }
             >
-              {linkWalletMutation.isPending ? "Linking…" : "Link Wallet"}
+              {linkWalletMutation.isPending ? "Linking…" : "Import address"}
             </Button>
           </DialogFooter>
         </DialogContent>

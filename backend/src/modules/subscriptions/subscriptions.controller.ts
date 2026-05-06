@@ -1,4 +1,12 @@
-import { Controller, Post, Get, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { SubscriptionsService } from './subscriptions.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveFundId } from '../../common/resolve-fund-id';
@@ -23,7 +31,11 @@ export class SubscriptionsController {
     @Body() body: { governingDocumentId: string; items: any[] },
   ) {
     const fundId = await resolveFundId(this.prisma, fundIdOrCode);
-    const data = await this.subscriptionsService.createSubscriptions(fundId, body.governingDocumentId, body.items);
+    const data = await this.subscriptionsService.createSubscriptions(
+      fundId,
+      body.governingDocumentId,
+      body.items,
+    );
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
@@ -38,10 +50,28 @@ export class SubscriptionsController {
     @Query('subscriptionRef') subscriptionRef?: string,
   ) {
     const fundId = await resolveFundId(this.prisma, fundIdOrCode);
-    const data = await this.subscriptionsService.listSubscriptions(fundId, { status, investorId, subscriptionRef });
+    const data = await this.subscriptionsService.listSubscriptions(fundId, {
+      status,
+      investorId,
+      subscriptionRef,
+    });
     return {
       data,
-      meta: { requestId: randomUUID(), timestamp: new Date().toISOString(), count: data.length },
+      meta: {
+        requestId: randomUUID(),
+        timestamp: new Date().toISOString(),
+        count: data.length,
+      },
+    };
+  }
+
+  @Get('funds/:fundId/allocation')
+  async getFundAllocation(@Param('fundId') fundIdOrCode: string) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
+    const data = await this.subscriptionsService.getFundAllocation(fundId);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
     };
   }
 }

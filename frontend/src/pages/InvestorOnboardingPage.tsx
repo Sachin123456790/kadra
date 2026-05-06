@@ -31,6 +31,7 @@ import {
   updateMyProfile,
 } from "@/services/onboarding.service";
 import {
+  autoGenerateMyWallet,
   createWalletChallenge,
   verifyWalletLink,
 } from "@/services/wallet-profile.service";
@@ -55,8 +56,9 @@ const STEP_META: Record<WizardStep, { title: string; subtitle: string }> = {
     subtitle: "Confirm your legal information for fund records.",
   },
   wallet: {
-    title: "Link your wallet",
-    subtitle: "Your wallet will hold fund ownership tokens.",
+    title: "Set up your wallet",
+    subtitle:
+      "Generate a custodial wallet in one click, or connect your own.",
   },
   review: {
     title: "You're all set",
@@ -114,6 +116,24 @@ export default function InvestorOnboardingPage() {
 
   const wallet = useWallet();
   const [walletLinking, setWalletLinking] = useState(false);
+  const [walletAutoGenerating, setWalletAutoGenerating] = useState(false);
+  const [generatedAddress, setGeneratedAddress] = useState<string | null>(null);
+
+  const handleAutoGenerateWallet = async () => {
+    try {
+      setWalletAutoGenerating(true);
+      const res = await autoGenerateMyWallet({});
+      setGeneratedAddress(res.data.address);
+      queryClient.invalidateQueries({ queryKey: ["investor", "onboarding"] });
+      toast.success("Custodial wallet created");
+      setStep("review");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Could not generate wallet: ${message}`);
+    } finally {
+      setWalletAutoGenerating(false);
+    }
+  };
 
   const handleLinkWallet = async () => {
     try {
@@ -186,7 +206,7 @@ export default function InvestorOnboardingPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <WalletIcon className="h-4 w-4 text-primary" />
-                    Link a wallet via MetaMask or Phantom
+                    Get a custodial wallet (or connect MetaMask / Phantom)
                   </li>
                   <li className="flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-primary" />
@@ -296,15 +316,62 @@ export default function InvestorOnboardingPage() {
             {step === "wallet" && (
               <div className="p-2 space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Link the wallet that will hold your fund ownership tokens. We
-                  ask you to sign a one-time message to prove you control the
-                  address — no transaction fees, no on-chain writes.
+                  Your wallet holds the fund ownership tokens. The fastest path
+                  is to let Angainor generate a custodial wallet for you — no
+                  browser extension, no setup. You can always connect your own
+                  wallet later from Profile.
                 </p>
 
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-primary mt-0.5" />
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-foreground">
+                        Recommended: generate a wallet for me
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Angainor will create a Sepolia testnet wallet and
+                        securely manage signing on your behalf. Best for
+                        first-time investors.
+                      </p>
+                    </div>
+                  </div>
+                  {generatedAddress && (
+                    <div className="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground break-all">
+                      {generatedAddress}
+                    </div>
+                  )}
+                  <Button
+                    onClick={handleAutoGenerateWallet}
+                    disabled={walletAutoGenerating || walletLinking}
+                    className="w-full"
+                  >
+                    {walletAutoGenerating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <WalletIcon className="mr-2 h-4 w-4" />
+                        Generate wallet for me
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <div className="relative my-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase tracking-wider">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Or connect your own
+                    </span>
+                  </div>
+                </div>
+
                 {wallet.availableProviders.length === 0 ? (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  <div className="rounded-lg border border-border bg-muted/40 p-4 text-xs text-muted-foreground">
                     No wallet extension detected. Install MetaMask or Phantom
-                    and reload this page.
+                    to connect an existing wallet.
                   </div>
                 ) : (
                   <div className="rounded-lg border border-border bg-muted/40 p-4">
@@ -341,9 +408,12 @@ export default function InvestorOnboardingPage() {
                     Back
                   </Button>
                   <Button
+                    variant="outline"
                     onClick={handleLinkWallet}
                     disabled={
-                      walletLinking || wallet.availableProviders.length === 0
+                      walletLinking ||
+                      walletAutoGenerating ||
+                      wallet.availableProviders.length === 0
                     }
                   >
                     {walletLinking ? (

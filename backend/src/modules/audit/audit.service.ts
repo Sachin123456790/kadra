@@ -5,6 +5,7 @@ import { EventLogService } from '../../common/event-log.service';
 import { createHash } from 'crypto';
 import { renderGpAdminExportPdf } from './gp-admin-export-renderer';
 import { buildGpAdminExportInput } from './gp-admin-export-builder';
+import { ADMIN_ROLES } from '../../common/auth/auth.types';
 
 @Injectable()
 export class AuditService {
@@ -361,11 +362,16 @@ export class AuditService {
 
   /**
    * Wipe all transactional data and re-seed the fund + active waterfall config.
-   * Preserves auth_users so existing logins keep working.
+   * Preserves admin auth_users so the GP can keep logging in; hard-deletes
+   * investor logins so the same emails can be re-imported after a reset.
    */
   async resetDemoFund(fundId: string) {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund not found');
+
+    await this.prisma.authUser.deleteMany({
+      where: { role: { notIn: ADMIN_ROLES } },
+    });
 
     const tables = [
       'audit_exports',

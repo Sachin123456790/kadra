@@ -55,3 +55,32 @@ export function createSubscriptions(
     { governingDocumentId, items },
   );
 }
+
+export interface FundAllocationInvestor {
+  investorId: string;
+  investorName: string | null;
+  investorEmail: string | null;
+  totalAllocationPct: number;
+  totalCommitted: number;
+  settledAllocationPct: number;
+  pendingAllocationPct: number;
+  subscriptionCount: number;
+}
+
+export interface FundAllocation {
+  fundId: string;
+  fundCapPct: number;
+  perInvestorCapPct: number;
+  totalAllocationPct: number;
+  remainingHeadroomPct: number;
+  investors: FundAllocationInvestor[];
+}
+
+/**
+ * Returns the fund's allocation headroom plus a per-investor breakdown.
+ * The Subscriptions page uses this to render "remaining headroom" and to
+ * detect when an admin's selected investor already has subs (top-up flow).
+ */
+export function getFundAllocation(fundId: string) {
+  return get<FundAllocation>(`/admin/funds/${fundId}/allocation`);
+}

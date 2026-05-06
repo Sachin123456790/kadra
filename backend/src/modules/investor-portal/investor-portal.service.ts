@@ -3,13 +3,215 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError } from '../../common/errors';
 import { SignatureVerificationService } from './signature-verification.service';
 import { computeOnboardingStage } from '../identity/onboarding-stage';
+import { IdentityService } from '../identity/identity.service';
+import { DocumentsService } from '../documents/documents.service';
+import { EventLogService } from '../../common/event-log.service';
 
 @Injectable()
 export class InvestorPortalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly signatureService: SignatureVerificationService,
+    private readonly identityService: IdentityService,
+    private readonly documentsService: DocumentsService,
+    private readonly eventLog: EventLogService,
   ) {}
+
+  async autoGenerateMyWallet(
+    email: string,
+    options?: { chainId?: number; label?: string },
+  ) {
+    const investor = await this.resolveInvestor(email);
+    return this.identityService.autoGenerateWallet(investor.id, options);
+  }
+
+  /**
+   * Off-chain (simulated) transfer driven by an uploaded wire/receipt PDF.
+   * Bypasses on-chain transfer + eligibility checks. Intended for the
+   * "Import off-chain transfer" demo flow — mutates token_positions so the
+   * cap table reflects the transfer immediately, with the PDF stored as
+   * evidence linked to the new TransferRequest row.
+   */
+  async importOffChainTransfer(input: {
+    email: string;
+    fundId: string;
+    toInvestorId: string;
+    tokenAmount: number;
+    note?: string;
+    file: { buffer: Buffer; filename: string; mimetype: string };
+  }) {
+    if (!Number.isFinite(input.tokenAmount) || input.tokenAmount <= 0) {
+      throw new BadRequestException('tokenAmount must be > 0');
+    }
+
+    const sender = await this.resolveInvestor(input.email);
+    if (sender.id === input.toInvestorId) {
+      throw new BadRequestException('Cannot transfer to yourself');
+    }
+
+    const recipient = await this.prisma.investor.findFirst({
+      where: { id: input.toInvestorId, deletedAt: null },
+      include: { wallets: { where: { deletedAt: null } } },
+    });
+    if (!recipient) throw new NotFoundError('Investor', input.toInvestorId);
+
+    const senderWallet = sender.wallets[0];
+    const recipientWallet = recipient.wallets[0];
+    if (!senderWallet) {
+      throw new BadRequestException(
+        'You must have a wallet linked before transferring',
+      );
+    }
+    if (!recipientWallet) {
+      throw new BadRequestException('Recipient does not have a wallet linked');
+    }
+
+    const contract = await this.prisma.tokenContract.findFirst({
+      where: {
+        fundId: input.fundId,
+        deploymentStatus: 'DEPLOYED',
+        deletedAt: null,
+      },
+    });
+    if (!contract) {
+      throw new NotFoundError('TokenContract', input.fundId);
+    }
+
+    // Store the wire/receipt PDF as evidence first so we can link it.
+    const evidenceDoc = await this.documentsService.uploadGenericDocument({
+      fundId: input.fundId,
+      documentType: 'TRANSFER_EVIDENCE',
+      storageKeyPrefix: `transfers/${sender.id}/off-chain`,
+      file: input.file.buffer,
+      filename: input.file.filename,
+      mimeType: input.file.mimetype,
+      uploadedBy: input.email,
+      linkedEntityType: 'INVESTOR',
+      linkedEntityId: sender.id,
+    });
+
+    const transferRequest = await this.prisma.$transaction(async (tx) => {
+      // Find or seed sender position
+      const senderPosition = await tx.tokenPosition.findFirst({
+        where: {
+          tokenContractId: contract.id,
+          walletAddressNorm: senderWallet.address.toLowerCase(),
+        },
+      });
+      if (!senderPosition) {
+        throw new BadRequestException(
+          'No settled token balance to transfer from',
+        );
+      }
+      const senderBalance = Number(senderPosition.settledTokenBalance);
+      if (senderBalance < input.tokenAmount) {
+        throw new BadRequestException(
+          `Insufficient balance: have ${senderBalance}, need ${input.tokenAmount}`,
+        );
+      }
+
+      const tr = await tx.transferRequest.create({
+        data: {
+          fundId: input.fundId,
+          tokenContractId: contract.id,
+          requestedBy: input.email,
+          fromWalletId: senderWallet.id,
+          fromWalletAddress: senderWallet.address,
+          toWalletId: recipientWallet.id,
+          toWalletAddress: recipientWallet.address,
+          tokenAmount: input.tokenAmount,
+          requestStatus: 'MINED',
+          precheckPassed: true,
+          finalizedAt: new Date(),
+          metadata: {
+            chainStatus: 'SIMULATED',
+            source: 'OFF_CHAIN_IMPORT',
+            evidenceDocumentId: evidenceDoc.documentId,
+            note: input.note,
+          },
+        },
+      });
+
+      await tx.transferEvent.create({
+        data: {
+          transferRequestId: tr.id,
+          fundId: input.fundId,
+          tokenContractId: contract.id,
+          eventKind: 'INDEXED',
+          payload: {
+            chainStatus: 'SIMULATED',
+            source: 'OFF_CHAIN_IMPORT',
+            evidenceDocumentId: evidenceDoc.documentId,
+            tokenAmount: input.tokenAmount,
+            fromWallet: senderWallet.address,
+            toWallet: recipientWallet.address,
+          },
+        },
+      });
+
+      // Decrement sender position
+      await tx.tokenPosition.update({
+        where: { id: senderPosition.id },
+        data: {
+          settledTokenBalance: { decrement: input.tokenAmount },
+        },
+      });
+
+      // Upsert recipient position
+      await tx.tokenPosition.upsert({
+        where: {
+          tokenContractId_walletAddressNorm: {
+            tokenContractId: contract.id,
+            walletAddressNorm: recipientWallet.address.toLowerCase(),
+          },
+        },
+        create: {
+          fundId: input.fundId,
+          tokenContractId: contract.id,
+          walletId: recipientWallet.id,
+          walletAddress: recipientWallet.address,
+          walletAddressNorm: recipientWallet.address.toLowerCase(),
+          settledTokenBalance: input.tokenAmount,
+        },
+        update: {
+          settledTokenBalance: { increment: input.tokenAmount },
+        },
+      });
+
+      // Link the evidence document to the transfer
+      await tx.document.update({
+        where: { id: evidenceDoc.documentId },
+        data: {
+          linkedEntityType: 'TRANSFER',
+          linkedEntityId: tr.id,
+        },
+      });
+
+      return tr;
+    });
+
+    await this.eventLog.log({
+      eventType: 'TRANSFER_IMPORTED_OFFCHAIN',
+      aggregateType: 'TRANSFER_REQUEST',
+      aggregateId: transferRequest.id,
+      fundId: input.fundId,
+      payload: {
+        senderInvestorId: sender.id,
+        recipientInvestorId: recipient.id,
+        tokenAmount: input.tokenAmount,
+        evidenceDocumentId: evidenceDoc.documentId,
+      },
+    });
+
+    return {
+      transferRequestId: transferRequest.id,
+      evidenceDocumentId: evidenceDoc.documentId,
+      tokenAmount: input.tokenAmount,
+      fromInvestor: { id: sender.id, legalName: sender.legalName },
+      toInvestor: { id: recipient.id, legalName: recipient.legalName },
+      chainStatus: 'SIMULATED',
+    };
+  }
 
   /**
    * Resolve an investor record from the authenticated user's email.
@@ -678,6 +880,32 @@ export class InvestorPortalService {
       select: { id: true },
     });
     if (sub) return;
+
+    // Transfer evidence on a transfer this investor is a party to (sender or
+    // recipient). Doc is linked with linkedEntityType=TRANSFER + linkedEntityId
+    // pointing at the transfer_requests row.
+    if (doc.linkedEntityType === 'TRANSFER' && doc.linkedEntityId) {
+      const investorWallets = await this.prisma.wallet.findMany({
+        where: { investorId, deletedAt: null },
+        select: { id: true },
+      });
+      const walletIds = investorWallets.map((w) => w.id);
+      if (walletIds.length > 0) {
+        const transfer = await this.prisma.transferRequest.findFirst({
+          where: {
+            id: doc.linkedEntityId,
+            fundId,
+            deletedAt: null,
+            OR: [
+              { fromWalletId: { in: walletIds } },
+              { toWalletId: { in: walletIds } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (transfer) return;
+      }
+    }
 
     throw new NotFoundError('Document', documentId);
   }

@@ -6,10 +6,19 @@ import type { HashProvider } from '../../adapters/hash/hash.provider';
 import { HASH_PROVIDER } from '../../adapters/hash/hash.provider';
 import type { DocumentParserAdapter } from '../../adapters/parser/parser.adapter';
 import { PARSER_ADAPTER } from '../../adapters/parser/parser.adapter';
-import { NotFoundError, ValidationError } from '../../common/errors';
+import {
+  NotFoundError,
+  ValidationError,
+  ConflictError,
+} from '../../common/errors';
 import { EventLogService } from '../../common/event-log.service';
 import { randomUUID } from 'crypto';
 import { AddManualExtractedFieldsDto } from './documents.dto';
+import {
+  DocumentType,
+  GOVERNING_DOCUMENT_TYPES,
+  AMENDS_PARENT_DOCUMENT_TYPES,
+} from '../../domain/enums';
 import type { DocumentRegistryAdapter } from '../../adapters/blockchain/viem-document-registry.adapter';
 import { DOCUMENT_REGISTRY_ADAPTER } from '../../adapters/blockchain/viem-document-registry.adapter';
 import type { FundTermsRegistryAdapter } from '../../adapters/blockchain/viem-fund-terms-registry.adapter';
@@ -36,6 +45,48 @@ export class DocumentsService {
     mimeType: string,
     uploadedBy?: string,
   ) {
+    return this.uploadGoverningDocument({
+      fundId,
+      documentType: DocumentType.MASTER_LPA,
+      file,
+      filename,
+      mimeType,
+      uploadedBy,
+    });
+  }
+
+  /**
+   * Upload a governing document (Master LPA, Amendment, Side Letter, Joinder, etc.).
+   *
+   * - For MASTER_LPA: parentDocumentId must be omitted; version auto-increments per fund.
+   * - For LPA_AMENDMENT, SIDE_LETTER, JOINDER, ASSIGNMENT_AND_ASSUMPTION:
+   *   parentDocumentId is REQUIRED and must reference an existing governing
+   *   document for the same fund. Version derives from the parent's amendment count.
+   *
+   * Hashes the file, anchors on-chain (fire-and-forget), parses extracted fields
+   * for Master LPAs, and emits a DOCUMENT_UPLOADED event.
+   */
+  async uploadGoverningDocument(params: {
+    fundId: string;
+    documentType: string;
+    file: Buffer;
+    filename: string;
+    mimeType: string;
+    uploadedBy?: string;
+    parentDocumentId?: string | null;
+    effectiveDate?: Date | null;
+  }) {
+    const {
+      fundId,
+      documentType,
+      file,
+      filename,
+      mimeType,
+      uploadedBy,
+      parentDocumentId,
+      effectiveDate,
+    } = params;
+
     if (mimeType !== 'application/pdf') {
       throw new ValidationError(
         'Invalid file type. Only PDF files are accepted.',
@@ -43,22 +94,80 @@ export class DocumentsService {
       );
     }
 
-    // Verify fund exists
+    if (!GOVERNING_DOCUMENT_TYPES.has(documentType)) {
+      throw new ValidationError(
+        `documentType "${documentType}" is not a governing document type. Use uploadGenericDocument for non-governing uploads.`,
+        { field: 'documentType', issue: 'not_governing_type' },
+      );
+    }
+
+    const requiresParent = AMENDS_PARENT_DOCUMENT_TYPES.has(documentType);
+    if (requiresParent && !parentDocumentId) {
+      throw new ValidationError(
+        `Document type ${documentType} requires a parentDocumentId (the governing document being amended).`,
+        { field: 'parentDocumentId', issue: 'missing_parent' },
+      );
+    }
+    if (!requiresParent && parentDocumentId) {
+      throw new ValidationError(
+        `Document type ${documentType} cannot have a parentDocumentId.`,
+        { field: 'parentDocumentId', issue: 'unexpected_parent' },
+      );
+    }
+
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);
 
-    const storageKey = `funds/${fundId}/lpa/${randomUUID()}-${filename}`;
+    let resolvedVersion = 1;
+    if (parentDocumentId) {
+      const parent = await this.prisma.document.findUnique({
+        where: { id: parentDocumentId },
+        include: { _count: { select: { amendments: true } } },
+      });
+      if (!parent || parent.deletedAt) {
+        throw new NotFoundError('ParentDocument', parentDocumentId);
+      }
+      if (parent.fundId !== fundId) {
+        throw new ConflictError(
+          'PARENT_FUND_MISMATCH',
+          'Parent document belongs to a different fund.',
+        );
+      }
+      if (!GOVERNING_DOCUMENT_TYPES.has(parent.documentType)) {
+        throw new ConflictError(
+          'PARENT_NOT_GOVERNING',
+          `Parent document is type ${parent.documentType}, which cannot be amended.`,
+        );
+      }
+      resolvedVersion = (parent._count.amendments ?? 0) + 2;
+    } else if (documentType === DocumentType.MASTER_LPA) {
+      const existingLpaCount = await this.prisma.document.count({
+        where: {
+          fundId,
+          documentType: DocumentType.MASTER_LPA,
+          deletedAt: null,
+        },
+      });
+      resolvedVersion = existingLpaCount + 1;
+    }
+
+    const folder =
+      documentType === DocumentType.MASTER_LPA
+        ? 'lpa'
+        : documentType.toLowerCase();
+    const storageKey = `funds/${fundId}/${folder}/${randomUUID()}-${filename}`;
     await this.storage.save(storageKey, file, mimeType);
 
-    // Compute hash
     const hashHex = this.hashProvider.hash(file);
 
-    // Create document + hash in transaction
     const document = await this.prisma.$transaction(async (tx) => {
       const doc = await tx.document.create({
         data: {
           fundId,
-          documentType: 'MASTER_LPA',
+          documentType,
+          parentDocumentId: parentDocumentId ?? null,
+          version: resolvedVersion,
+          effectiveDate: effectiveDate ?? null,
           storageProvider: process.env.SUPABASE_URL ? 'SUPABASE' : 'LOCAL_FS',
           storageKey,
           originalFilename: filename,
@@ -89,8 +198,17 @@ export class DocumentsService {
       return doc;
     });
 
-    // Run parse synchronously for MVP (small files)
-    await this.parseDocument(document.id);
+    if (documentType === DocumentType.MASTER_LPA) {
+      // Master LPA: run extraction so admin can review fund terms.
+      await this.parseDocument(document.id);
+    } else {
+      // Amendments + side letters: skip parse pipeline; mark as completed
+      // so admins can immediately approve / anchor.
+      await this.prisma.document.update({
+        where: { id: document.id },
+        data: { parseStatus: 'COMPLETED' },
+      });
+    }
 
     await this.eventLog.log({
       eventType: 'DOCUMENT_UPLOADED',
@@ -101,16 +219,55 @@ export class DocumentsService {
         filename,
         mimeType,
         hashHex,
-        documentType: 'MASTER_LPA',
+        documentType,
+        parentDocumentId: parentDocumentId ?? null,
+        version: resolvedVersion,
         uploadedBy,
       },
     });
 
     return {
       documentId: document.id,
-      parseStatus: 'COMPLETED',
+      documentType,
+      parentDocumentId: parentDocumentId ?? null,
+      version: resolvedVersion,
+      parseStatus:
+        documentType === DocumentType.MASTER_LPA ? 'COMPLETED' : 'COMPLETED',
       hashStatus: 'PENDING',
     };
+  }
+
+  /**
+   * Resolve the active LPA stack for a fund: the latest Master LPA
+   * (highest version) plus all amendments / side letters that target it,
+   * ordered by effective date (or creation if not set).
+   */
+  async getActiveLpaStack(fundId: string) {
+    const lpa = await this.prisma.document.findFirst({
+      where: {
+        fundId,
+        documentType: DocumentType.MASTER_LPA,
+        deletedAt: null,
+      },
+      orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
+    });
+    if (!lpa) return null;
+
+    const amendments = await this.prisma.document.findMany({
+      where: {
+        fundId,
+        parentDocumentId: lpa.id,
+        deletedAt: null,
+        documentType: { in: Array.from(AMENDS_PARENT_DOCUMENT_TYPES) },
+      },
+      orderBy: [
+        { effectiveDate: 'asc' },
+        { version: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    });
+
+    return { lpa, amendments };
   }
 
   /**
@@ -659,6 +816,9 @@ export class DocumentsService {
       return {
         documentId: doc.id,
         documentType: doc.documentType,
+        parentDocumentId: doc.parentDocumentId ?? null,
+        version: doc.version,
+        effectiveDate: doc.effectiveDate?.toISOString() ?? null,
         originalFilename: doc.originalFilename,
         mimeType: doc.mimeType,
         byteSize: Number(doc.byteSize),

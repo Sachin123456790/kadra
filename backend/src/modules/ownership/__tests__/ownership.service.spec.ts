@@ -94,18 +94,18 @@ describe('OwnershipService', () => {
       prisma.fund.findUnique.mockResolvedValue(mockFund);
       prisma.tokenContract.findFirst.mockResolvedValue(null); // no contract deployed
       prisma.tokenPosition.findMany.mockResolvedValue([]); // won't be called, but safe
-      // First call: SETTLED subs (none), second call: PENDING subs
-      prisma.subscription.findMany
-        .mockResolvedValueOnce([]) // SETTLED query returns empty
-        .mockResolvedValueOnce([
-          {
-            id: 'sub-1',
-            investorId: 'inv-1',
-            allocationPct: 20,
-            investor: { id: 'inv-1', legalName: 'Investor A' },
-            wallet: { address: '0xABC' },
-          },
-        ]);
+      // Fallback path issues a single combined SETTLED+PENDING query.
+      prisma.subscription.findMany.mockResolvedValue([
+        {
+          id: 'sub-1',
+          investorId: 'inv-1',
+          allocationPct: 20,
+          status: 'PENDING',
+          committedAmount: '200000',
+          investor: { id: 'inv-1', legalName: 'Investor A' },
+          wallet: { address: '0xABC' },
+        },
+      ]);
 
       const result = await service.getCapTable(fundId, {
         includePending: true,
@@ -115,6 +115,90 @@ describe('OwnershipService', () => {
       expect(result.rows[0].pendingAllocationPct).toBe(20);
       expect(result.rows[0].settledTokenBalance).toBe('0');
       expect(result.rows[0].ownershipPct).toBe(0);
+    });
+
+    // ── Top-up grouping: investor with multiple subs collapses to one row ──
+    it('groups multiple subscriptions per investor into one cap-table row', async () => {
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.tokenContract.findFirst.mockResolvedValue(null); // pre-mint demo path
+      prisma.tokenPosition.findMany.mockResolvedValue([]);
+      // inv-1 has TWO settled subscriptions (original 20% + top-up 10% = 30%).
+      // The cap table should show ONE row for inv-1 totalling 30%.
+      prisma.subscription.findMany.mockResolvedValue([
+        {
+          id: 'sub-1',
+          investorId: 'inv-1',
+          allocationPct: 20,
+          status: 'SETTLED',
+          committedAmount: '200000',
+          investor: { id: 'inv-1', legalName: 'Investor A' },
+          wallet: { address: '0xABC' },
+        },
+        {
+          id: 'sub-2',
+          investorId: 'inv-1',
+          allocationPct: 10,
+          status: 'SETTLED',
+          committedAmount: '100000',
+          investor: { id: 'inv-1', legalName: 'Investor A' },
+          wallet: { address: '0xABC' },
+        },
+      ]);
+
+      const result = await service.getCapTable(fundId);
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0].investorId).toBe('inv-1');
+      expect(result.rows[0].ownershipPct).toBeCloseTo(30);
+      expect(result.rows[0].subscriptionCount).toBe(2);
+      expect(Number(result.rows[0].settledTokenBalance)).toBeCloseTo(300000);
+    });
+
+    it('groups on-chain positions and pending top-ups by investor', async () => {
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.tokenContract.findFirst.mockResolvedValue(mockContract);
+      // inv-1 has 2000 tokens (40% of 5000 total), inv-2 has 3000 (60%).
+      prisma.tokenPosition.findMany.mockResolvedValue([
+        {
+          id: 'pos-1',
+          tokenContractId: contractId,
+          walletAddress: '0xABC',
+          settledTokenBalance: 2000,
+          wallet: {
+            address: '0xABC',
+            investor: { id: 'inv-1', legalName: 'Investor A' },
+          },
+        },
+        {
+          id: 'pos-2',
+          tokenContractId: contractId,
+          walletAddress: '0xDEF',
+          settledTokenBalance: 3000,
+          wallet: {
+            address: '0xDEF',
+            investor: { id: 'inv-2', legalName: 'Investor B' },
+          },
+        },
+      ]);
+      // inv-1 has a pending top-up of 10% on top of their 40% settled position.
+      prisma.subscription.findMany.mockResolvedValue([
+        {
+          id: 'sub-topup',
+          investorId: 'inv-1',
+          allocationPct: 10,
+          investor: { id: 'inv-1', legalName: 'Investor A' },
+          wallet: { address: '0xABC' },
+        },
+      ]);
+
+      const result = await service.getCapTable(fundId);
+
+      expect(result.rows).toHaveLength(2);
+      const a = result.rows.find((r) => r.investorId === 'inv-1')!;
+      const b = result.rows.find((r) => r.investorId === 'inv-2')!;
+      expect(a.ownershipPct).toBeCloseTo(40); // settled
+      expect(a.pendingAllocationPct).toBeCloseTo(10); // top-up still pending
+      expect(b.ownershipPct).toBeCloseTo(60);
     });
 
     it('merges pending allocation into existing settled row', async () => {

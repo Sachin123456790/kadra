@@ -25,6 +25,9 @@ describe('DocumentsService', () => {
       update: jest.fn(),
       findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
+      findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     documentHash: {
       create: jest.fn(),

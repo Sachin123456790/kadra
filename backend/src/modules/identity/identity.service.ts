@@ -3,6 +3,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError, ConflictError } from '../../common/errors';
 import { EventLogService } from '../../common/event-log.service';
 import { computeOnboardingStage } from './onboarding-stage';
+import {
+  generateCustodialWallet,
+  encryptPrivateKey,
+} from '../../common/wallet-crypto';
+
+const DEFAULT_CUSTODIAL_CHAIN_ID = 11155111; // Sepolia
 
 @Injectable()
 export class IdentityService {
@@ -166,6 +172,75 @@ export class IdentityService {
       investorId: wallet.investorId,
       chainId: wallet.chainId,
       address: wallet.address,
+    };
+  }
+
+  async autoGenerateWallet(
+    investorId: string,
+    options?: { chainId?: number; label?: string },
+  ) {
+    const investor = await this.prisma.investor.findUnique({
+      where: { id: investorId },
+    });
+    if (!investor) throw new NotFoundError('Investor', investorId);
+
+    const chainId = options?.chainId ?? DEFAULT_CUSTODIAL_CHAIN_ID;
+
+    const existingActive = await this.prisma.wallet.findFirst({
+      where: {
+        investorId,
+        walletStatus: 'ACTIVE',
+        deletedAt: null,
+        walletSource: { in: ['METAMASK', 'PHANTOM', 'IMPORTED', 'CUSTODIAL'] },
+      },
+    });
+    if (existingActive) {
+      throw new ConflictError(
+        'WALLET_ALREADY_LINKED',
+        'Investor already has an active wallet linked',
+      );
+    }
+
+    const { address, privateKey } = generateCustodialWallet();
+    const addressNorm = address.toLowerCase();
+    const encryptedPrivateKey = encryptPrivateKey(privateKey);
+
+    const walletCount = await this.prisma.wallet.count({
+      where: { investorId, deletedAt: null },
+    });
+
+    const wallet = await this.prisma.wallet.create({
+      data: {
+        investorId,
+        chainId,
+        address,
+        addressNorm,
+        label: options?.label ?? 'Angainor custodial',
+        isPrimary: walletCount === 0,
+        walletStatus: 'ACTIVE',
+        walletSource: 'CUSTODIAL',
+        encryptedPrivateKey,
+      },
+    });
+
+    await this.eventLog.log({
+      eventType: 'WALLET_LINKED',
+      aggregateType: 'WALLET',
+      aggregateId: wallet.id,
+      payload: {
+        investorId,
+        chainId,
+        address: wallet.address,
+        walletSource: 'CUSTODIAL',
+      },
+    });
+
+    return {
+      walletId: wallet.id,
+      investorId: wallet.investorId,
+      chainId: wallet.chainId,
+      address: wallet.address,
+      walletSource: wallet.walletSource,
     };
   }
 

@@ -280,6 +280,41 @@ export class InvestorPortalController {
     };
   }
 
+  @Post('me/transfers/import-off-chain')
+  async importOffChainTransfer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('fundId') fundIdOrCode: string | undefined,
+    @Req() req: any,
+  ) {
+    const file = await extractFile(req);
+    if (!file) {
+      throw new BadRequestException('No wire/receipt PDF provided');
+    }
+    const toInvestorId = String(req.body?.toInvestorId ?? '').trim();
+    if (!toInvestorId) {
+      throw new BadRequestException('toInvestorId is required');
+    }
+    const tokenAmount = Number(req.body?.tokenAmount);
+    const note = req.body?.note ? String(req.body.note) : undefined;
+
+    const fundId = await resolveFundId(
+      this.prisma,
+      fundIdOrCode || DEFAULT_FUND_CODE,
+    );
+    const data = await this.portalService.importOffChainTransfer({
+      email: user.email,
+      fundId,
+      toInvestorId,
+      tokenAmount,
+      note,
+      file,
+    });
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
   @Get('me/transfers')
   async getMyTransfers(
     @CurrentUser() user: AuthenticatedUser,
@@ -363,6 +398,21 @@ export class InvestorPortalController {
       user.email,
       { address: dto.address, chainId: dto.chainId },
     );
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Post('me/wallets/auto-generate')
+  async autoGenerateMyWallet(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { chainId?: number; label?: string } = {},
+  ) {
+    const data = await this.portalService.autoGenerateMyWallet(user.email, {
+      chainId: body.chainId,
+      label: body.label,
+    });
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },

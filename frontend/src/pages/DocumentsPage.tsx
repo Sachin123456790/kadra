@@ -12,6 +12,11 @@ import {
   getInvestors,
 } from "@/services";
 import {
+  uploadGoverningDocument,
+  GOVERNING_DOCUMENT_TYPE_OPTIONS,
+  type GoverningDocumentType,
+} from "@/services/documents.service";
+import {
   getNotices,
   createNotice,
   updateNoticeDelivery,
@@ -156,13 +161,26 @@ function fieldDisplayValue(f: ExtractedField): string {
   return "";
 }
 
-const DOCUMENT_TYPE_OPTIONS = [
-  "Master LPA",
-  "Amendment",
-  "Side Letter",
-  "Wire Confirmation",
-  "Other",
-] as const;
+/**
+ * Friendly labels for the governing-document types stored on Document.documentType.
+ * Keep in sync with backend DocumentType enum.
+ */
+const GOVERNING_TYPE_LABELS: Record<string, string> = {
+  MASTER_LPA: "Master LPA",
+  LPA_AMENDMENT: "LPA Amendment",
+  SIDE_LETTER: "Side Letter",
+  JOINDER: "Joinder",
+  ASSIGNMENT_AND_ASSUMPTION: "Assignment & Assumption",
+  SUBSCRIPTION_AGREEMENT: "Subscription Agreement",
+  WIRE_CONFIRMATION: "Wire Confirmation",
+  GP_REPORT: "GP Report",
+  INVESTOR_UPLOAD: "Investor Upload",
+};
+
+function friendlyDocumentType(type: string | null | undefined): string {
+  if (!type) return "Master LPA";
+  return GOVERNING_TYPE_LABELS[type] ?? type;
+}
 
 // ── Governing Documents table columns ────────────────────────
 
@@ -182,9 +200,33 @@ const buildGoverningDocColumns = (
   {
     key: "documentType",
     header: "Type",
-    render: (row) => (
-      <span className="text-muted-foreground">{row.documentType ?? "Master LPA"}</span>
-    ),
+    render: (row) => {
+      const label = friendlyDocumentType(row.documentType);
+      const isAmendment = row.parentDocumentId != null;
+      return (
+        <div className="flex flex-col gap-0.5">
+          <span
+            className={
+              isAmendment
+                ? "text-muted-foreground"
+                : "font-medium text-foreground"
+            }
+          >
+            {label}
+            {row.version && row.version > 1 ? (
+              <span className="ml-1 text-xs text-muted-foreground">
+                v{row.version}
+              </span>
+            ) : null}
+          </span>
+          {isAmendment && (
+            <span className="text-[10px] uppercase tracking-wider text-indigo-600">
+              Amends Master LPA
+            </span>
+          )}
+        </div>
+      );
+    },
   },
   {
     key: "createdAt",
@@ -544,7 +586,11 @@ export default function DocumentsPage() {
   const [approveSuccess, setApproveSuccess] = useState<number | null>(null);
   const [fieldEdits, setFieldEdits] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
-  const [uploadDocType, setUploadDocType] = useState<string>("Master LPA");
+  const [uploadDocType, setUploadDocType] =
+    useState<GoverningDocumentType>("MASTER_LPA");
+  const [uploadParentId, setUploadParentId] = useState<string>("");
+  const [uploadEffectiveDate, setUploadEffectiveDate] = useState<string>("");
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [viewerDoc, setViewerDoc] = useState<{ id: string; filename: string } | null>(null);
   const [showGenerateNoticeModal, setShowGenerateNoticeModal] = useState(false);
   const [noticeForm, setNoticeForm] = useState<{
@@ -659,13 +705,37 @@ export default function DocumentsPage() {
   // ── Mutations ──────────────────────────────────────────────
 
   const uploadMutation = useMutation({
-    mutationFn: (file: File) =>
-      uploadMasterLpa(fundId, file).then((r) => r.data),
-    onSuccess: (_data: UploadResult) => {
+    mutationFn: (file: File) => {
+      if (uploadDocType === "MASTER_LPA") {
+        return uploadMasterLpa(fundId, file).then((r) => r.data);
+      }
+      // Amendment / side-letter / joinder path: requires parent.
+      return uploadGoverningDocument({
+        fundId,
+        file,
+        documentType: uploadDocType,
+        parentDocumentId: uploadParentId || undefined,
+        effectiveDate: uploadEffectiveDate || undefined,
+      }).then((r) => ({
+        documentId: r.data.documentId,
+        parseStatus: r.data.parseStatus,
+        hashStatus: r.data.hashStatus,
+      }));
+    },
+    onSuccess: (_data) => {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.documents(fundId),
       });
       setSelectedDocId(_data.documentId);
+      setUploadError(null);
+      // Reset amendment form state on success so a follow-up upload starts clean.
+      setUploadParentId("");
+      setUploadEffectiveDate("");
+    },
+    onError: (err: unknown) => {
+      setUploadError(
+        err instanceof Error ? err.message : "Upload failed",
+      );
     },
   });
 
@@ -791,12 +861,26 @@ export default function DocumentsPage() {
 
   // ── File handling ──────────────────────────────────────────
 
+  const selectedTypeRequiresParent =
+    GOVERNING_DOCUMENT_TYPE_OPTIONS.find((o) => o.value === uploadDocType)
+      ?.requiresParent ?? false;
+
   const handleFileSelect = useCallback(
     (file: File) => {
-      if (file.type !== "application/pdf") return;
+      if (file.type !== "application/pdf") {
+        setUploadError("Only PDF files are accepted.");
+        return;
+      }
+      if (selectedTypeRequiresParent && !uploadParentId) {
+        setUploadError(
+          "Pick the Master LPA this document amends before uploading.",
+        );
+        return;
+      }
+      setUploadError(null);
       uploadMutation.mutate(file);
     },
-    [uploadMutation],
+    [uploadMutation, selectedTypeRequiresParent, uploadParentId],
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1122,10 +1206,37 @@ export default function DocumentsPage() {
               />
             )}
             {documents && documents.length > 0 && (() => {
-              const GOVERNING_TYPES = new Set(["MASTER_LPA", "AMENDMENT", "SIDE_LETTER"]);
-              const governingDocs = documents.filter(
-                (d) => GOVERNING_TYPES.has(d.documentType) || !d.documentType,
-              );
+              // Keep this in sync with backend GOVERNING_DOCUMENT_TYPES.
+              const GOVERNING_TYPES = new Set([
+                "MASTER_LPA",
+                "LPA_AMENDMENT",
+                "SIDE_LETTER",
+                "JOINDER",
+                "ASSIGNMENT_AND_ASSUMPTION",
+              ]);
+              const governingDocs = documents
+                .filter(
+                  (d) => GOVERNING_TYPES.has(d.documentType) || !d.documentType,
+                )
+                // Sort so each Master LPA's amendments cluster directly under
+                // it, ordered by version. Standalone Master LPAs go by date.
+                .sort((a, b) => {
+                  const aIsAmendment = !!a.parentDocumentId;
+                  const bIsAmendment = !!b.parentDocumentId;
+                  if (aIsAmendment !== bIsAmendment) return aIsAmendment ? 1 : -1;
+                  if (aIsAmendment && bIsAmendment) {
+                    if (a.parentDocumentId !== b.parentDocumentId) {
+                      return (a.parentDocumentId ?? "").localeCompare(
+                        b.parentDocumentId ?? "",
+                      );
+                    }
+                    return (a.version ?? 0) - (b.version ?? 0);
+                  }
+                  return (
+                    new Date(b.createdAt).getTime() -
+                    new Date(a.createdAt).getTime()
+                  );
+                });
               if (governingDocs.length === 0) {
                 return (
                   <EmptyState
@@ -1544,21 +1655,96 @@ export default function DocumentsPage() {
         {/* Tab 4: Document Upload */}
         <TabsContent value="upload">
           <SectionCard title="Upload Document" className="mb-6">
-            {/* Document type selector */}
-            <div className="mb-4">
-              <label htmlFor="doc-type-select" className="block text-sm font-medium text-gray-700 mb-1">
-                Document Type
-              </label>
-              <select
-                id="doc-type-select"
-                value={uploadDocType}
-                onChange={(e) => setUploadDocType(e.target.value)}
-                className="w-full sm:w-64 rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                {DOCUMENT_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
+            <div className="grid gap-4 sm:grid-cols-2 mb-4">
+              {/* Document type — drives which backend endpoint is called. */}
+              <div>
+                <label
+                  htmlFor="doc-type-select"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Document Type
+                </label>
+                <select
+                  id="doc-type-select"
+                  value={uploadDocType}
+                  onChange={(e) => {
+                    const next = e.target.value as GoverningDocumentType;
+                    setUploadDocType(next);
+                    // Clear parent selection when switching to/from Master LPA.
+                    setUploadParentId("");
+                    setUploadError(null);
+                  }}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  {GOVERNING_DOCUMENT_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {uploadDocType === "MASTER_LPA"
+                    ? "The fund's governing limited-partnership agreement."
+                    : "Modifies an existing Master LPA. Cap-table calculations apply the LPA + all amendments."}
+                </p>
+              </div>
+
+              {/* Parent picker — only shown for amendments / side letters / joinders. */}
+              {selectedTypeRequiresParent && (
+                <div>
+                  <label
+                    htmlFor="amends-select"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Amends Document <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    id="amends-select"
+                    value={uploadParentId}
+                    onChange={(e) => {
+                      setUploadParentId(e.target.value);
+                      setUploadError(null);
+                    }}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">— Select a Master LPA —</option>
+                    {(documents ?? [])
+                      .filter((d) => d.documentType === "MASTER_LPA")
+                      .map((d) => (
+                        <option key={d.documentId} value={d.documentId}>
+                          v{d.version ?? 1} · {d.originalFilename}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The amendment is anchored on-chain alongside the original
+                    LPA's hash, so future investors see the full history.
+                  </p>
+                </div>
+              )}
+
+              {/* Effective date — optional, only relevant for amendments. */}
+              {selectedTypeRequiresParent && (
+                <div>
+                  <label
+                    htmlFor="effective-date"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Effective Date
+                  </label>
+                  <input
+                    id="effective-date"
+                    type="date"
+                    value={uploadEffectiveDate}
+                    onChange={(e) => setUploadEffectiveDate(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    When this amendment takes legal effect. Optional — leave
+                    blank to use the upload date.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Drag/drop upload zone */}
@@ -1602,11 +1788,15 @@ export default function DocumentsPage() {
               </div>
             )}
 
-            {uploadMutation.isError && (
+            {(uploadMutation.isError || uploadError) && (
               <div className="mt-4">
                 <ErrorAlert
                   title="Upload Failed"
-                  message={(uploadMutation.error as Error).message}
+                  message={
+                    uploadError ??
+                    (uploadMutation.error as Error | undefined)?.message ??
+                    "Unknown error"
+                  }
                 />
               </div>
             )}

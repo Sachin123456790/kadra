@@ -59,9 +59,18 @@ describe('InvestorPortalService', () => {
   beforeEach(() => {
     prisma = mockPrisma();
     const mockSignatureService = {} as SignatureVerificationService;
+    const mockIdentityService =
+      {} as import('../../identity/identity.service').IdentityService;
+    const mockDocumentsService =
+      {} as import('../../documents/documents.service').DocumentsService;
+    const mockEventLog =
+      {} as import('../../../common/event-log.service').EventLogService;
     service = new InvestorPortalService(
       prisma as unknown as PrismaService,
       mockSignatureService,
+      mockIdentityService,
+      mockDocumentsService,
+      mockEventLog,
     );
   });
 
@@ -148,7 +157,13 @@ describe('InvestorPortalService', () => {
               {
                 fundId,
                 aggregateId: {
-                  in: ['sub-1', 'transfer-1', 'wallet-1', 'notice-1', investorId],
+                  in: [
+                    'sub-1',
+                    'transfer-1',
+                    'wallet-1',
+                    'notice-1',
+                    investorId,
+                  ],
                 },
               },
               {
@@ -194,9 +209,7 @@ describe('InvestorPortalService', () => {
         id: 'ca-1',
         asOfDate: new Date('2025-03-01T00:00:00Z'),
       });
-      prisma.subscription.findMany.mockResolvedValue([
-        { id: 'sub-1' },
-      ]);
+      prisma.subscription.findMany.mockResolvedValue([{ id: 'sub-1' }]);
       prisma.distributionLineItem.findMany.mockResolvedValue([]);
 
       const result = await service.getTaxReport(investorId, fundId, 2025);
