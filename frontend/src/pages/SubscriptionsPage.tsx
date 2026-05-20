@@ -14,6 +14,7 @@ import { TableSkeleton } from "@/components/angainor/Skeleton";
 import { QUERY_KEYS, DEFAULT_FUND_CODE } from "@/config/constants";
 import { getSubscriptions, getInvestors, getDocuments, createSubscriptions } from "@/services";
 import { getFundAllocation } from "@/services/subscriptions.service";
+import { getFund } from "@/services/fund.service";
 import { createNotice } from "@/services/notices.service";
 import { toFriendlyMessage } from "@/lib/errorMessages";
 import {
@@ -106,9 +107,10 @@ export default function SubscriptionsPage() {
   const fundId = DEFAULT_FUND_CODE;
 
   // ── Create subscription form state
+  // Allocation % is derived from createAmount / fund target commitment,
+  // so the admin only enters the committed amount.
   const [createLpId, setCreateLpId] = useState("");
   const [createAmount, setCreateAmount] = useState("");
-  const [createAllocation, setCreateAllocation] = useState("");
 
   const { data: subscriptions, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.subscriptions(fundId),
@@ -123,6 +125,12 @@ export default function SubscriptionsPage() {
   const { data: documentsData } = useQuery({
     queryKey: QUERY_KEYS.documents(fundId),
     queryFn: () => getDocuments(fundId).then(r => r.data),
+  });
+
+  // Fund target commitment: denominator for the derived allocation %.
+  const { data: fundData } = useQuery({
+    queryKey: ["fund", fundId, "details"],
+    queryFn: () => getFund(fundId).then(r => r.data),
   });
 
   // Fund allocation: total committed pct, headroom, per-investor breakdown.
@@ -140,7 +148,16 @@ export default function SubscriptionsPage() {
     return allocationData.investors.find(i => i.investorId === createLpId) ?? null;
   }, [createLpId, allocationData]);
 
-  const proposedAllocationPct = Number(createAllocation) || 0;
+  // Fund total commitment drives the derived allocation %.
+  const fundTargetCommitment = Number(fundData?.targetCommitment ?? 0) || 0;
+  const proposedAllocationPct =
+    fundTargetCommitment > 0
+      ? Number(
+          (((Number(createAmount) || 0) / fundTargetCommitment) * 100).toFixed(
+            4,
+          ),
+        )
+      : 0;
   const headroomPct = allocationData?.remainingHeadroomPct ?? 100;
   const investorExistingPct = selectedInvestorAllocation?.totalAllocationPct ?? 0;
   const investorAfterPct = investorExistingPct + proposedAllocationPct;
@@ -183,7 +200,7 @@ export default function SubscriptionsPage() {
         {
           investorId: createLpId,
           walletId,
-          allocationPct: Number(createAllocation),
+          allocationPct: proposedAllocationPct,
           committedAmount: createAmount,
           subscriptionRef: buildSubscriptionRef(createLpId),
         },
@@ -337,7 +354,6 @@ export default function SubscriptionsPage() {
             onClick={() => {
               setCreateLpId("");
               setCreateAmount("");
-              setCreateAllocation("");
               setShowCreateModal(true);
             }}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
@@ -633,25 +649,28 @@ export default function SubscriptionsPage() {
             </div>
 
             <div>
-              <label htmlFor="allocation-pct" className="block text-sm font-medium text-muted-foreground mb-1">
+              <label className="block text-sm font-medium text-muted-foreground mb-1">
                 Allocation %{" "}
                 {selectedInvestorAllocation && (
                   <span className="font-normal text-xs text-muted-foreground">
                     (additional)
                   </span>
                 )}
+                <span className="font-normal text-xs text-muted-foreground">
+                  {" "}
+                  · derived
+                </span>
               </label>
-              <input
-                id="allocation-pct"
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                value={createAllocation}
-                onChange={e => setCreateAllocation(e.target.value)}
-                placeholder="e.g. 20"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
-              />
+              <div className="flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2">
+                <span className="text-sm font-medium text-foreground tabular-nums">
+                  {proposedAllocationPct.toFixed(2)}%
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {fundTargetCommitment > 0
+                    ? `of ${fmt(fundTargetCommitment)} fund total`
+                    : "set the fund total commitment to derive this"}
+                </span>
+              </div>
               {proposedAllocationPct > 0 && selectedInvestorAllocation && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Investor total after top-up:{" "}
@@ -695,7 +714,7 @@ export default function SubscriptionsPage() {
               disabled={
                 !createLpId ||
                 !createAmount ||
-                !createAllocation ||
+                proposedAllocationPct <= 0 ||
                 !latestLpa ||
                 allocationBlocked ||
                 createMutation.isPending

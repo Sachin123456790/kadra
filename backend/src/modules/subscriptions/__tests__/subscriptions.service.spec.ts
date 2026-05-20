@@ -259,6 +259,97 @@ describe('SubscriptionsService', () => {
       ).rejects.toThrow('LPA Amendment');
     });
 
+    // ── Amendment-driven subscription creation ─────────────────────────
+    // Subscriptions created from an approved LPA Amendment use the
+    // amendment's document id as the governingDocumentId. The service is
+    // document-type-agnostic, so the only requirement is a hashed document.
+    it('creates subscriptions from an LPA amendment document', async () => {
+      const amendmentDocId = 'amendment-doc-1';
+      prisma.fund.findUnique.mockResolvedValue({ id: fundId });
+      prisma.document.findUnique.mockResolvedValue({
+        id: amendmentDocId,
+        documentType: 'LPA_AMENDMENT',
+        hashes: [{ id: 'hash-amend-1', isPrimary: true }],
+      });
+      prisma.investorFundEligibility.findFirst.mockResolvedValue({
+        id: 'elig-1',
+        eligibilityStatus: 'ELIGIBLE',
+      });
+      // Fund is at 80%; the amendment adds a 20% allocation for a new LP.
+      prisma.subscription.findMany.mockResolvedValue([
+        { investorId: 'inv-1', allocationPct: 20, status: 'SETTLED' },
+        { investorId: 'inv-2', allocationPct: 20, status: 'SETTLED' },
+        { investorId: 'inv-3', allocationPct: 20, status: 'SETTLED' },
+        { investorId: 'inv-4', allocationPct: 20, status: 'SETTLED' },
+      ]);
+      mockTx.subscription.create.mockResolvedValue({
+        id: 'sub-amend-1',
+        status: 'PENDING',
+        subscriptionRef: 'SUB-AMEND-001',
+      });
+
+      const amendmentItems = [
+        {
+          investorId: 'inv-5',
+          walletId: 'w-5',
+          allocationPct: 20,
+          committedAmount: '200000',
+          subscriptionRef: 'SUB-AMEND-001',
+        },
+      ];
+
+      const result = await service.createSubscriptions(
+        fundId,
+        amendmentDocId,
+        amendmentItems,
+      );
+
+      expect(result.createdCount).toBe(1);
+      // The created subscription must reference the amendment as its
+      // governing document.
+      expect(mockTx.subscription.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            governingDocumentId: amendmentDocId,
+            governingHashId: 'hash-amend-1',
+          }),
+        }),
+      );
+    });
+
+    it('rejects an amendment subscription that exceeds fund headroom', async () => {
+      const amendmentDocId = 'amendment-doc-2';
+      prisma.fund.findUnique.mockResolvedValue({ id: fundId });
+      prisma.document.findUnique.mockResolvedValue({
+        id: amendmentDocId,
+        documentType: 'LPA_AMENDMENT',
+        hashes: [{ id: 'hash-amend-2', isPrimary: true }],
+      });
+      prisma.investorFundEligibility.findFirst.mockResolvedValue({
+        id: 'elig-1',
+        eligibilityStatus: 'ELIGIBLE',
+      });
+      // Fund already fully allocated at 100%.
+      prisma.subscription.findMany.mockResolvedValue([
+        { investorId: 'inv-1', allocationPct: 50, status: 'SETTLED' },
+        { investorId: 'inv-2', allocationPct: 50, status: 'SETTLED' },
+      ]);
+
+      const amendmentItems = [
+        {
+          investorId: 'inv-3',
+          walletId: 'w-3',
+          allocationPct: 10,
+          committedAmount: '100000',
+          subscriptionRef: 'SUB-AMEND-OVER',
+        },
+      ];
+
+      await expect(
+        service.createSubscriptions(fundId, amendmentDocId, amendmentItems),
+      ).rejects.toThrow(ConflictError);
+    });
+
     it('rejects a top-up that would push one investor above 100%', async () => {
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
       prisma.document.findUnique.mockResolvedValue({

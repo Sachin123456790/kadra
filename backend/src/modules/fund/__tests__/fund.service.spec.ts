@@ -6,6 +6,7 @@ const mockPrisma = () => ({
   fund: {
     create: jest.fn(),
     findUnique: jest.fn(),
+    update: jest.fn(),
   },
   investorFundEligibility: {
     count: jest.fn(),
@@ -28,7 +29,11 @@ describe('FundService', () => {
   let prisma: ReturnType<typeof mockPrisma>;
 
   const fundId = 'fund-1';
-  const mockFund = { id: fundId, name: 'Angainor Demo Fund I', status: 'ACTIVE' };
+  const mockFund = {
+    id: fundId,
+    name: 'Angainor Demo Fund I',
+    status: 'ACTIVE',
+  };
 
   beforeEach(() => {
     prisma = mockPrisma();
@@ -126,6 +131,63 @@ describe('FundService', () => {
         },
       });
       expect(result.status).toBe('DRAFT');
+    });
+  });
+
+  describe('updateFund', () => {
+    it('persists the fund target commitment', async () => {
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.fund.update.mockResolvedValue({
+        id: fundId,
+        code: 'ANGAINOR-DEMO-001',
+        name: 'Angainor Demo Fund I',
+        legalForm: 'LP',
+        jurisdictionCode: 'US-DE',
+        baseCurrency: 'USD',
+        targetCommitment: { toString: () => '10000000.00' },
+        status: 'ACTIVE',
+        updatedAt: new Date('2026-05-20T00:00:00Z'),
+      });
+
+      const result = await service.updateFund(fundId, {
+        targetCommitment: 10000000,
+      });
+
+      expect(prisma.fund.update).toHaveBeenCalledWith({
+        where: { id: fundId },
+        data: { targetCommitment: 10000000 },
+      });
+      expect(result.targetCommitment).toBe('10000000.00');
+    });
+
+    it('throws NotFoundError for a missing fund', async () => {
+      prisma.fund.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateFund('nonexistent', { targetCommitment: 5000000 }),
+      ).rejects.toThrow(NotFoundError);
+    });
+
+    it('only updates provided fields', async () => {
+      prisma.fund.findUnique.mockResolvedValue(mockFund);
+      prisma.fund.update.mockResolvedValue({
+        id: fundId,
+        code: 'ANGAINOR-DEMO-001',
+        name: 'Renamed Fund',
+        legalForm: 'LP',
+        jurisdictionCode: null,
+        baseCurrency: 'USD',
+        targetCommitment: null,
+        status: 'ACTIVE',
+        updatedAt: new Date('2026-05-20T00:00:00Z'),
+      });
+
+      await service.updateFund(fundId, { name: 'Renamed Fund' });
+
+      expect(prisma.fund.update).toHaveBeenCalledWith({
+        where: { id: fundId },
+        data: { name: 'Renamed Fund' },
+      });
     });
   });
 

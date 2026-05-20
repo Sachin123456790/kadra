@@ -1,4 +1,4 @@
-import { get, post } from './api-client';
+import { get, post, put } from './api-client';
 
 // ── Response types ─────────────────────────────────────────
 
@@ -11,6 +11,7 @@ export interface FundOverview {
   eligibleWalletCount: number;
   pendingSubscriptions: number;
   settledSubscriptions: number;
+  targetCommitment: string | null;
   totalCommittedAmount: string;
   totalSettledAmount: string;
   createdAt?: string;
@@ -62,6 +63,30 @@ export function createFund(body: {
 
 export function getFund(fundId: string) {
   return get<FundOverview>(`/admin/funds/${fundId}`);
+}
+
+export interface UpdateFundResult {
+  fundId: string;
+  code: string;
+  name: string;
+  legalForm: string;
+  jurisdictionCode: string | null;
+  baseCurrency: string;
+  targetCommitment: string | null;
+  status: string;
+  updatedAt: string;
+}
+
+export function updateFund(
+  fundId: string,
+  body: {
+    name?: string;
+    legalForm?: string;
+    jurisdictionCode?: string;
+    targetCommitment?: number;
+  },
+) {
+  return put<UpdateFundResult>(`/admin/funds/${fundId}`, body);
 }
 
 // ── Activity Feed ──────────────────────────────────────────

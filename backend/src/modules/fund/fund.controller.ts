@@ -2,13 +2,14 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Param,
   Body,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { FundService } from './fund.service';
-import { CreateFundDto } from './fund.dto';
+import { CreateFundDto, UpdateFundDto } from './fund.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
@@ -39,6 +40,19 @@ export class FundController {
   async getFundDetails(@Param('fundId') fundIdOrCode: string) {
     const fundId = await resolveFundId(this.prisma, fundIdOrCode);
     const data = await this.fundService.getFundDetails(fundId);
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Put(':fundId')
+  async updateFund(
+    @Param('fundId') fundIdOrCode: string,
+    @Body() body: UpdateFundDto,
+  ) {
+    const fundId = await resolveFundId(this.prisma, fundIdOrCode);
+    const data = await this.fundService.updateFund(fundId, body);
     return {
       data,
       meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },

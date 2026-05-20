@@ -42,10 +42,52 @@ export class FundService {
       legalForm: fund.legalForm,
       jurisdictionCode: fund.jurisdictionCode,
       baseCurrency: fund.baseCurrency,
+      targetCommitment: fund.targetCommitment?.toString() ?? null,
       status: fund.status,
       metadata: fund.metadata,
       createdAt: fund.createdAt.toISOString(),
       updatedAt: fund.updatedAt.toISOString(),
+    };
+  }
+
+  async updateFund(
+    fundId: string,
+    input: {
+      name?: string;
+      legalForm?: string;
+      jurisdictionCode?: string;
+      targetCommitment?: number;
+    },
+  ) {
+    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
+    if (!fund) throw new NotFoundError('Fund', fundId);
+
+    const updated = await this.prisma.fund.update({
+      where: { id: fundId },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.legalForm !== undefined
+          ? { legalForm: input.legalForm }
+          : {}),
+        ...(input.jurisdictionCode !== undefined
+          ? { jurisdictionCode: input.jurisdictionCode }
+          : {}),
+        ...(input.targetCommitment !== undefined
+          ? { targetCommitment: input.targetCommitment }
+          : {}),
+      },
+    });
+
+    return {
+      fundId: updated.id,
+      code: updated.code,
+      name: updated.name,
+      legalForm: updated.legalForm,
+      jurisdictionCode: updated.jurisdictionCode,
+      baseCurrency: updated.baseCurrency,
+      targetCommitment: updated.targetCommitment?.toString() ?? null,
+      status: updated.status,
+      updatedAt: updated.updatedAt.toISOString(),
     };
   }
 
@@ -81,27 +123,32 @@ export class FundService {
     const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
     if (!fund) throw new NotFoundError('Fund', fundId);
 
-    const [eligibleInvestors, eligibleWalletCount, pendingSubs, settledSubs, contract] =
-      await Promise.all([
-        this.prisma.investorFundEligibility.findMany({
-          where: { fundId, eligibilityStatus: 'ELIGIBLE', deletedAt: null },
-          distinct: ['investorId'],
-          select: { investorId: true },
-        }),
-        this.prisma.investorFundEligibility.count({
-          where: { fundId, eligibilityStatus: 'ELIGIBLE', deletedAt: null },
-        }),
-        this.prisma.subscription.count({
-          where: { fundId, status: 'PENDING', deletedAt: null },
-        }),
-        this.prisma.subscription.count({
-          where: { fundId, status: 'SETTLED', deletedAt: null },
-        }),
-        this.prisma.tokenContract.findFirst({
-          where: { fundId, deletedAt: null },
-          orderBy: { createdAt: 'desc' },
-        }),
-      ]);
+    const [
+      eligibleInvestors,
+      eligibleWalletCount,
+      pendingSubs,
+      settledSubs,
+      contract,
+    ] = await Promise.all([
+      this.prisma.investorFundEligibility.findMany({
+        where: { fundId, eligibilityStatus: 'ELIGIBLE', deletedAt: null },
+        distinct: ['investorId'],
+        select: { investorId: true },
+      }),
+      this.prisma.investorFundEligibility.count({
+        where: { fundId, eligibilityStatus: 'ELIGIBLE', deletedAt: null },
+      }),
+      this.prisma.subscription.count({
+        where: { fundId, status: 'PENDING', deletedAt: null },
+      }),
+      this.prisma.subscription.count({
+        where: { fundId, status: 'SETTLED', deletedAt: null },
+      }),
+      this.prisma.tokenContract.findFirst({
+        where: { fundId, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
 
     const committedAgg = await this.prisma.subscription.aggregate({
       where: { fundId, deletedAt: null },
@@ -127,6 +174,7 @@ export class FundService {
       eligibleWalletCount,
       pendingSubscriptions: pendingSubs,
       settledSubscriptions: settledSubs,
+      targetCommitment: fund.targetCommitment?.toString() ?? null,
       totalCommittedAmount:
         committedAgg._sum.committedAmount?.toString() ?? '0.00',
       totalSettledAmount: settledAgg._sum.committedAmount?.toString() ?? '0.00',

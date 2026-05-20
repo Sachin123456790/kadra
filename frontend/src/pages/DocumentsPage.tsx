@@ -25,6 +25,8 @@ import {
 } from "@/services/notices.service";
 import { NoticeBodyEditor } from "@/components/angainor/NoticeBodyEditor";
 import { getCapitalCalls } from "@/services/capital-calls.service";
+import { getFund, updateFund } from "@/services/fund.service";
+import { getFundAllocation } from "@/services/subscriptions.service";
 import { toFriendlyMessage } from "@/lib/errorMessages";
 import { toast } from "sonner";
 import type {
@@ -583,6 +585,8 @@ export default function DocumentsPage() {
   const [subscriptionDrafts, setSubscriptionDrafts] = useState<
     SubscriptionDraft[]
   >([]);
+  // Fund-wide total commitment used to derive each LP's allocation %.
+  const [fundTotalCommitment, setFundTotalCommitment] = useState<number>(0);
   const [approveSuccess, setApproveSuccess] = useState<number | null>(null);
   const [fieldEdits, setFieldEdits] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
@@ -664,6 +668,18 @@ export default function DocumentsPage() {
   const { data: capitalCalls } = useQuery({
     queryKey: QUERY_KEYS.capitalCalls(fundId),
     queryFn: () => getCapitalCalls(fundId).then((r) => r.data),
+  });
+
+  const { data: fundData } = useQuery({
+    queryKey: ["fund", fundId, "details"],
+    queryFn: () => getFund(fundId).then((r) => r.data),
+  });
+
+  // Fund allocation headroom: drives "already fully allocated" filtering when
+  // creating subscriptions from an LPA amendment (top-up flow).
+  const { data: fundAllocation } = useQuery({
+    queryKey: ["fund-allocation", fundId],
+    queryFn: () => getFundAllocation(fundId).then((r) => r.data),
   });
 
   // Fetch the default template body whenever the type/recipient/related entity
@@ -774,6 +790,9 @@ export default function DocumentsPage() {
       });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.subscriptions(fundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["fund-allocation", fundId],
       });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.extractedFields(selectedDocId ?? ""),
@@ -912,10 +931,30 @@ export default function DocumentsPage() {
   const [showAddDropdown, setShowAddDropdown] = useState(false);
 
   const getTotalCommitment = () => {
+    // Fund's documented total commitment takes priority. Fall back to the
+    // extracted LPA field, then a sane default for an unconfigured demo fund.
+    const fromFund = parseFloat(fundData?.targetCommitment ?? "");
+    if (Number.isFinite(fromFund) && fromFund > 0) return fromFund;
     const fieldMap = new Map(
       extractedFields.map((f) => [f.fieldName.toLowerCase(), fieldDisplayValue(f)]),
     );
     return parseFloat(fieldMap.get("total_commitment") ?? "0") || 10000000;
+  };
+
+  // Derive allocation % from a committed amount against the fund total.
+  const deriveAllocationPct = (amount: number, fundTotal: number): number => {
+    if (!Number.isFinite(fundTotal) || fundTotal <= 0) return 0;
+    return parseFloat(((amount / fundTotal) * 100).toFixed(4));
+  };
+
+  // An investor is "fully allocated" once their existing subscriptions reach
+  // 100% of the fund. Such investors are hidden when creating subscriptions
+  // from an amendment so the admin only tops up investors with headroom.
+  const isInvestorFullyAllocated = (investorId: string): boolean => {
+    const row = fundAllocation?.investors.find(
+      (i) => i.investorId === investorId,
+    );
+    return (row?.totalAllocationPct ?? 0) >= 100 - 0.000001;
   };
 
   const openApproveModal = () => {
@@ -923,28 +962,32 @@ export default function DocumentsPage() {
 
     const eligible = investors.filter(
       (inv) =>
-        inv.fundEligibility?.status === "APPROVED" ||
-        inv.fundEligibility?.status === "ELIGIBLE",
+        (inv.fundEligibility?.status === "APPROVED" ||
+          inv.fundEligibility?.status === "ELIGIBLE") &&
+        // For amendments, drop investors already at 100% — no headroom to top up.
+        !(isAmendment && isInvestorFullyAllocated(inv.investorId)),
     );
     if (eligible.length === 0) return;
 
     const totalCommitment = getTotalCommitment();
-    const equalPct = parseFloat((100 / eligible.length).toFixed(2));
     const commitPerLp = totalCommitment / eligible.length;
 
     const drafts: SubscriptionDraft[] = eligible.map((inv) => {
       const primaryWallet =
         inv.wallets.find((w) => w.isPrimary) ?? inv.wallets[0];
+      // Amendments are top-ups: start at zero so the admin enters new capital.
+      const amount = isAmendment ? 0 : commitPerLp;
       return {
         investorId: inv.investorId,
         investorName: inv.legalName,
         walletId: primaryWallet?.walletId ?? "",
         walletAddress: primaryWallet?.address ?? "No wallet",
-        allocationPct: equalPct,
-        committedAmount: commitPerLp,
+        allocationPct: deriveAllocationPct(amount, totalCommitment),
+        committedAmount: amount,
       };
     });
 
+    setFundTotalCommitment(totalCommitment);
     setSubscriptionDrafts(drafts);
     setShowApproveModal(true);
     setApproveSuccess(null);
@@ -976,25 +1019,39 @@ export default function DocumentsPage() {
 
   const redistributeEqually = () => {
     if (subscriptionDrafts.length === 0) return;
-    const totalCommitment = getTotalCommitment();
-    const equalPct = parseFloat((100 / subscriptionDrafts.length).toFixed(2));
-    const commitPerLp = totalCommitment / subscriptionDrafts.length;
+    const commitPerLp = fundTotalCommitment / subscriptionDrafts.length;
     setSubscriptionDrafts((prev) =>
       prev.map((d) => ({
         ...d,
-        allocationPct: equalPct,
         committedAmount: commitPerLp,
+        allocationPct: deriveAllocationPct(commitPerLp, fundTotalCommitment),
       })),
     );
   };
 
-  const updateDraft = (
-    index: number,
-    field: "allocationPct" | "committedAmount",
-    value: number,
-  ) => {
+  // Only the committed amount is editable per row; allocation % is derived.
+  const updateDraftAmount = (index: number, value: number) => {
     setSubscriptionDrafts((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, [field]: value } : d)),
+      prev.map((d, i) =>
+        i === index
+          ? {
+              ...d,
+              committedAmount: value,
+              allocationPct: deriveAllocationPct(value, fundTotalCommitment),
+            }
+          : d,
+      ),
+    );
+  };
+
+  // When the fund total changes, every derived allocation % must be recomputed.
+  const updateFundTotal = (value: number) => {
+    setFundTotalCommitment(value);
+    setSubscriptionDrafts((prev) =>
+      prev.map((d) => ({
+        ...d,
+        allocationPct: deriveAllocationPct(d.committedAmount, value),
+      })),
     );
   };
 
@@ -1005,7 +1062,7 @@ export default function DocumentsPage() {
     if (updates.length > 0) saveFieldsMutation.mutate(updates);
   };
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     const items: SubscriptionItem[] = subscriptionDrafts.map((d) => ({
       investorId: d.investorId,
       walletId: d.walletId,
@@ -1015,6 +1072,21 @@ export default function DocumentsPage() {
     const approveFieldUpdates: FieldUpdate[] = Object.entries(fieldEdits).map(
       ([fieldId, value]) => ({ fieldId, fieldValueText: value }),
     );
+    // Persist the fund total commitment so the derived % stays reproducible.
+    if (
+      fundTotalCommitment > 0 &&
+      fundTotalCommitment !== parseFloat(fundData?.targetCommitment ?? "")
+    ) {
+      try {
+        await updateFund(fundId, { targetCommitment: fundTotalCommitment });
+        queryClient.invalidateQueries({
+          queryKey: ["fund", fundId, "details"],
+        });
+      } catch (err) {
+        toast.error(toFriendlyMessage(err));
+        return;
+      }
+    }
     approveMutation.mutate({
       items,
       approveNotes: notes || undefined,
@@ -1031,6 +1103,24 @@ export default function DocumentsPage() {
   const isParsed = parseStatusData?.parseStatus === "COMPLETED";
   const isApproved = !!(selectedDoc?.metadata as Record<string, unknown>)?.approved;
   const isMasterLpa = selectedDoc?.documentType === "MASTER_LPA";
+  const isAmendment = selectedDoc?.documentType === "LPA_AMENDMENT";
+  // A doc qualifies for subscription creation once it is "ready": a parsed
+  // Master LPA or a COMPLETED amendment (amendments skip the parse step).
+  const isSubscriptionReady = isParsed && (isMasterLpa || isAmendment);
+
+  // Validity of the draft allocation set. Master LPA: must total exactly 100%.
+  // Amendment: must fit within the fund's remaining headroom.
+  const draftTotalPct = subscriptionDrafts.reduce(
+    (sum, d) => sum + d.allocationPct,
+    0,
+  );
+  const fundHeadroomPct = Math.max(
+    0,
+    100 - (fundAllocation?.totalAllocationPct ?? 0),
+  );
+  const isDraftAllocationValid = isAmendment
+    ? draftTotalPct > 0 && draftTotalPct <= fundHeadroomPct + 0.01
+    : Math.abs(draftTotalPct - 100) <= 0.01;
   const eligibleInvestors =
     investors?.filter(
       (inv) =>
@@ -1503,9 +1593,16 @@ export default function DocumentsPage() {
                 </SectionCard>
               )}
 
-              {/* Eligible Investors (MASTER_LPA only) */}
-              {isParsed && isMasterLpa && (
-                <SectionCard title="Eligible Investors" className="mb-6">
+              {/* Eligible Investors (Master LPA + LPA Amendment) */}
+              {isSubscriptionReady && (
+                <SectionCard
+                  title={
+                    isAmendment
+                      ? "Eligible Investors (Amendment Allocation)"
+                      : "Eligible Investors"
+                  }
+                  className="mb-6"
+                >
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
                     <MetricCard
                       label="Total Eligible"
@@ -1822,9 +1919,35 @@ export default function DocumentsPage() {
               Confirm Subscription Creation
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Add or remove investors below. Allocation must total 100%.
+              Enter each LP's committed amount. Allocation % is derived from the
+              fund total commitment below and must total 100%.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Fund total commitment — drives every derived allocation % */}
+          <div className="rounded-md border border-border bg-muted/40 p-3">
+            <label
+              htmlFor="fund-total-commitment"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              Fund Total Commitment (USD)
+            </label>
+            <input
+              id="fund-total-commitment"
+              type="number"
+              step="100000"
+              min="0"
+              value={fundTotalCommitment || ""}
+              onChange={(e) =>
+                updateFundTotal(parseFloat(e.target.value) || 0)
+              }
+              placeholder="e.g. 10000000"
+              className="w-48 rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Each LP's allocation % = committed amount / fund total commitment.
+            </p>
+          </div>
 
           {/* Investor table */}
           <div className="overflow-x-auto max-h-72 overflow-y-auto">
@@ -1856,17 +1979,12 @@ export default function DocumentsPage() {
                       <HashDisplay value={draft.walletAddress} fallback="None" />
                     </td>
                     <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={draft.allocationPct}
-                        onChange={(e) =>
-                          updateDraft(idx, "allocationPct", parseFloat(e.target.value) || 0)
-                        }
-                        className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
-                      />
+                      <span
+                        className="inline-block w-20 rounded-md bg-muted px-2 py-1 text-sm text-foreground tabular-nums"
+                        title="Derived from committed amount / fund total commitment"
+                      >
+                        {draft.allocationPct.toFixed(2)}%
+                      </span>
                     </td>
                     <td className="px-3 py-2">
                       <input
@@ -1875,7 +1993,7 @@ export default function DocumentsPage() {
                         min="0"
                         value={draft.committedAmount}
                         onChange={(e) =>
-                          updateDraft(idx, "committedAmount", parseFloat(e.target.value) || 0)
+                          updateDraftAmount(idx, parseFloat(e.target.value) || 0)
                         }
                         className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                       />
@@ -1919,7 +2037,9 @@ export default function DocumentsPage() {
                   (inv) =>
                     !draftIds.has(inv.investorId) &&
                     (inv.fundEligibility?.status === "APPROVED" ||
-                      inv.fundEligibility?.status === "ELIGIBLE"),
+                      inv.fundEligibility?.status === "ELIGIBLE") &&
+                    // For amendments, hide investors already at 100% allocation.
+                    !(isAmendment && isInvestorFullyAllocated(inv.investorId)),
                 );
                 const filtered = investorSearch
                   ? available.filter((inv) =>
@@ -1985,11 +2105,12 @@ export default function DocumentsPage() {
             </Button>
           </div>
 
-          {/* Totals row */}
+          {/* Totals row.
+              Master LPA: new subscriptions must fill the fund (sum of amounts
+              == fund total => 100%). Amendment top-up: new allocations only
+              need to fit within the fund's remaining headroom. */}
           {(() => {
-            const totalPct = subscriptionDrafts.reduce((sum, d) => sum + d.allocationPct, 0);
             const totalAmt = subscriptionDrafts.reduce((sum, d) => sum + d.committedAmount, 0);
-            const isValid = Math.abs(totalPct - 100) <= 0.01;
             return (
               <>
                 <div className="flex items-center justify-between rounded-lg border border-border bg-muted px-4 py-3 text-sm">
@@ -1999,8 +2120,8 @@ export default function DocumentsPage() {
                   <div className="flex items-center gap-6">
                     <span className="text-muted-foreground">
                       Allocation:{" "}
-                      <span className={`font-semibold ${isValid ? "text-green-700" : "text-red-600"}`}>
-                        {totalPct.toFixed(2)}%
+                      <span className={`font-semibold ${isDraftAllocationValid ? "text-green-700" : "text-red-600"}`}>
+                        {draftTotalPct.toFixed(2)}%
                       </span>
                     </span>
                     <span className="text-muted-foreground">
@@ -2010,11 +2131,13 @@ export default function DocumentsPage() {
                   </div>
                 </div>
 
-                {!isValid && subscriptionDrafts.length > 0 && (
+                {!isDraftAllocationValid && subscriptionDrafts.length > 0 && (
                   <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                     <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                     <span>
-                      Total allocation is {totalPct.toFixed(2)}% -- must equal 100%.
+                      {isAmendment
+                        ? `New allocation is ${draftTotalPct.toFixed(2)}% -- exceeds the fund's ${fundHeadroomPct.toFixed(2)}% remaining headroom.`
+                        : `Total allocation is ${draftTotalPct.toFixed(2)}% -- must equal 100%.`}
                     </span>
                   </div>
                 )}
@@ -2042,9 +2165,7 @@ export default function DocumentsPage() {
               disabled={
                 approveMutation.isPending ||
                 subscriptionDrafts.length === 0 ||
-                Math.abs(
-                  subscriptionDrafts.reduce((sum, d) => sum + d.allocationPct, 0) - 100,
-                ) > 0.01
+                !isDraftAllocationValid
               }
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >

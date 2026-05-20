@@ -33,6 +33,14 @@ vi.mock("@/services", () => ({
   createSubscriptions: vi.fn(),
 }));
 
+vi.mock("@/services/subscriptions.service", () => ({
+  getFundAllocation: vi.fn(),
+}));
+
+vi.mock("@/services/fund.service", () => ({
+  getFund: vi.fn(),
+}));
+
 import SubscriptionsPage from "@/pages/SubscriptionsPage";
 import {
   getSubscriptions,
@@ -40,6 +48,8 @@ import {
   getDocuments,
   createSubscriptions,
 } from "@/services";
+import { getFundAllocation } from "@/services/subscriptions.service";
+import { getFund } from "@/services/fund.service";
 
 function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -117,11 +127,53 @@ const mockDocuments = {
   meta: { requestId: "r3", timestamp: "2025-01-15T10:00:00Z" },
 };
 
+const mockFundAllocation = {
+  data: {
+    fundId: "ANGAINOR-DEMO-001",
+    fundCapPct: 100,
+    perInvestorCapPct: 100,
+    totalAllocationPct: 20,
+    remainingHeadroomPct: 80,
+    investors: [
+      {
+        investorId: "inv-001",
+        investorName: "Alpine Capital Partners",
+        investorEmail: "alpine@example.com",
+        totalAllocationPct: 20,
+        totalCommitted: 2000000,
+        settledAllocationPct: 20,
+        pendingAllocationPct: 0,
+        subscriptionCount: 1,
+      },
+    ],
+  },
+  meta: { requestId: "r5", timestamp: "2025-01-15T10:00:00Z" },
+};
+
+const mockFund = {
+  data: {
+    fundId: "ANGAINOR-DEMO-001",
+    fundName: "Angainor Demo Fund I",
+    status: "ACTIVE",
+    lpCount: 2,
+    eligibleWalletCount: 2,
+    pendingSubscriptions: 0,
+    settledSubscriptions: 1,
+    targetCommitment: "10000000.00",
+    totalCommittedAmount: "2000000",
+    totalSettledAmount: "2000000",
+    tokenContract: null,
+  },
+  meta: { requestId: "r6", timestamp: "2025-01-15T10:00:00Z" },
+};
+
 describe("SubscriptionsPage", () => {
   beforeEach(() => {
     vi.mocked(getSubscriptions).mockResolvedValue(mockSubscriptions as any);
     vi.mocked(getInvestors).mockResolvedValue(mockInvestors as any);
     vi.mocked(getDocuments).mockResolvedValue(mockDocuments as any);
+    vi.mocked(getFundAllocation).mockResolvedValue(mockFundAllocation as any);
+    vi.mocked(getFund).mockResolvedValue(mockFund as any);
     vi.mocked(createSubscriptions).mockResolvedValue({
       data: { createdCount: 1, subscriptions: [{ subscriptionId: "sub-new", status: "PENDING", subscriptionRef: "SUB-BRIDGE" }] },
       meta: { requestId: "r4", timestamp: "2025-01-15T10:00:00Z" },
@@ -159,7 +211,33 @@ describe("SubscriptionsPage", () => {
     // Modal should show the investor dropdown
     expect(screen.getByLabelText("Investor (LP)")).toBeInTheDocument();
     expect(screen.getByLabelText("Committed Amount (USD)")).toBeInTheDocument();
-    expect(screen.getByLabelText("Allocation %")).toBeInTheDocument();
+    // Allocation % is now a derived, read-only display, not an input.
+    expect(screen.getByText(/derived/i)).toBeInTheDocument();
+  });
+
+  it("derives allocation % from the committed amount and fund total", async () => {
+    renderWithProviders(<SubscriptionsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText("Alpine Capital Partners").length,
+      ).toBeGreaterThanOrEqual(1);
+    });
+
+    fireEvent.click(screen.getByText("Create Subscription"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Investor (LP)")).toBeInTheDocument();
+    });
+
+    // 2,500,000 committed against a 10,000,000 fund total => 25.00%.
+    fireEvent.change(screen.getByLabelText("Committed Amount (USD)"), {
+      target: { value: "2500000" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("25.00%")).toBeInTheDocument();
+    });
   });
 
   it("calls createSubscriptions API when modal form is submitted", async () => {
@@ -177,10 +255,9 @@ describe("SubscriptionsPage", () => {
       expect(screen.getByLabelText("Investor (LP)")).toBeInTheDocument();
     });
 
-    // Fill form
+    // Fill form. Allocation % is derived: 2,000,000 / 10,000,000 fund total = 20%.
     fireEvent.change(screen.getByLabelText("Investor (LP)"), { target: { value: "inv-002" } });
     fireEvent.change(screen.getByLabelText("Committed Amount (USD)"), { target: { value: "2000000" } });
-    fireEvent.change(screen.getByLabelText("Allocation %"), { target: { value: "20" } });
 
     // Submit - the submit button text inside the modal (not the page-level one)
     const submitButtons = screen.getAllByRole("button");

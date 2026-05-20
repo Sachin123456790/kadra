@@ -16,6 +16,7 @@ model Fund {
   legalForm        String   @default("LP") @map("legal_form") // LP | LLC | OTHER
   jurisdictionCode String?  @map("jurisdiction_code")
   baseCurrency     String   @default("USD") @map("base_currency") @db.Char(3)
+  targetCommitment Decimal? @map("target_commitment") @db.Decimal(20, 2)
   status           String   @default("DRAFT") // DRAFT | ACTIVE | CLOSED
   metadata         Json     @default("{}")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
