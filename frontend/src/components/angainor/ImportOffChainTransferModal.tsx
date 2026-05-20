@@ -25,6 +25,14 @@ import { QUERY_KEYS } from "@/config/constants";
 import { toFriendlyMessage } from "@/lib/errorMessages";
 import type { InvestorCapTableRow } from "@/services/investor-portal.service";
 
+// 1 token = $1 par value, so token units map 1:1 to USD.
+const fmtUsd = (n: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(n);
+
 interface Props {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
@@ -71,7 +79,7 @@ export function ImportOffChainTransferModal({
       if (!file) throw new Error("Upload a wire/receipt PDF");
       const amt = Number(tokenAmount);
       if (!Number.isFinite(amt) || amt <= 0) {
-        throw new Error("Enter a valid token amount");
+        throw new Error("Enter a valid transfer amount");
       }
       if (!toInvestorId) throw new Error("Pick a recipient");
       return importOffChainTransfer({
@@ -84,7 +92,7 @@ export function ImportOffChainTransferModal({
     },
     onSuccess: (res) => {
       toast.success(
-        `Recorded ${res.data.tokenAmount} tokens to ${res.data.toInvestor.legalName}`,
+        `Recorded ${fmtUsd(res.data.tokenAmount)} to ${res.data.toInvestor.legalName}`,
       );
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.investorTransfers(fundId),
@@ -151,18 +159,24 @@ export function ImportOffChainTransferModal({
           </div>
 
           <div>
-            <Label htmlFor="tokenAmount">Token amount</Label>
-            <Input
-              id="tokenAmount"
-              type="number"
-              min="0"
-              step="any"
-              placeholder="e.g. 500"
-              value={tokenAmount}
-              onChange={(e) => setTokenAmount(e.target.value)}
-            />
+            <Label htmlFor="tokenAmount">Transfer Amount (USD)</Label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                $
+              </span>
+              <Input
+                id="tokenAmount"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="e.g. 500"
+                value={tokenAmount}
+                onChange={(e) => setTokenAmount(e.target.value)}
+                className="pl-7"
+              />
+            </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Your current balance: {senderTokenBalance} units
+              Your current balance: {fmtUsd(Number(senderTokenBalance) || 0)}
             </p>
           </div>
 
