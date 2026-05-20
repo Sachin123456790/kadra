@@ -21,8 +21,13 @@ import { useHighlightRow } from "@/hooks/useHighlightRow";
 import { cn } from "@/lib/utils";
 import { isAddress } from "viem";
 
-const fmt = (n: number) =>
-  new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n);
+// 1 token = $1 par value, so token units map 1:1 to USD.
+const fmtUsd = (n: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(n);
 
 // ── Section 1: Transfer Eligibility ─────────────────────────
 
@@ -257,17 +262,22 @@ function InitiateTransferSection({
             <h4 className="text-sm font-medium text-foreground mb-3">Amount</h4>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Transfer Amount</label>
-                <input
-                  type="number"
-                  value={tokenAmount}
-                  onChange={(e) => setTokenAmount(e.target.value)}
-                  placeholder="e.g. 500"
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-ring focus:border-primary"
-                  disabled={transferStep !== "idle"}
-                />
+                <label className="block text-sm font-medium text-foreground mb-1">Transfer Amount (USD)</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    value={tokenAmount}
+                    onChange={(e) => setTokenAmount(e.target.value)}
+                    placeholder="e.g. 500"
+                    className="w-full pl-7 pr-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-ring focus:border-primary"
+                    disabled={transferStep !== "idle"}
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Current allocation: {tokenBalance} units
+                  Available to transfer: {fmtUsd(Number(tokenBalance) || 0)}
                 </p>
               </div>
             </div>
@@ -365,7 +375,7 @@ function TransferHistorySection({
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Direction</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Counterparty</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Amount</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Amount (USD)</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Result</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Reason</th>
               </tr>
@@ -408,7 +418,7 @@ function TransferHistorySection({
                       </div>
                     </td>
                     <td className="px-4 py-3 font-medium text-foreground">
-                      {fmt(Number(t.tokenAmount))}
+                      {fmtUsd(Number(t.tokenAmount))}
                     </td>
                     <td className="px-4 py-3">
                       {blocked ? (
