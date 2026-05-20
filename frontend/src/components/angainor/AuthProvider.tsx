@@ -9,17 +9,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Hydrate from localStorage on mount
+  // Hydrate from sessionStorage on mount (per-tab session)
   useEffect(() => {
-    const storedUser = localStorage.getItem(AUTH_USER_KEY);
-    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    const storedUser = sessionStorage.getItem(AUTH_USER_KEY);
+    const storedToken = sessionStorage.getItem(AUTH_TOKEN_KEY);
     if (storedUser && storedToken) {
       try {
         setUser(JSON.parse(storedUser));
       } catch {
-        localStorage.removeItem(AUTH_USER_KEY);
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        localStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
+        sessionStorage.removeItem(AUTH_USER_KEY);
+        sessionStorage.removeItem(AUTH_TOKEN_KEY);
+        sessionStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
       }
     }
     setIsLoading(false);
@@ -29,27 +29,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setOnUnauthorized(() => {
       setUser(null);
-      localStorage.removeItem(AUTH_TOKEN_KEY);
-      localStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
-      localStorage.removeItem(AUTH_USER_KEY);
+      sessionStorage.removeItem(AUTH_TOKEN_KEY);
+      sessionStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
+      sessionStorage.removeItem(AUTH_USER_KEY);
       navigate(ROUTES.LOGIN, { replace: true });
     });
     return () => setOnUnauthorized(null);
   }, [navigate]);
 
   const login = useCallback((token: string, authUser: AuthUser, refreshToken?: string) => {
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(authUser));
+    sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+    sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(authUser));
     if (refreshToken) {
-      localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, refreshToken);
+      sessionStorage.setItem(AUTH_REFRESH_TOKEN_KEY, refreshToken);
     }
     setUser(authUser);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_USER_KEY);
+    sessionStorage.removeItem(AUTH_TOKEN_KEY);
+    sessionStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
+    sessionStorage.removeItem(AUTH_USER_KEY);
     setUser(null);
     navigate(ROUTES.LOGIN, { replace: true });
   }, [navigate]);

@@ -225,7 +225,7 @@ export function uploadReportingDocument(
   // Use native fetch to include multipart fields alongside the file
   return (async () => {
     const { API_BASE_URL, AUTH_TOKEN_KEY } = await import('@/config/constants');
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
     const formData = new FormData();
     formData.append('file', file);
     formData.append('title', title);

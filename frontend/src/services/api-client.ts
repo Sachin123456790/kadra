@@ -38,7 +38,7 @@ export function setOnUnauthorized(listener: UnauthorizedListener | null) {
 let refreshPromise: Promise<boolean> | null = null;
 
 async function tryRefreshToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem(AUTH_REFRESH_TOKEN_KEY);
+  const refreshToken = sessionStorage.getItem(AUTH_REFRESH_TOKEN_KEY);
   if (!refreshToken) return false;
 
   try {
@@ -55,12 +55,12 @@ async function tryRefreshToken(): Promise<boolean> {
     if (!data?.accessToken) return false;
 
     // Update stored tokens
-    localStorage.setItem(AUTH_TOKEN_KEY, data.accessToken);
+    sessionStorage.setItem(AUTH_TOKEN_KEY, data.accessToken);
     if (data.refreshToken) {
-      localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, data.refreshToken);
+      sessionStorage.setItem(AUTH_REFRESH_TOKEN_KEY, data.refreshToken);
     }
     if (data.user) {
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
+      sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
     }
     return true;
   } catch {
@@ -81,7 +81,7 @@ function refreshOnce(): Promise<boolean> {
 // ── Helpers ────────────────────────────────────────────────
 
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

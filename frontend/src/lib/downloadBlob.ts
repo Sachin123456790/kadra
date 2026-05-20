@@ -5,7 +5,7 @@ import { API_BASE_URL, AUTH_TOKEN_KEY } from '@/config/constants';
  * Path is joined to the API base URL; pass an absolute URL to skip the prefix.
  */
 export async function downloadBlob(path: string, filename: string): Promise<void> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
   const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
   const res = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},

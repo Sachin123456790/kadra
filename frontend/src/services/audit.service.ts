@@ -83,7 +83,7 @@ export function getDocumentProvenance(fundId: string) {
 
 export async function downloadGpAdminExportPdf(fundId: string): Promise<void> {
   const { API_BASE_URL, AUTH_TOKEN_KEY } = await import('@/config/constants');
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
   const res = await fetch(
     `${API_BASE_URL}/admin/funds/${fundId}/gp-admin-export.pdf`,
     { headers: token ? { Authorization: `Bearer ${token}` } : {} },

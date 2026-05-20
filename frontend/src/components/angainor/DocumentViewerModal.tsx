@@ -43,7 +43,7 @@ export function DocumentViewerModal({
     setBlobUrl(null);
     setMimeType(null);
 
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
 
