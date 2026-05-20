@@ -24,6 +24,9 @@ const mockPrisma = () => ({
     findFirst: jest.fn(),
     findUnique: jest.fn(),
   },
+  settlementEvidence: {
+    create: jest.fn(),
+  },
   capitalAccount: {
     upsert: jest.fn(),
   },
@@ -385,6 +388,92 @@ describe('SettlementsService', () => {
 
       await expect(
         service.confirmSettlement(subscriptionId, 'no-sr'),
+      ).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('approveSettlementDirectly', () => {
+    const reason = 'Manual GP approval';
+
+    it('settles a PENDING subscription via manual attestation', async () => {
+      prisma.subscription.findUnique.mockResolvedValue(pendingSubscription);
+      prisma.settlementRecord.create.mockResolvedValue({
+        id: 'sr-approve-1',
+        subscriptionId,
+        status: 'OVERRIDDEN',
+      });
+      prisma.settlementEvidence.create.mockResolvedValue({
+        id: 'ev-1',
+        settlementRecordId: 'sr-approve-1',
+        evidenceType: 'MANUAL_ATTESTATION',
+      });
+      prisma.settlementRecord.findUnique.mockResolvedValue({
+        id: 'sr-approve-1',
+        subscriptionId,
+        status: 'OVERRIDDEN',
+      });
+      const settledAt = new Date();
+      prisma.subscription.update.mockResolvedValue({
+        id: subscriptionId,
+        status: 'SETTLED',
+        settledAt,
+      });
+      prisma.capitalAccount.upsert.mockResolvedValue({ id: 'ca-1' });
+
+      const result = await service.approveSettlementDirectly(
+        subscriptionId,
+        reason,
+      );
+
+      expect(result.status).toBe('SETTLED');
+      expect(result.subscriptionId).toBe(subscriptionId);
+
+      expect(prisma.settlementRecord.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            subscriptionId,
+            status: 'OVERRIDDEN',
+            failureReasonText: reason,
+            checkAmountMatch: false,
+            checkInvestorMatch: false,
+            checkReferenceMatch: false,
+            checkHashMatch: false,
+            checkNoDoubleSettlement: false,
+          }),
+        }),
+      );
+      expect(prisma.settlementEvidence.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            settlementRecordId: 'sr-approve-1',
+            evidenceType: 'MANUAL_ATTESTATION',
+            notes: reason,
+          }),
+        }),
+      );
+      expect(prisma.capitalAccount.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a non-PENDING subscription', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({
+        ...pendingSubscription,
+        status: 'SETTLED',
+      });
+
+      await expect(
+        service.approveSettlementDirectly(subscriptionId, reason),
+      ).rejects.toThrow(ConflictError);
+      await expect(
+        service.approveSettlementDirectly(subscriptionId, reason),
+      ).rejects.toThrow('Subscription is not in PENDING status');
+      expect(prisma.settlementRecord.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects when subscription not found', async () => {
+      prisma.subscription.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.approveSettlementDirectly('no-sub', reason),
       ).rejects.toThrow(NotFoundError);
     });
   });

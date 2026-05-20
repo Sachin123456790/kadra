@@ -25,6 +25,7 @@ import {
   requestPaymentValidation,
   confirmSettlement,
   uploadWireConfirmation,
+  approveSettlementDirectly,
 } from "@/services";
 import { mintTokens } from "@/services/tokenization.service";
 import {
@@ -457,6 +458,36 @@ function SettlementValidationSection({
     },
   });
 
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [approveReason, setApproveReason] = useState("Manual GP approval");
+
+  const approveMutation = useMutation({
+    mutationFn: ({
+      subscriptionId,
+      reason,
+    }: {
+      subscriptionId: string;
+      reason: string;
+    }) => approveSettlementDirectly(subscriptionId, reason).then((r) => r.data),
+    onSuccess: () => {
+      toast.success("Settlement approved", {
+        description:
+          "Ownership records and cap table have been updated via manual GP attestation.",
+      });
+      setApproveOpen(false);
+      setApproveReason("Manual GP approval");
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.subscriptions(fundId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.capitalCalls(fundId),
+      });
+    },
+    onError: (err: Error) => {
+      toast.error(toFriendlyMessage(err));
+    },
+  });
+
   if (isLoading)
     return (
       <div className="flex items-center gap-2 p-6 text-muted-foreground">
@@ -702,6 +733,85 @@ function SettlementValidationSection({
                       : "Confirm Settlement"}
                   </button>
                 </div>
+
+                {selected?.subscriptionStatus === "PENDING" && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <button
+                      onClick={() => {
+                        setApproveReason("Manual GP approval");
+                        setApproveOpen(true);
+                      }}
+                      disabled={approveMutation.isPending}
+                      className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    >
+                      {approveMutation.isPending
+                        ? "Approving..."
+                        : "Approve Settlement"}
+                    </button>
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Settle directly via manual GP attestation, without wire
+                      verification.
+                    </p>
+                  </div>
+                )}
+
+                <Dialog open={approveOpen} onOpenChange={setApproveOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Approve this settlement?</DialogTitle>
+                      <DialogDescription>
+                        Approve this settlement without wire verification. This
+                        records a manual GP attestation and flips the
+                        subscription to SETTLED.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Reason
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={approveReason}
+                        onChange={(e) => setApproveReason(e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        placeholder="Reason for the manual approval"
+                      />
+                    </div>
+                    <DialogFooter>
+                      <button
+                        type="button"
+                        onClick={() => setApproveOpen(false)}
+                        className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selected) {
+                            approveMutation.mutate({
+                              subscriptionId: selected.subscriptionId,
+                              reason:
+                                approveReason.trim() || "Manual GP approval",
+                            });
+                          }
+                        }}
+                        disabled={approveMutation.isPending}
+                        className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                      >
+                        {approveMutation.isPending
+                          ? "Approving..."
+                          : "Approve Settlement"}
+                      </button>
+                    </DialogFooter>
+                    {approveMutation.isError && (
+                      <p className="mt-2 text-xs text-red-600">
+                        {(approveMutation.error as Error).message}. Please try
+                        again or contact support.
+                      </p>
+                    )}
+                  </DialogContent>
+                </Dialog>
 
                 {!hasPaymentDoc && !uploadMutation.isPending && (
                   <p className="mt-2 text-xs text-amber-600">

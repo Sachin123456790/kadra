@@ -386,6 +386,53 @@ export class SettlementsService {
     };
   }
 
+  async approveSettlementDirectly(subscriptionId: string, reason: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+    });
+    if (!subscription) throw new NotFoundError('Subscription', subscriptionId);
+    if (subscription.status !== 'PENDING') {
+      throw new ConflictError(
+        'SUBSCRIPTION_NOT_PENDING',
+        'Subscription is not in PENDING status',
+      );
+    }
+
+    const now = new Date();
+
+    // Create an OVERRIDDEN settlement record via manual GP attestation. The
+    // five check booleans mirror the overrideSettlement path: an override
+    // bypasses the 3-way match rather than recording per-check outcomes.
+    const record = await this.prisma.settlementRecord.create({
+      data: {
+        subscriptionId,
+        status: 'OVERRIDDEN',
+        expectedAmount: subscription.committedAmount,
+        receivedAmount: subscription.committedAmount,
+        expectedCurrency: subscription.currency,
+        receivedCurrency: subscription.currency,
+        checkAmountMatch: false,
+        checkInvestorMatch: false,
+        checkReferenceMatch: false,
+        checkHashMatch: false,
+        checkNoDoubleSettlement: false,
+        failureReasonText: reason,
+        validatedAt: now,
+      },
+    });
+
+    await this.prisma.settlementEvidence.create({
+      data: {
+        settlementRecordId: record.id,
+        evidenceType: 'MANUAL_ATTESTATION',
+        notes: reason,
+        metadata: {},
+      },
+    });
+
+    return this.confirmSettlement(subscriptionId, record.id);
+  }
+
   async confirmSettlement(subscriptionId: string, settlementRecordId: string) {
     const subscription = await this.prisma.subscription.findUnique({
       where: { id: subscriptionId },

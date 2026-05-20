@@ -1,6 +1,10 @@
 import { Controller, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { SettlementsService } from './settlements.service';
-import { UploadPaymentEvidenceDto, OverrideSettlementDto } from './settlements.dto';
+import {
+  UploadPaymentEvidenceDto,
+  OverrideSettlementDto,
+  ApproveSettlementDto,
+} from './settlements.dto';
 import { randomUUID } from 'crypto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -42,6 +46,21 @@ export class SettlementsController {
     const data = await this.settlementsService.confirmSettlement(
       subscriptionId,
       body.settlementRecordId,
+    );
+    return {
+      data,
+      meta: { requestId: randomUUID(), timestamp: new Date().toISOString() },
+    };
+  }
+
+  @Post(':subscriptionId/settlement-approval')
+  async approveSettlement(
+    @Param('subscriptionId') subscriptionId: string,
+    @Body() body: ApproveSettlementDto,
+  ) {
+    const data = await this.settlementsService.approveSettlementDirectly(
+      subscriptionId,
+      body.reason,
     );
     return {
       data,

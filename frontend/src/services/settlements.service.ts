@@ -43,6 +43,16 @@ export function confirmSettlement(
   );
 }
 
+export function approveSettlementDirectly(
+  subscriptionId: string,
+  reason: string,
+) {
+  return post<SettlementConfirmation>(
+    `/admin/subscriptions/${subscriptionId}/settlement-approval`,
+    { reason },
+  );
+}
+
 export function uploadPaymentEvidence(
   subscriptionId: string,
   body: {
