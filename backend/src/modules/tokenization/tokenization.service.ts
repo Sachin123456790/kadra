@@ -110,10 +110,16 @@ export class TokenizationService {
         'No deployed contract found',
       );
 
-    // Calculate token amount (allocation % of total supply, e.g., 20% of 10000 = 2000)
-    const totalSupply = 10000;
-    const tokenAmount =
-      (Number(subscription.allocationPct) / 100) * totalSupply;
+    // Tokens are dollar-anchored: 1 token represents TOKEN_PAR_USD of committed
+    // capital. Minting against a fixed par (rather than a % of a fixed supply)
+    // keeps the cap table correct when an LPA amendment expands the fund -- new
+    // LPs mint fresh supply, so every LP's share of total supply equals their
+    // share of total committed capital. (e.g. $30M / $5,000 = 6,000 tokens.)
+    const TOKEN_PAR_USD = 5000;
+    // Floored to whole tokens -- ERC-20 balances here are integer units.
+    const tokenAmount = Math.floor(
+      Number(subscription.committedAmount) / TOKEN_PAR_USD,
+    );
 
     const MAX_ATTEMPTS = 3;
     let lastError: unknown = null;

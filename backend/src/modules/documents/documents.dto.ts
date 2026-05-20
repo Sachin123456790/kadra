@@ -46,6 +46,7 @@ export class ApproveDocumentSubscriptionItemDto {
   allocationPct!: number;
 
   @IsNumber()
+  @Min(0)
   committedAmount!: number;
 }
 

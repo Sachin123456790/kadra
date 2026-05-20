@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SubscriptionsService } from './subscriptions.service';
+import { CreateSubscriptionsDto } from './subscriptions.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveFundId } from '../../common/resolve-fund-id';
 import { randomUUID } from 'crypto';
@@ -28,13 +29,19 @@ export class SubscriptionsController {
   @Post('funds/:fundId/subscriptions')
   async createSubscriptions(
     @Param('fundId') fundIdOrCode: string,
-    @Body() body: { governingDocumentId: string; items: any[] },
+    @Body() body: CreateSubscriptionsDto,
   ) {
     const fundId = await resolveFundId(this.prisma, fundIdOrCode);
+    // committedAmount is validated as a number; the service + Prisma Decimal
+    // column take a string, matching the documents-approve path.
+    const items = body.items.map((item) => ({
+      ...item,
+      committedAmount: String(item.committedAmount),
+    }));
     const data = await this.subscriptionsService.createSubscriptions(
       fundId,
       body.governingDocumentId,
-      body.items,
+      items,
     );
     return {
       data,

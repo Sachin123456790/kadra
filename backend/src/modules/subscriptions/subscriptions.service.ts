@@ -47,6 +47,12 @@ export class SubscriptionsService {
 
     const governingHashId = doc.hashes[0].id;
 
+    // Only an LPA amendment expands the fund: it raises the dollar target and
+    // the whole cap table re-normalizes against the new total, so existing LPs
+    // dilute. Side letters / joinders also reference a parent document but must
+    // NOT resize the fund, so the check is on documentType, not parentDocumentId.
+    const isAmendment = doc.documentType === 'LPA_AMENDMENT';
+
     // Validate all investors are eligible
     for (const item of items) {
       const eligibility = await this.prisma.investorFundEligibility.findFirst({
@@ -80,76 +86,138 @@ export class SubscriptionsService {
       select: { investorId: true, allocationPct: true },
     });
 
-    const existingByInvestor = new Map<string, number>();
-    let existingFundTotal = 0;
-    for (const sub of existingSubs) {
-      const pct = Number(sub.allocationPct);
-      existingFundTotal += pct;
-      existingByInvestor.set(
-        sub.investorId,
-        (existingByInvestor.get(sub.investorId) ?? 0) + pct,
+    // An amendment must bring in new capital, otherwise it cannot expand the
+    // fund. Guards against empty / zero / negative committed amounts.
+    const newCommittedTotal = items.reduce(
+      (sum, item) => sum + Number(item.committedAmount),
+      0,
+    );
+    if (isAmendment && !(newCommittedTotal > 0)) {
+      throw new ConflictError(
+        'AMENDMENT_REQUIRES_NEW_CAPITAL',
+        'An LPA amendment must add at least one subscription with a positive committed amount.',
       );
     }
 
-    const newByInvestor = new Map<string, number>();
-    let newRequestTotal = 0;
-    for (const item of items) {
-      newRequestTotal += item.allocationPct;
-      newByInvestor.set(
-        item.investorId,
-        (newByInvestor.get(item.investorId) ?? 0) + item.allocationPct,
-      );
-    }
+    // Cap checks only apply to non-amendment creates (Master LPA fills a fixed
+    // 100%). Amendments deliberately push past the prior 100% and re-normalize.
+    if (!isAmendment) {
+      const existingByInvestor = new Map<string, number>();
+      let existingFundTotal = 0;
+      for (const sub of existingSubs) {
+        const pct = Number(sub.allocationPct);
+        existingFundTotal += pct;
+        existingByInvestor.set(
+          sub.investorId,
+          (existingByInvestor.get(sub.investorId) ?? 0) + pct,
+        );
+      }
 
-    // Per-investor cap check.
-    for (const [investorId, additional] of newByInvestor.entries()) {
-      const existing = existingByInvestor.get(investorId) ?? 0;
-      const investorTotal = existing + additional;
-      if (
-        investorTotal >
-        PER_INVESTOR_ALLOCATION_CAP_PCT + ALLOCATION_EPSILON
-      ) {
+      const newByInvestor = new Map<string, number>();
+      let newRequestTotal = 0;
+      for (const item of items) {
+        newRequestTotal += item.allocationPct;
+        newByInvestor.set(
+          item.investorId,
+          (newByInvestor.get(item.investorId) ?? 0) + item.allocationPct,
+        );
+      }
+
+      // Per-investor cap check.
+      for (const [investorId, additional] of newByInvestor.entries()) {
+        const existing = existingByInvestor.get(investorId) ?? 0;
+        const investorTotal = existing + additional;
+        if (
+          investorTotal >
+          PER_INVESTOR_ALLOCATION_CAP_PCT + ALLOCATION_EPSILON
+        ) {
+          throw new ConflictError(
+            'INVESTOR_ALLOCATION_EXCEEDED',
+            `Investor ${investorId} would have ${investorTotal.toFixed(4)}% allocation (existing ${existing.toFixed(4)}% + new ${additional.toFixed(4)}%), which exceeds 100%.`,
+          );
+        }
+      }
+
+      // Fund-level cap check.
+      const fundTotal = existingFundTotal + newRequestTotal;
+      if (fundTotal > FUND_ALLOCATION_CAP_PCT + ALLOCATION_EPSILON) {
         throw new ConflictError(
-          'INVESTOR_ALLOCATION_EXCEEDED',
-          `Investor ${investorId} would have ${investorTotal.toFixed(4)}% allocation (existing ${existing.toFixed(4)}% + new ${additional.toFixed(4)}%), which exceeds 100%.`,
+          'FUND_ALLOCATION_EXCEEDED',
+          `Fund total allocation would be ${fundTotal.toFixed(4)}%, which exceeds 100% (existing ${existingFundTotal.toFixed(4)}% + new ${newRequestTotal.toFixed(4)}%). Upload an LPA Amendment to expand the fund before adding more capital.`,
         );
       }
     }
 
-    // Fund-level cap check.
-    const fundTotal = existingFundTotal + newRequestTotal;
-    if (fundTotal > FUND_ALLOCATION_CAP_PCT + ALLOCATION_EPSILON) {
-      throw new ConflictError(
-        'FUND_ALLOCATION_EXCEEDED',
-        `Fund total allocation would be ${fundTotal.toFixed(4)}%, which exceeds 100% (existing ${existingFundTotal.toFixed(4)}% + new ${newRequestTotal.toFixed(4)}%). Upload an LPA Amendment to expand the fund before adding more capital.`,
-      );
-    }
+    // Create subscriptions in transaction. For amendments, the fund target and
+    // every allocation % are re-derived inside the same transaction so all
+    // reads + writes are atomic (no race with a concurrent amendment).
+    const { results, finalTarget } = await this.prisma.$transaction(
+      async (tx) => {
+        const created: any[] = [];
+        for (const item of items) {
+          const sub = await tx.subscription.create({
+            data: {
+              subscriptionRef: item.subscriptionRef,
+              fundId,
+              investorId: item.investorId,
+              walletId: item.walletId,
+              governingDocumentId,
+              governingHashId,
+              allocationPct: item.allocationPct,
+              committedAmount: item.committedAmount,
+              currency: item.currency || 'USD',
+              status: 'PENDING',
+              metadata: {},
+            },
+          });
+          created.push(sub);
+        }
 
-    // Create subscriptions in transaction
-    const subscriptions = await this.prisma.$transaction(async (tx) => {
-      const results: any[] = [];
-      for (const item of items) {
-        const sub = await tx.subscription.create({
-          data: {
-            subscriptionRef: item.subscriptionRef,
-            fundId,
-            investorId: item.investorId,
-            walletId: item.walletId,
-            governingDocumentId,
-            governingHashId,
-            allocationPct: item.allocationPct,
-            committedAmount: item.committedAmount,
-            currency: item.currency || 'USD',
-            status: 'PENDING',
-            metadata: {},
-          },
-        });
-        results.push(sub);
-      }
-      return results;
-    });
+        // Amendment: raise the fund's dollar target to the total committed
+        // capital and re-normalize every LP's allocation % against it, so the
+        // cap table still sums to 100% with existing LPs proportionally diluted.
+        let target: number | null = null;
+        if (isAmendment) {
+          const allSubs = await tx.subscription.findMany({
+            where: {
+              fundId,
+              deletedAt: null,
+              status: { in: ['PENDING', 'SETTLED'] },
+            },
+            select: { id: true, committedAmount: true },
+          });
+          target = allSubs.reduce(
+            (sum, sub) => sum + Number(sub.committedAmount),
+            0,
+          );
+          if (target > 0) {
+            for (const sub of allSubs) {
+              const pct = (Number(sub.committedAmount) / target) * 100;
+              await tx.subscription.update({
+                where: { id: sub.id },
+                data: { allocationPct: Number(pct.toFixed(8)) },
+              });
+            }
+            await tx.fund.update({
+              where: { id: fundId },
+              data: { targetCommitment: target },
+            });
+          }
+        }
 
-    for (const sub of subscriptions) {
+        return { results: created, finalTarget: target };
+      },
+    );
+
+    for (const sub of results) {
+      // For amendments the stored allocationPct was re-normalized after create,
+      // so log the post-amendment value rather than the stale input.
+      const loggedPct =
+        isAmendment && finalTarget && finalTarget > 0
+          ? Number(
+              ((Number(sub.committedAmount) / finalTarget) * 100).toFixed(8),
+            )
+          : Number(sub.allocationPct);
       await this.eventLog.log({
         eventType: 'SUBSCRIPTION_CREATED',
         aggregateType: 'SUBSCRIPTION',
@@ -159,14 +227,14 @@ export class SubscriptionsService {
           subscriptionRef: sub.subscriptionRef,
           investorId: sub.investorId,
           walletId: sub.walletId,
-          allocationPct: Number(sub.allocationPct),
+          allocationPct: loggedPct,
         },
       });
     }
 
     return {
-      createdCount: subscriptions.length,
-      subscriptions: subscriptions.map((s) => ({
+      createdCount: results.length,
+      subscriptions: results.map((s) => ({
         subscriptionId: s.id,
         status: s.status,
         subscriptionRef: s.subscriptionRef,
@@ -282,11 +350,13 @@ export class SubscriptionsService {
       }
     >();
     let totalAllocationPct = 0;
+    let totalCommitted = 0;
 
     for (const sub of subs) {
       const pct = Number(sub.allocationPct);
       const amt = Number(sub.committedAmount);
       totalAllocationPct += pct;
+      totalCommitted += amt;
       const existing = byInvestor.get(sub.investorId) ?? {
         investorId: sub.investorId,
         investorName: sub.investor?.legalName ?? null,
@@ -310,6 +380,9 @@ export class SubscriptionsService {
       fundCapPct: FUND_ALLOCATION_CAP_PCT,
       perInvestorCapPct: PER_INVESTOR_ALLOCATION_CAP_PCT,
       totalAllocationPct,
+      totalCommitted,
+      targetCommitment:
+        fund.targetCommitment != null ? Number(fund.targetCommitment) : null,
       remainingHeadroomPct: Math.max(
         0,
         FUND_ALLOCATION_CAP_PCT - totalAllocationPct,

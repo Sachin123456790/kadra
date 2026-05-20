@@ -72,6 +72,10 @@ export interface FundAllocation {
   fundCapPct: number;
   perInvestorCapPct: number;
   totalAllocationPct: number;
+  /** Sum of committed capital across all pending + settled subscriptions. */
+  totalCommitted: number;
+  /** Fund's documented dollar target; an LPA amendment raises this. */
+  targetCommitment: number | null;
   remainingHeadroomPct: number;
   investors: FundAllocationInvestor[];
 }

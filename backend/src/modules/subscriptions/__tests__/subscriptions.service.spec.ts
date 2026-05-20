@@ -6,6 +6,11 @@ import { NotFoundError, ConflictError } from '../../../common/errors';
 const mockTx = {
   subscription: {
     create: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
+  },
+  fund: {
+    update: jest.fn(),
   },
 };
 
@@ -30,6 +35,9 @@ describe('SubscriptionsService', () => {
   beforeEach(() => {
     prisma = mockPrisma();
     mockTx.subscription.create.mockReset();
+    mockTx.subscription.findMany.mockReset().mockResolvedValue([]);
+    mockTx.subscription.update.mockReset().mockResolvedValue({});
+    mockTx.fund.update.mockReset().mockResolvedValue({});
     // Default: no existing subscriptions in the fund. Individual tests
     // override this when exercising top-up / over-allocation scenarios.
     prisma.subscription.findMany.mockResolvedValue([]);
@@ -260,40 +268,57 @@ describe('SubscriptionsService', () => {
     });
 
     // ── Amendment-driven subscription creation ─────────────────────────
-    // Subscriptions created from an approved LPA Amendment use the
-    // amendment's document id as the governingDocumentId. The service is
-    // document-type-agnostic, so the only requirement is a hashed document.
-    it('creates subscriptions from an LPA amendment document', async () => {
+    // An LPA Amendment expands the fund (dollar-anchored model): it raises
+    // the fund's targetCommitment and re-normalizes every LP's allocation %
+    // so the cap table still sums to 100% with existing LPs diluted.
+    it('expands the fund and re-normalizes allocations from an LPA amendment', async () => {
       const amendmentDocId = 'amendment-doc-1';
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
       prisma.document.findUnique.mockResolvedValue({
         id: amendmentDocId,
         documentType: 'LPA_AMENDMENT',
+        parentDocumentId: 'master-lpa-1',
         hashes: [{ id: 'hash-amend-1', isPrimary: true }],
       });
       prisma.investorFundEligibility.findFirst.mockResolvedValue({
         id: 'elig-1',
         eligibilityStatus: 'ELIGIBLE',
       });
-      // Fund is at 80%; the amendment adds a 20% allocation for a new LP.
+      // Fund is fully subscribed at $50M (Summit $30M / Holloway $20M).
       prisma.subscription.findMany.mockResolvedValue([
-        { investorId: 'inv-1', allocationPct: 20, status: 'SETTLED' },
-        { investorId: 'inv-2', allocationPct: 20, status: 'SETTLED' },
-        { investorId: 'inv-3', allocationPct: 20, status: 'SETTLED' },
-        { investorId: 'inv-4', allocationPct: 20, status: 'SETTLED' },
+        {
+          investorId: 'inv-1',
+          allocationPct: 60,
+          committedAmount: '30000000',
+          status: 'SETTLED',
+        },
+        {
+          investorId: 'inv-2',
+          allocationPct: 40,
+          committedAmount: '20000000',
+          status: 'SETTLED',
+        },
       ]);
       mockTx.subscription.create.mockResolvedValue({
         id: 'sub-amend-1',
         status: 'PENDING',
         subscriptionRef: 'SUB-AMEND-001',
+        committedAmount: '12500000',
       });
+      // The post-create recompute query returns all three subscriptions.
+      mockTx.subscription.findMany.mockResolvedValue([
+        { id: 'sub-old-1', committedAmount: '30000000' },
+        { id: 'sub-old-2', committedAmount: '20000000' },
+        { id: 'sub-amend-1', committedAmount: '12500000' },
+      ]);
 
+      // Amendment adds a new $12.5M LP, expanding the fund to $62.5M.
       const amendmentItems = [
         {
           investorId: 'inv-5',
           walletId: 'w-5',
           allocationPct: 20,
-          committedAmount: '200000',
+          committedAmount: '12500000',
           subscriptionRef: 'SUB-AMEND-001',
         },
       ];
@@ -305,8 +330,6 @@ describe('SubscriptionsService', () => {
       );
 
       expect(result.createdCount).toBe(1);
-      // The created subscription must reference the amendment as its
-      // governing document.
       expect(mockTx.subscription.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -315,24 +338,61 @@ describe('SubscriptionsService', () => {
           }),
         }),
       );
+      // Fund target raised to the new total committed capital.
+      expect(mockTx.fund.update).toHaveBeenCalledWith({
+        where: { id: fundId },
+        data: { targetCommitment: 62500000 },
+      });
+      // Every subscription's allocation % re-normalized against $62.5M.
+      expect(mockTx.subscription.update).toHaveBeenCalledTimes(3);
+      expect(mockTx.subscription.update).toHaveBeenCalledWith({
+        where: { id: 'sub-old-1' },
+        data: { allocationPct: 48 }, // 30M / 62.5M
+      });
+      expect(mockTx.subscription.update).toHaveBeenCalledWith({
+        where: { id: 'sub-amend-1' },
+        data: { allocationPct: 20 }, // 12.5M / 62.5M
+      });
     });
 
-    it('rejects an amendment subscription that exceeds fund headroom', async () => {
+    it('lets an amendment expand a fully-allocated fund instead of rejecting', async () => {
       const amendmentDocId = 'amendment-doc-2';
       prisma.fund.findUnique.mockResolvedValue({ id: fundId });
       prisma.document.findUnique.mockResolvedValue({
         id: amendmentDocId,
         documentType: 'LPA_AMENDMENT',
+        parentDocumentId: 'master-lpa-1',
         hashes: [{ id: 'hash-amend-2', isPrimary: true }],
       });
       prisma.investorFundEligibility.findFirst.mockResolvedValue({
         id: 'elig-1',
         eligibilityStatus: 'ELIGIBLE',
       });
-      // Fund already fully allocated at 100%.
+      // Fund already fully allocated at 100% ($50M).
       prisma.subscription.findMany.mockResolvedValue([
-        { investorId: 'inv-1', allocationPct: 50, status: 'SETTLED' },
-        { investorId: 'inv-2', allocationPct: 50, status: 'SETTLED' },
+        {
+          investorId: 'inv-1',
+          allocationPct: 50,
+          committedAmount: '25000000',
+          status: 'SETTLED',
+        },
+        {
+          investorId: 'inv-2',
+          allocationPct: 50,
+          committedAmount: '25000000',
+          status: 'SETTLED',
+        },
+      ]);
+      mockTx.subscription.create.mockResolvedValue({
+        id: 'sub-amend-over',
+        status: 'PENDING',
+        subscriptionRef: 'SUB-AMEND-OVER',
+        committedAmount: '10000000',
+      });
+      mockTx.subscription.findMany.mockResolvedValue([
+        { id: 'sub-old-1', committedAmount: '25000000' },
+        { id: 'sub-old-2', committedAmount: '25000000' },
+        { id: 'sub-amend-over', committedAmount: '10000000' },
       ]);
 
       const amendmentItems = [
@@ -340,14 +400,84 @@ describe('SubscriptionsService', () => {
           investorId: 'inv-3',
           walletId: 'w-3',
           allocationPct: 10,
-          committedAmount: '100000',
+          committedAmount: '10000000',
           subscriptionRef: 'SUB-AMEND-OVER',
         },
       ];
 
+      const result = await service.createSubscriptions(
+        fundId,
+        amendmentDocId,
+        amendmentItems,
+      );
+
+      expect(result.createdCount).toBe(1);
+      // No 100% cap rejection — the fund expanded to $60M instead.
+      expect(mockTx.fund.update).toHaveBeenCalledWith({
+        where: { id: fundId },
+        data: { targetCommitment: 60000000 },
+      });
+    });
+
+    it('does not treat a side letter as a fund expansion', async () => {
+      // A SIDE_LETTER references a parent document but must NOT expand the
+      // fund. With the fund already at 100%, the normal cap check applies.
+      prisma.fund.findUnique.mockResolvedValue({ id: fundId });
+      prisma.document.findUnique.mockResolvedValue({
+        id: 'side-letter-1',
+        documentType: 'SIDE_LETTER',
+        parentDocumentId: 'master-lpa-1',
+        hashes: [{ id: 'hash-sl-1', isPrimary: true }],
+      });
+      prisma.investorFundEligibility.findFirst.mockResolvedValue({
+        id: 'elig-1',
+        eligibilityStatus: 'ELIGIBLE',
+      });
+      prisma.subscription.findMany.mockResolvedValue([
+        { investorId: 'inv-1', allocationPct: 100, status: 'SETTLED' },
+      ]);
+
+      const sideLetterItems = [
+        {
+          investorId: 'inv-2',
+          walletId: 'w-2',
+          allocationPct: 10,
+          committedAmount: '5000000',
+          subscriptionRef: 'SUB-SL-001',
+        },
+      ];
+
       await expect(
-        service.createSubscriptions(fundId, amendmentDocId, amendmentItems),
-      ).rejects.toThrow(ConflictError);
+        service.createSubscriptions(fundId, 'side-letter-1', sideLetterItems),
+      ).rejects.toThrow('exceeds 100%');
+      expect(mockTx.fund.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an amendment that brings no new committed capital', async () => {
+      prisma.fund.findUnique.mockResolvedValue({ id: fundId });
+      prisma.document.findUnique.mockResolvedValue({
+        id: 'amendment-doc-3',
+        documentType: 'LPA_AMENDMENT',
+        hashes: [{ id: 'hash-amend-3', isPrimary: true }],
+      });
+      prisma.investorFundEligibility.findFirst.mockResolvedValue({
+        id: 'elig-1',
+        eligibilityStatus: 'ELIGIBLE',
+      });
+
+      const zeroItems = [
+        {
+          investorId: 'inv-1',
+          walletId: 'w-1',
+          allocationPct: 0,
+          committedAmount: '0',
+          subscriptionRef: 'SUB-AMEND-ZERO',
+        },
+      ];
+
+      await expect(
+        service.createSubscriptions(fundId, 'amendment-doc-3', zeroItems),
+      ).rejects.toThrow('positive committed amount');
     });
 
     it('rejects a top-up that would push one investor above 100%', async () => {
@@ -409,10 +539,17 @@ describe('SubscriptionsService', () => {
         },
       ]);
 
+      prisma.fund.findUnique.mockResolvedValue({
+        id: fundId,
+        targetCommitment: '1000000',
+      });
+
       const result = await service.getFundAllocation(fundId);
 
       expect(result.totalAllocationPct).toBeCloseTo(60);
       expect(result.remainingHeadroomPct).toBeCloseTo(40);
+      expect(result.totalCommitted).toBeCloseTo(600000);
+      expect(result.targetCommitment).toBe(1000000);
       expect(result.investors).toHaveLength(2);
       const alpine = result.investors.find((i) => i.investorId === 'inv-1')!;
       expect(alpine.totalAllocationPct).toBeCloseTo(30);

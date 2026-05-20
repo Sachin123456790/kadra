@@ -51,6 +51,7 @@ describe('TokenizationService', () => {
     investorId: 'inv-1',
     walletId: 'w-1',
     allocationPct: 20,
+    committedAmount: 10000000,
     wallet: mockWallet,
     fund: mockFund,
   };
@@ -153,7 +154,7 @@ describe('TokenizationService', () => {
 
       expect(result.status).toBe('CONFIRMED');
       expect(result.txHash).toMatch(/^0x[a-f0-9]{64}$/);
-      expect(result.tokenAmount).toBe('2000'); // 20% of 10000
+      expect(result.tokenAmount).toBe('2000'); // $10M committed / $5,000 par
       expect(result.mintRequestId).toBe('evt-1');
       expect(prisma.tokenPositionEvent.create).toHaveBeenCalledTimes(1);
       expect(prisma.tokenPosition.create).toHaveBeenCalledTimes(1);
