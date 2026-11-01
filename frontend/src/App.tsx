@@ -9,6 +9,7 @@ import { AuthGuard } from "@/components/angainor/AuthGuard";
 import { RoleGuard } from "@/components/angainor/RoleGuard";
 import { AppLayout } from "@/components/angainor/AppLayout";
 import FundOverview from "./pages/FundOverview";
+import WaterfallTermsPage from "./pages/WaterfallTermsPage";
 import InvestorsPage from "./pages/InvestorsPage";
 import InvestorOnboardingDetailPage from "./pages/InvestorOnboardingDetailPage";
 import SubscriptionsPage from "./pages/SubscriptionsPage";
@@ -66,6 +67,7 @@ const App = () => (
                     <Routes>
                       {/* Admin routes */}
                       <Route path="/dashboard" element={<RoleGuard allow="admin"><FundOverview /></RoleGuard>} />
+                      <Route path="/waterfall" element={<RoleGuard allow="admin"><WaterfallTermsPage /></RoleGuard>} />
                       <Route path="/investors" element={<RoleGuard allow="admin"><InvestorsPage /></RoleGuard>} />
                       <Route path="/investors/:investorId/onboarding" element={<RoleGuard allow="admin"><InvestorOnboardingDetailPage /></RoleGuard>} />
                       <Route path="/subscriptions" element={<RoleGuard allow="admin"><SubscriptionsPage /></RoleGuard>} />
