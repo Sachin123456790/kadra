@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundError } from '../../common/errors';
 import { EventLogService } from '../../common/event-log.service';
@@ -365,112 +365,10 @@ export class AuditService {
    * Preserves admin auth_users so the GP can keep logging in; hard-deletes
    * investor logins so the same emails can be re-imported after a reset.
    */
-  async resetDemoFund(fundId: string) {
-    const fund = await this.prisma.fund.findUnique({ where: { id: fundId } });
-    if (!fund) throw new NotFoundError('Fund not found');
-
-    await this.prisma.authUser.deleteMany({
-      where: { role: { notIn: ADMIN_ROLES } },
-    });
-
-    const tables = [
-      'audit_exports',
-      'capital_accounts',
-      'capital_call_responses',
-      'capital_calls',
-      'distribution_line_items',
-      'distribution_runs',
-      'document_hashes',
-      'documents',
-      'extracted_document_fields',
-      'investor_fund_eligibility',
-      'investors',
-      'jobs',
-      'jobs_dead_letter',
-      'notice_deliveries',
-      'notices',
-      'ownership_snapshot_rows',
-      'ownership_snapshots',
-      'settlement_evidence',
-      'settlement_records',
-      'subscriptions',
-      'system_event_log',
-      'tax_reports',
-      'token_contracts',
-      'token_position_events',
-      'token_positions',
-      'transfer_events',
-      'transfer_requests',
-      'wallet_link_challenges',
-      'wallets',
-      'waterfall_tiers',
-      'waterfall_configs',
-      'funds',
-    ];
-
-    await this.prisma.$executeRawUnsafe(
-      `TRUNCATE TABLE ${tables.map((t) => `"${t}"`).join(', ')} RESTART IDENTITY CASCADE`,
+  async resetDemoFund(_fundId: string) {
+    // The former reset truncated every fund. Only a scoped generation reset is supported.
+    throw new ForbiddenException(
+      'Legacy reset is disabled. Use the isolated sandbox reset.',
     );
-
-    const newFund = await this.prisma.fund.create({
-      data: {
-        code: fund.code,
-        name: fund.name,
-        legalForm: fund.legalForm,
-        jurisdictionCode: fund.jurisdictionCode,
-        baseCurrency: fund.baseCurrency,
-        status: 'ACTIVE',
-      },
-    });
-
-    await this.prisma.waterfallConfig.create({
-      data: {
-        fundId: newFund.id,
-        version: '1.0',
-        isActive: true,
-        calculationBasis: 'IRR',
-        distributionFrequency: 'QUARTERLY',
-        catchUpEnabled: false,
-        gpPromotePct: 20 as unknown as never,
-        prefReturnPct: 8 as unknown as never,
-        rulesJson: {
-          tiers: [
-            {
-              name: 'Return of Capital',
-              hurdle: 'NONE',
-              lpShare: 100,
-              gpShare: 0,
-            },
-            {
-              name: 'Preferred Return',
-              hurdle: 'IRR',
-              hurdleValue: 8,
-              lpShare: 100,
-              gpShare: 0,
-            },
-            {
-              name: 'GP Catch-up',
-              hurdle: 'NONE',
-              lpShare: 0,
-              gpShare: 100,
-              catchUp: true,
-            },
-            {
-              name: 'Carried Interest',
-              hurdle: 'NONE',
-              lpShare: 80,
-              gpShare: 20,
-            },
-          ],
-        },
-      },
-    });
-
-    return {
-      fundId: newFund.id,
-      fundCode: newFund.code,
-      fundName: newFund.name,
-      resetAt: new Date().toISOString(),
-    };
   }
 }

@@ -1,0 +1,63 @@
+.restored-control-room .cr-workspace {
+  background: linear-gradient(
+      115deg,
+      hsl(218 15% 91% / 0.55),
+      hsl(40 16% 97% / 0) 45%,
+      hsl(193 15% 90% / 0.3)
+    )
+    top / 100% 260px no-repeat;
+}
+.dark .restored-control-room .cr-workspace {
+  background: linear-gradient(110deg, hsl(220 15% 11% / 0.7), transparent 70%)
+    top / 100% 260px no-repeat;
+}
+.cr-input {
+  @apply rounded-md border border-border bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/60 focus:ring-1 focus:ring-primary/30 disabled:opacity-60;
+}
+.cr-button {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-primary bg-primary px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45;
+}
+.cr-button-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs transition-colors hover:border-primary/30 hover:bg-muted/40 disabled:opacity-45;
+}
+.cr-mode {
+  @apply flex flex-1 items-center justify-center gap-2 rounded py-1.5 text-muted-foreground;
+}
+.cr-mode-active {
+  @apply bg-sidebar-accent text-foreground;
+}
+.cr-fund-link {
+  @apply my-0.5 flex items-center gap-2 rounded px-2 py-1.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground;
+}
+.cr-count {
+  @apply ml-auto rounded bg-destructive/10 px-1 text-[9px] text-destructive;
+}
+.cr-review-tag {
+  @apply inline-block rounded border border-destructive/10 bg-destructive/5 px-1.5 py-0.5 text-[10px] text-destructive;
+}
+.cr-upload-zone {
+  @apply flex min-h-44 w-full flex-col items-center justify-center rounded-lg border border-dashed border-primary/40 bg-card p-6 hover:border-primary hover:bg-primary/5;
+}
+.cr-upload-row {
+  @apply flex items-center gap-3 rounded-md border border-border bg-card px-3 py-3 text-xs;
+}
+.cr-citation {
+  @apply inline-flex max-w-full items-center gap-1.5 rounded border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] text-sidebar-accent-foreground hover:bg-primary/20;
+}
+.cr-chart-grid {
+  border-bottom: 1px solid hsl(var(--border));
+  border-left: 1px solid hsl(var(--border));
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent calc(25% - 1px),
+    hsl(var(--border) / 0.5) calc(25% - 1px),
+    hsl(var(--border) / 0.5) 25%
+  );
+}
+.restored-control-room .workspace-nav-item {
+  @apply py-1.5 text-xs;
+}
+.restored-control-room .shadow-sm {
+  box-shadow: none;
+}

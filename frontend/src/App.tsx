@@ -38,6 +38,7 @@ import NotificationsPage from "./pages/NotificationsPage";
 import ProfilePage from "./pages/ProfilePage";
 import HelpSupportPage from "./pages/HelpSupportPage";
 import NotFound from "./pages/NotFound";
+import SandboxApp from './sandbox/SandboxApp';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,7 +50,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
+const App = () => import.meta.env.VITE_SANDBOX_MODE === 'true' ? <SandboxApp /> : (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
     <TooltipProvider>

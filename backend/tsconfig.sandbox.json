@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {"rootDir":"src", "outDir":"dist-sandbox", "declaration":false, "incremental":false},
+  "include":["src/sandbox/**/*.ts"],
+  "exclude":["src/sandbox/**/*.spec.ts"]
+}

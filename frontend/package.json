@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dev:sandbox": "VITE_SANDBOX_MODE=true vite --port 8081",
+    "build:sandbox": "tsc --noEmit -p tsconfig.sandbox.json && VITE_SANDBOX_MODE=true vite build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
