@@ -30,6 +30,8 @@ import InvestorCapitalAccount from "./pages/InvestorCapitalAccount";
 import InvestorDocuments from "./pages/InvestorDocuments";
 import InvestorOnboardingPage from "./pages/InvestorOnboardingPage";
 import LandingPage from "./pages/LandingPage";
+import { DEMO_MODE } from "./config/constants";
+import { Navigate } from "react-router-dom";
 import PrivacyAndControlPage from "./pages/PrivacyAndControlPage";
 import LoginPage from "./pages/LoginPage";
 import NotificationsPage from "./pages/NotificationsPage";
@@ -57,7 +59,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={DEMO_MODE ? <Navigate to="/login" replace /> : <LandingPage />} />
             <Route path="/privacy" element={<PrivacyAndControlPage />} />
             <Route
               path="*"

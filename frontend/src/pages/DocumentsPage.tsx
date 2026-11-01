@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { isWorkspaceDocument } from "@/lib/document-workspace";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DEFAULT_FUND_CODE, QUERY_KEYS } from "@/config/constants";
+import { DEFAULT_FUND_CODE, QUERY_KEYS, DEMO_MODE } from "@/config/constants";
 import {
   uploadMasterLpa,
   getParseStatus,
@@ -1886,6 +1886,11 @@ export default function DocumentsPage() {
 
         {/* Tab 4: Document Upload */}
         <TabsContent value="upload">
+          {DEMO_MODE ? (
+            <SectionCard title="Uploads are disabled in this demo">
+              <p className="text-sm text-muted-foreground">Explore the fictional sources in Governing Documents. Personal files are not needed for this preview.</p>
+            </SectionCard>
+          ) : (
           <SectionCard title="Upload Document" className="mb-6">
             <div className="grid gap-4 sm:grid-cols-2 mb-4">
               {/* Document type — drives which backend endpoint is called. */}
@@ -2040,6 +2045,7 @@ export default function DocumentsPage() {
               </div>
             )}
           </SectionCard>
+          )}
         </TabsContent>
       </Tabs>
 

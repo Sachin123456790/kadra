@@ -1,8 +1,10 @@
 // Single source of truth for all configuration constants.
-// Only VITE_API_URL is read from env; everything else is hardcoded.
+// Demo builds always use the isolated, same-origin fixture API.
+export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+export const DEMO_READ_ONLY_MESSAGE = 'This is a read-only demo. Changes, uploads, and transactions are disabled.';
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '/api/v1';
+  DEMO_MODE ? '/api/v1' : (import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '/api/v1');
 
 export const AUTH_TOKEN_KEY = 'angainor_auth_token';
 export const AUTH_REFRESH_TOKEN_KEY = 'angainor_auth_refresh_token';

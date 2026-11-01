@@ -47,7 +47,7 @@ import { resetDemoFund } from "@/services/audit.service";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications, formatRelativeTime } from "@/hooks/useNotifications";
-import { ADMIN_ROLES, DEFAULT_FUND_CODE, QUERY_KEYS } from "@/config/constants";
+import { ADMIN_ROLES, DEFAULT_FUND_CODE, QUERY_KEYS, DEMO_MODE } from "@/config/constants";
 import { getFundOverview } from "@/services";
 import { adminWorkspaceNavigation } from "./workspace-navigation";
 import { WorkspaceSearch } from "./WorkspaceSearch";
@@ -434,9 +434,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <WorkspaceSearch destinations={navItems} isAdmin={isAdmin} />
-            {isAdmin && <ResetDemoButton />}
+            {isAdmin && !DEMO_MODE && <ResetDemoButton />}
           </div>
         </header>
+        {DEMO_MODE && (
+          <div role="note" className="border-b border-border bg-primary/10 px-4 py-2 text-xs text-foreground lg:px-8">
+            <strong>Demo workspace</strong> · Fictional records. Changes, uploads, and transactions are disabled.
+          </div>
+        )}
         <main
           id="workspace-main"
           tabIndex={-1}

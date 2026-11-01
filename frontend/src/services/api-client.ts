@@ -1,4 +1,4 @@
-import { API_BASE_URL, AUTH_TOKEN_KEY, AUTH_REFRESH_TOKEN_KEY, AUTH_USER_KEY, HTTP_STATUS } from '@/config/constants';
+import { API_BASE_URL, AUTH_TOKEN_KEY, AUTH_REFRESH_TOKEN_KEY, AUTH_USER_KEY, HTTP_STATUS, DEMO_MODE, DEMO_READ_ONLY_MESSAGE } from '@/config/constants';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -146,6 +146,7 @@ export async function get<T>(path: string): Promise<ApiResponse<T>> {
 }
 
 export async function post<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
+  if (DEMO_MODE && path !== '/auth/login') throw new ApiRequestError(405, 'DEMO_READ_ONLY', DEMO_READ_ONLY_MESSAGE);
   const doFetch = () => fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
@@ -160,6 +161,7 @@ export async function post<T>(path: string, body?: unknown): Promise<ApiResponse
 }
 
 export async function put<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
+  if (DEMO_MODE) throw new ApiRequestError(405, 'DEMO_READ_ONLY', DEMO_READ_ONLY_MESSAGE);
   const doFetch = () => fetch(`${API_BASE_URL}${path}`, {
     method: 'PUT',
     headers: {
@@ -179,6 +181,7 @@ export async function upload<T>(
   fieldName = 'file',
   extraFields?: Record<string, string | number>,
 ): Promise<ApiResponse<T>> {
+  if (DEMO_MODE) throw new ApiRequestError(405, 'DEMO_READ_ONLY', DEMO_READ_ONLY_MESSAGE);
   const doFetch = () => {
     const formData = new FormData();
     formData.append(fieldName, file);
