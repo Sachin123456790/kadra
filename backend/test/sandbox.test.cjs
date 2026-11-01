@@ -75,6 +75,202 @@ after(async () => {
   await app?.close();
   await rm(folder, { recursive: true, force: true });
 });
+test('portfolio, onboarding and conversations stay persistent and fund scoped', async () => {
+  const user = await account('control-room@example.test');
+  const created = await req(
+    '/funds',
+    'POST',
+    {
+      name: 'Onboarding test fund',
+      currency: 'USD',
+      strategy: 'Real estate',
+      reviewerEmail: 'reviewer@example.test',
+    },
+    user.cookie,
+  );
+  assert.equal(created.status, 201);
+  const f = `/funds/${created.body.id}`;
+  let state = (
+    await req(`/state?fundId=${created.body.id}`, 'GET', undefined, user.cookie)
+  ).body;
+  assert.equal(state.fund.onboarding.reviewerStatus, 'CONTACT_ONLY');
+  assert.equal(state.fund.onboarding.step, 2);
+  assert.equal(
+    (
+      await req(
+        f + '/onboarding/confirm',
+        'POST',
+        { revision: 1, documentIds: [], reason: 'Checked package' },
+        user.cookie,
+      )
+    ).status,
+    422,
+  );
+  assert.equal(
+    (
+      await req(
+        f + '/onboarding/confirm',
+        'POST',
+        { revision: 1, documentIds: [], reason: 'Checked package' },
+        b.cookie,
+      )
+    ).status,
+    404,
+  );
+  const seed = user.state;
+  const confirmed = await req(
+    user.f + '/onboarding/confirm',
+    'POST',
+    {
+      revision: seed.fund.revision,
+      documentIds: seed.documents.map((d) => d.id),
+      reason:
+        'Checked synthetic types and dates; no rules automatically approved.',
+    },
+    user.cookie,
+  );
+  assert.equal(confirmed.status, 201, JSON.stringify(confirmed.body));
+  assert.equal(
+    (
+      await req(
+        user.f + '/onboarding/confirm',
+        'POST',
+        {
+          revision: seed.fund.revision,
+          documentIds: seed.documents.map((d) => d.id),
+          reason: 'Stale',
+        },
+        user.cookie,
+      )
+    ).status,
+    409,
+  );
+  state = (
+    await req(`/state?fundId=${seed.fund.id}`, 'GET', undefined, user.cookie)
+  ).body;
+  assert.equal(state.fund.onboarding.step, 4);
+  assert.equal(state.rulebook.version, seed.rulebook.version);
+  assert.equal(state.fund.onboarding.documents.length, seed.documents.length);
+  const portfolio = (await req('/portfolio', 'GET', undefined, user.cookie))
+    .body;
+  assert.equal(portfolio.funds.length, 2);
+  assert.equal(
+    portfolio.funds.find((r) => r.id === created.body.id).documents,
+    0,
+  );
+  assert.ok(portfolio.funds.every((r) => r.org_id === user.user.orgId));
+  assert.equal(
+    (await req('/portfolio', 'GET', undefined, b.cookie)).body.funds.some(
+      (r) => r.id === seed.fund.id,
+    ),
+    false,
+  );
+  const first = await req(
+    user.f + '/questions',
+    'POST',
+    { question: 'What are total commitments?', asOf: '2026-11-01' },
+    user.cookie,
+  );
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  const conversationId = first.body.conversationId;
+  assert.ok(conversationId);
+  const second = await req(
+    user.f + '/questions',
+    'POST',
+    {
+      question: 'What are total contributions?',
+      asOf: '2026-11-01',
+      conversationId,
+    },
+    user.cookie,
+  );
+  assert.equal(second.status, 201);
+  assert.equal(second.body.conversationId, conversationId);
+  const history = await req(
+    user.f + '/conversations/' + conversationId,
+    'GET',
+    undefined,
+    user.cookie,
+  );
+  assert.equal(history.body.answers.length, 2);
+  assert.equal(history.body.answers[0].id, first.body.id);
+  assert.equal(
+    (
+      await req(
+        f + '/questions',
+        'POST',
+        {
+          question: 'What are total commitments?',
+          asOf: '2026-11-01',
+          conversationId,
+        },
+        user.cookie,
+      )
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await req(
+        user.f + '/conversations/' + conversationId,
+        'GET',
+        undefined,
+        b.cookie,
+      )
+    ).status,
+    404,
+  );
+  await db.as(b.user.orgId, async () =>
+    assert.equal(
+      (
+        await db.query('SELECT id FROM sb_conversations WHERE id=$1', [
+          conversationId,
+        ])
+      ).rows.length,
+      0,
+    ),
+  );
+  const legacyId = randomUUID();
+  await db.query(
+    'INSERT INTO sb_answers(id,org_id,fund_id,question,answer,actor_id) VALUES($1,$2,$3,$4,$5::jsonb,$6)',
+    [
+      legacyId,
+      user.user.orgId,
+      seed.fund.id,
+      'Earlier immutable question',
+      JSON.stringify(first.body.answer),
+      user.user.id,
+    ],
+  );
+  assert.equal(
+    (
+      await req(
+        user.f + '/questions',
+        'POST',
+        {
+          question: 'What are total commitments?',
+          asOf: '2026-11-01',
+          conversationId: legacyId,
+        },
+        user.cookie,
+      )
+    ).status,
+    201,
+  );
+  const legacy = (
+    await req(
+      user.f + '/conversations/' + legacyId,
+      'GET',
+      undefined,
+      user.cookie,
+    )
+  ).body;
+  assert.equal(legacy.answers.length, 2);
+  assert.equal(
+    legacy.answers.find((answer) => answer.id === legacyId).conversation_id,
+    null,
+  );
+});
 test('registration is invite-only, cookie authenticated, and personal', async () => {
   assert.notEqual(a.user.orgId, b.user.orgId);
   assert.notEqual(a.state.fund.id, b.state.fund.id);

@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS sb_records (
  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(org_id,fund_id,id),
  FOREIGN KEY(org_id,fund_id) REFERENCES sb_funds(org_id,id)
 );
+ALTER TABLE sb_funds ADD COLUMN IF NOT EXISTS onboarding jsonb NOT NULL DEFAULT '{}';
 CREATE TABLE IF NOT EXISTS sb_documents (
  id uuid PRIMARY KEY, org_id uuid NOT NULL, fund_id uuid NOT NULL, logical_id uuid NOT NULL, version integer NOT NULL CHECK(version>0),
  filename text NOT NULL, mime text NOT NULL, document_type text NOT NULL, effective_date date,
@@ -76,6 +77,17 @@ CREATE TABLE IF NOT EXISTS sb_answers (
  answer jsonb NOT NULL, actor_id uuid NOT NULL REFERENCES sb_users(id), created_at timestamptz NOT NULL DEFAULT now(),
  FOREIGN KEY(org_id,fund_id) REFERENCES sb_funds(org_id,id)
 );
+CREATE TABLE IF NOT EXISTS sb_conversations (
+ id uuid PRIMARY KEY, org_id uuid NOT NULL, fund_id uuid NOT NULL, title text NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(org_id,fund_id,id),
+ FOREIGN KEY(org_id,fund_id) REFERENCES sb_funds(org_id,id)
+);
+ALTER TABLE sb_answers ADD COLUMN IF NOT EXISTS conversation_id uuid;
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='sb_answer_conversation') THEN
+  ALTER TABLE sb_answers ADD CONSTRAINT sb_answer_conversation FOREIGN KEY(org_id,fund_id,conversation_id) REFERENCES sb_conversations(org_id,fund_id,id);
+ END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS sb_artifacts (
  id uuid PRIMARY KEY,org_id uuid NOT NULL,fund_id uuid NOT NULL,run_id uuid NOT NULL,
  filename text NOT NULL,mime text NOT NULL,content bytea NOT NULL,sha256 char(64) NOT NULL,
@@ -111,7 +123,7 @@ DO $$ DECLARE t text; BEGIN
  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='angainor_sandbox') THEN
   CREATE ROLE angainor_sandbox NOLOGIN NOBYPASSRLS;
  END IF;
- FOREACH t IN ARRAY ARRAY['sb_funds','sb_records','sb_documents','sb_sources','sb_facts','sb_rulebooks','sb_calls','sb_runs','sb_approvals','sb_artifacts','sb_answers','sb_jobs','sb_events','sb_idempotency'] LOOP
+ FOREACH t IN ARRAY ARRAY['sb_funds','sb_records','sb_documents','sb_sources','sb_facts','sb_rulebooks','sb_calls','sb_runs','sb_approvals','sb_artifacts','sb_answers','sb_conversations','sb_jobs','sb_events','sb_idempotency'] LOOP
   EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t);
   IF NOT EXISTS(SELECT 1 FROM pg_policies WHERE tablename=t AND policyname='sandbox_tenant') THEN
    EXECUTE format('CREATE POLICY sandbox_tenant ON %I TO angainor_sandbox USING (org_id = nullif(current_setting(''angainor.org_id'',true),'''')::uuid) WITH CHECK (org_id = nullif(current_setting(''angainor.org_id'',true),'''')::uuid)',t);

@@ -194,6 +194,13 @@ export class SandboxService {
         [actor.orgId, selected],
       )
     ).rows;
+    const conversations = (
+      await this.db.query(
+        `SELECT c.*, (SELECT max(a.created_at) FROM sb_answers a WHERE a.org_id=c.org_id AND a.conversation_id=c.id) AS updated_at
+       FROM sb_conversations c WHERE c.org_id=$1 AND c.fund_id=$2 ORDER BY updated_at DESC NULLS LAST`,
+        [actor.orgId, selected],
+      )
+    ).rows;
     return {
       funds,
       fund,
@@ -219,6 +226,7 @@ export class SandboxService {
       events,
       jobs,
       answers,
+      conversations,
       taxonomy,
       taxonomyVersion: TAXONOMY_VERSION,
       generation: actor.generation,
@@ -252,12 +260,174 @@ export class SandboxService {
         'UNSUPPORTED_CURRENCY',
         'The initial calculation engine supports USD only.',
       );
+    const details = z
+      .object({
+        strategy: z
+          .enum(['Real estate', 'Credit', 'Buyout', 'Venture', 'Other'])
+          .default('Real estate'),
+        reviewerEmail: z
+          .union([z.string().trim().email(), z.literal('')])
+          .default(''),
+      })
+      .safeParse({
+        strategy: body.strategy,
+        reviewerEmail: body.reviewerEmail,
+      });
+    if (!details.success)
+      fail(
+        422,
+        'INVALID_FUND',
+        'Choose a strategy and enter a valid reviewer email.',
+      );
+    const onboarding = {
+      ...details.data,
+      step: 2,
+      reviewerStatus: 'CONTACT_ONLY',
+    };
     await tx.query(
-      'INSERT INTO sb_funds(id,org_id,generation,name,currency) VALUES($1,$2,$3,$4,$5)',
-      [fundId, actor.orgId, actor.generation, name, 'USD'],
+      'INSERT INTO sb_funds(id,org_id,generation,name,currency,onboarding) VALUES($1,$2,$3,$4,$5,$6::jsonb)',
+      [
+        fundId,
+        actor.orgId,
+        actor.generation,
+        name,
+        'USD',
+        JSON.stringify(onboarding),
+      ],
     );
-    await event(tx, actor, 'FUND_CREATED', { id: fundId, name }, fundId);
+    await event(
+      tx,
+      actor,
+      'FUND_CREATED',
+      { id: fundId, name, onboarding },
+      fundId,
+    );
     return { id: fundId };
+  }
+  async portfolio(actor: Actor) {
+    const funds = (
+      await this.db.query(
+        `
+      SELECT f.*,
+        (SELECT count(*)::int FROM sb_documents d WHERE d.org_id=f.org_id AND d.fund_id=f.id) AS documents,
+        (SELECT count(*)::int FROM sb_documents d WHERE d.org_id=f.org_id AND d.fund_id=f.id AND d.status='READY') AS ready_documents,
+        (SELECT count(*)::int FROM sb_documents d WHERE d.org_id=f.org_id AND d.fund_id=f.id AND d.status<>'READY') AS review_documents,
+        (SELECT count(*)::int FROM sb_sources s WHERE s.org_id=f.org_id AND s.fund_id=f.id) AS source_passages,
+        (SELECT count(*)::int FROM sb_facts t WHERE t.org_id=f.org_id AND t.fund_id=f.id AND t.state='UNREVIEWED') AS unreviewed_terms,
+        (SELECT count(DISTINCT taxonomy_key)::int FROM sb_facts t WHERE t.org_id=f.org_id AND t.fund_id=f.id AND t.value IS NOT NULL) AS extracted_terms,
+        COALESCE((SELECT jsonb_array_length(r.rules) FROM sb_rulebooks r WHERE r.org_id=f.org_id AND r.fund_id=f.id ORDER BY r.version DESC LIMIT 1),0) AS rules,
+        (SELECT max(r.created_at) FROM sb_rulebooks r WHERE r.org_id=f.org_id AND r.fund_id=f.id) AS last_review
+      FROM sb_funds f WHERE f.org_id=$1 AND f.generation=$2 ORDER BY f.created_at,f.id`,
+        [actor.orgId, actor.generation],
+      )
+    ).rows;
+    const recent = (
+      await this.db.query(
+        `SELECT a.id,a.conversation_id,a.fund_id,a.question,a.created_at,f.name AS fund_name
+      FROM sb_answers a JOIN sb_funds f ON f.org_id=a.org_id AND f.id=a.fund_id
+      WHERE a.org_id=$1 AND f.generation=$2 ORDER BY a.created_at DESC LIMIT 8`,
+        [actor.orgId, actor.generation],
+      )
+    ).rows;
+    const rules = (
+      await this.db.query(
+        `SELECT DISTINCT ON (r.fund_id) r.fund_id,r.rules,f.name AS fund_name
+      FROM sb_rulebooks r JOIN sb_funds f ON f.org_id=r.org_id AND f.id=r.fund_id
+      WHERE r.org_id=$1 AND f.generation=$2 ORDER BY r.fund_id,r.version DESC`,
+        [actor.orgId, actor.generation],
+      )
+    ).rows;
+    const upcoming = rules
+      .flatMap((r) =>
+        r.rules
+          .filter(
+            (rule: any) =>
+              rule.effectiveFrom > new Date().toISOString().slice(0, 10),
+          )
+          .map((rule: any) => ({
+            ...rule,
+            fundId: r.fund_id,
+            fundName: r.fund_name,
+          })),
+      )
+      .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom))
+      .slice(0, 6);
+    return { funds, recent, upcoming };
+  }
+  async confirmOnboarding(
+    tx: Queryable,
+    actor: Actor,
+    fundId: string,
+    body: any,
+  ) {
+    allow(actor, ['editor']);
+    const fund = await this.fund(tx, actor, fundId);
+    requireRevision(fund.revision, body.revision);
+    const reason = text(body.reason, 1000);
+    const docs = (
+      await tx.query(
+        'SELECT id,document_type,effective_date::text,sha256,version FROM sb_documents WHERE org_id=$1 AND fund_id=$2 ORDER BY id',
+        [actor.orgId, fundId],
+      )
+    ).rows;
+    if (!docs.length)
+      fail(
+        422,
+        'DOCUMENT_REQUIRED',
+        'Upload at least one document before building the rulebook.',
+      );
+    const manifest = z.array(uuid).min(1).safeParse(body.documentIds);
+    if (
+      !manifest.success ||
+      new Set(manifest.data).size !== docs.length ||
+      docs.some((d) => !manifest.data.includes(d.id))
+    )
+      fail(
+        409,
+        'DOCUMENTS_CHANGED',
+        'The document set changed. Review it again before continuing.',
+      );
+    const onboarding = {
+      ...fund.onboarding,
+      step: 4,
+      confirmedAt: new Date().toISOString(),
+      confirmedBy: actor.id,
+      documents: docs,
+      reason,
+    };
+    await tx.query(
+      'UPDATE sb_funds SET onboarding=$1::jsonb,revision=revision+1 WHERE org_id=$2 AND id=$3',
+      [JSON.stringify(onboarding), actor.orgId, fundId],
+    );
+    await event(
+      tx,
+      actor,
+      'DOCUMENT_PACKAGE_CONFIRMED',
+      { documents: docs, reason, interpretationStatus: 'REQUIRES_REVIEW' },
+      fundId,
+    );
+    return { onboarding };
+  }
+  async conversation(actor: Actor, fundId: string, conversationId: string) {
+    await this.fund(this.db, actor, fundId);
+    if (!uuid.safeParse(conversationId).success)
+      fail(404, 'NOT_FOUND', 'Conversation not found.');
+    const conversation = (
+      await this.db.query(
+        'SELECT * FROM sb_conversations WHERE org_id=$1 AND fund_id=$2 AND id=$3',
+        [actor.orgId, fundId, conversationId],
+      )
+    ).rows[0];
+    // Older immutable answers remain accessible as individual conversations.
+    const answers = (
+      await this.db.query(
+        'SELECT * FROM sb_answers WHERE org_id=$1 AND fund_id=$2 AND (conversation_id=$3 OR (conversation_id IS NULL AND id=$3)) ORDER BY created_at,id',
+        [actor.orgId, fundId, conversationId],
+      )
+    ).rows;
+    if (!conversation && !answers.length)
+      fail(404, 'NOT_FOUND', 'Conversation not found.');
+    return { conversation, answers };
   }
   async saveRecord(
     tx: Queryable,
@@ -1203,6 +1373,28 @@ export class SandboxService {
   }
   async answer(actor: Actor, fundId: string, body: any) {
     await this.fund(this.db, actor, fundId);
+    const conversationId = body.conversationId || id();
+    if (!uuid.safeParse(conversationId).success)
+      fail(422, 'INVALID_CONVERSATION', 'Invalid conversation.');
+    const existingConversation = body.conversationId
+      ? (
+          await this.db.query(
+            'SELECT id,title FROM sb_conversations WHERE org_id=$1 AND fund_id=$2 AND id=$3',
+            [actor.orgId, fundId, conversationId],
+          )
+        ).rows[0]
+      : null;
+    const legacyConversation =
+      body.conversationId && !existingConversation
+        ? (
+            await this.db.query(
+              'SELECT id,question AS title FROM sb_answers WHERE org_id=$1 AND fund_id=$2 AND id=$3 AND conversation_id IS NULL',
+              [actor.orgId, fundId, conversationId],
+            )
+          ).rows[0]
+        : null;
+    if (body.conversationId && !existingConversation && !legacyConversation)
+      fail(404, 'NOT_FOUND', 'Conversation not found in this fund.');
     const question = text(body.question, 2000);
     const asOf = date(body.asOf);
     const sources = await this.sources(actor, fundId);
@@ -1558,8 +1750,18 @@ export class SandboxService {
           'The sandbox was reset while answering. Ask again in the new generation.',
         );
       await this.fund(tx, actor, fundId);
+      if (!existingConversation)
+        await tx.query(
+          'INSERT INTO sb_conversations(id,org_id,fund_id,title) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING',
+          [
+            conversationId,
+            actor.orgId,
+            fundId,
+            (legacyConversation?.title || question).slice(0, 160),
+          ],
+        );
       await tx.query(
-        'INSERT INTO sb_answers(id,org_id,fund_id,question,answer,actor_id) VALUES($1,$2,$3,$4,$5::jsonb,$6)',
+        'INSERT INTO sb_answers(id,org_id,fund_id,question,answer,actor_id,conversation_id) VALUES($1,$2,$3,$4,$5::jsonb,$6,$7)',
         [
           answerId,
           actor.orgId,
@@ -1567,6 +1769,7 @@ export class SandboxService {
           question,
           JSON.stringify(answer),
           actor.id,
+          conversationId,
         ],
       );
       await event(
@@ -1577,7 +1780,7 @@ export class SandboxService {
         fundId,
       );
     });
-    return { id: answerId, question, answer };
+    return { id: answerId, conversationId, question, answer };
   }
   async exportRun(tx: Queryable, actor: Actor, fundId: string, runId: string) {
     allow(actor, ['editor']);

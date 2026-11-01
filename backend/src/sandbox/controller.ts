@@ -94,6 +94,24 @@ export class SandboxController {
       this.service.createFund(tx, a, body),
     );
   }
+  @Get('portfolio') portfolio(@Req() req: FastifyRequest) {
+    return this.use(req, (a) => this.service.portfolio(a));
+  }
+  @Post('funds/:fundId/onboarding/confirm') confirmOnboarding(
+    @Req() req: FastifyRequest,
+    @Param('fundId') fundId: string,
+    @Body() body: any,
+  ) {
+    return this.mutation(req, `onboarding:${fundId}`, body, (a, tx) =>
+      this.service.confirmOnboarding(tx, a, fundId, body),
+    );
+  }
+  @Get('funds/:fundId/conversations/:id') conversation(
+    @Req() req: FastifyRequest,
+    @Param() p: any,
+  ) {
+    return this.use(req, (a) => this.service.conversation(a, p.fundId, p.id));
+  }
   @Post('reset') reset(@Req() req: FastifyRequest, @Body() body: any) {
     return this.mutation(req, 'reset', body, (a, tx) =>
       this.service.reset(tx, a, body),
