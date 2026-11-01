@@ -448,7 +448,12 @@ test('local AI outputs validate citations and fail visibly back to source eviden
     );
     assert.equal(valid.body.answer.mode, 'local_ai_draft');
     assert.equal(valid.body.answer.requiresReview, true);
-    assert.equal(valid.body.answer.citations.length, 1);
+    assert.equal(valid.body.answer.modelCitedSourceIds.length, 1);
+    assert.ok(
+      valid.body.answer.citations.some(
+        (c) => c.id === valid.body.answer.modelCitedSourceIds[0],
+      ),
+    );
   } finally {
     global.fetch = originalFetch;
     if (originalModel === undefined) delete process.env.OLLAMA_MODEL;

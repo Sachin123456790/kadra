@@ -1523,9 +1523,10 @@ export class SandboxService {
           throw new Error('Invalid evidence citations');
         answer = {
           ...answer,
-          citations: citationRows.filter((s) =>
-            parsed.sourceIds.includes(s.id),
-          ),
+          // Preserve the full retrieved evidence set, including context the model
+          // may mention without selecting its source ID in the structured output.
+          citations: citationRows,
+          modelCitedSourceIds: parsed.sourceIds,
           mode: 'local_ai_draft',
           status: parsed.insufficientEvidence
             ? 'INSUFFICIENT_EVIDENCE'
