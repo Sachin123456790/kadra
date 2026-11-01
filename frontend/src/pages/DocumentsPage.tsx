@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { isWorkspaceDocument } from "@/lib/document-workspace";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DEFAULT_FUND_CODE, QUERY_KEYS } from "@/config/constants";
 import {
@@ -138,12 +140,19 @@ function AnchoredBadgeWithTx({ txHash }: { readonly txHash: string }) {
   return (
     <div className="inline-flex flex-col">
       <button
-        onClick={(e) => { e.stopPropagation(); setExpanded((prev) => !prev); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setExpanded((prev) => !prev);
+        }}
         className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors"
       >
         <CheckCircle2 className="h-3 w-3" />
         Anchored
-        {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        {expanded ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronRight className="h-3 w-3" />
+        )}
       </button>
       {expanded && (
         <div className="mt-1" onClick={(e) => e.stopPropagation()}>
@@ -184,132 +193,6 @@ function friendlyDocumentType(type: string | null | undefined): string {
   return GOVERNING_TYPE_LABELS[type] ?? type;
 }
 
-// ── Governing Documents table columns ────────────────────────
-
-const buildGoverningDocColumns = (
-  onView: (doc: FundDocument) => void,
-): Column<FundDocument>[] => [
-  {
-    key: "originalFilename",
-    header: "Document Name",
-    render: (row) => (
-      <div className="flex items-center gap-2">
-        <FileText className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium text-foreground">{row.originalFilename}</span>
-      </div>
-    ),
-  },
-  {
-    key: "documentType",
-    header: "Type",
-    render: (row) => {
-      const label = friendlyDocumentType(row.documentType);
-      const isAmendment = row.parentDocumentId != null;
-      return (
-        <div className="flex flex-col gap-0.5">
-          <span
-            className={
-              isAmendment
-                ? "text-muted-foreground"
-                : "font-medium text-foreground"
-            }
-          >
-            {label}
-            {row.version && row.version > 1 ? (
-              <span className="ml-1 text-xs text-muted-foreground">
-                v{row.version}
-              </span>
-            ) : null}
-          </span>
-          {isAmendment && (
-            <span className="text-[10px] uppercase tracking-wider text-indigo-600">
-              Amends Master LPA
-            </span>
-          )}
-        </div>
-      );
-    },
-  },
-  {
-    key: "createdAt",
-    header: "Upload Date",
-    render: (row) => (
-      <span className="text-muted-foreground">
-        {new Date(row.createdAt).toLocaleDateString()}
-      </span>
-    ),
-  },
-  {
-    key: "hash",
-    header: "Verified",
-    render: (row) => {
-      const hashHex = row.hash?.hashHex ?? "";
-      if (!hashHex) return <span className="text-gray-400">--</span>;
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={(e) => { e.stopPropagation(); copyToClipboard(hashHex); }}
-                className="inline-flex items-center gap-1 text-green-600 hover:text-green-700 transition-colors"
-                title="Click to copy SHA-256 hash"
-              >
-                <ShieldCheck className="h-4 w-4" />
-                <span className="text-xs font-medium">Verified</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-xs">
-              <p className="text-xs text-muted-foreground mb-1">SHA-256 Hash (click to copy)</p>
-              <p className="font-mono text-xs break-all">{hashHex}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    },
-  },
-  {
-    key: "anchorRef",
-    header: "Anchored",
-    render: (row) => {
-      if (!row.hash?.anchoredOnchain) {
-        return <span className="text-gray-400 text-xs">Pending</span>;
-      }
-      const txHash = (row.metadata as Record<string, unknown>)?.anchorTxHash as string | undefined;
-      if (!txHash) {
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-            <CheckCircle2 className="h-3 w-3" />
-            Anchored
-          </span>
-        );
-      }
-      return <AnchoredBadgeWithTx txHash={txHash} />;
-    },
-  },
-  {
-    key: "parseStatus",
-    header: "Status",
-    render: (row) => <StatusBadge status={mapParseStatus(row.parseStatus)} />,
-  },
-  {
-    key: "actions",
-    header: "",
-    render: (row) => (
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onView(row);
-        }}
-        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
-        title={`View ${row.originalFilename}`}
-      >
-        <Eye className="h-3.5 w-3.5" />
-        View
-      </button>
-    ),
-  },
-];
-
 // ── Notice status badge colors ──────────────────────────────
 
 function noticeStatusBadge(status: string) {
@@ -319,9 +202,12 @@ function noticeStatusBadge(status: string) {
     SENT: "bg-blue-50 text-blue-700",
     VIEWED: "bg-green-50 text-green-700",
   };
-  const classes = colorMap[status.toUpperCase()] ?? "bg-gray-100 text-muted-foreground";
+  const classes =
+    colorMap[status.toUpperCase()] ?? "bg-gray-100 text-muted-foreground";
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${classes}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${classes}`}
+    >
       {status}
     </span>
   );
@@ -469,7 +355,9 @@ function ReportingSection({
         }
       >
         {isLoading ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">Loading reports…</div>
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            Loading reports…
+          </div>
         ) : rows.length === 0 ? (
           <EmptyState
             title="No reporting packages"
@@ -480,25 +368,46 @@ function ReportingSection({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Document Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Period</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Upload Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Uploaded By</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">View</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Document Name
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Period
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Upload Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Uploaded By
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    View
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((report) => (
-                  <tr key={report.documentId} className="border-b border-border">
+                  <tr
+                    key={report.documentId}
+                    className="border-b border-border"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium text-foreground">{report.title}</span>
+                        <span className="font-medium text-foreground">
+                          {report.title}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{report.period ?? "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{new Date(report.uploadedAt).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{report.uploadedBy ?? "—"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {report.period ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {new Date(report.uploadedAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {report.uploadedBy ?? "—"}
+                    </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => onView(report)}
@@ -521,12 +430,18 @@ function ReportingSection({
           <DialogHeader>
             <DialogTitle>Upload Reporting Document</DialogTitle>
             <DialogDescription>
-              Add a new LP reporting package. It will be visible to all investors with a subscription in this fund.
+              Add a new LP reporting package. It will be visible to all
+              investors with a subscription in this fund.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label htmlFor="report-title" className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <label
+                htmlFor="report-title"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Title
+              </label>
               <input
                 id="report-title"
                 type="text"
@@ -537,7 +452,12 @@ function ReportingSection({
               />
             </div>
             <div>
-              <label htmlFor="report-period" className="block text-sm font-medium text-gray-700 mb-1">Period</label>
+              <label
+                htmlFor="report-period"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Period
+              </label>
               <input
                 id="report-period"
                 type="text"
@@ -548,7 +468,12 @@ function ReportingSection({
               />
             </div>
             <div>
-              <label htmlFor="report-file" className="block text-sm font-medium text-gray-700 mb-1">File</label>
+              <label
+                htmlFor="report-file"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                File
+              </label>
               <input
                 id="report-file"
                 type="file"
@@ -559,7 +484,11 @@ function ReportingSection({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsUploadOpen(false)} disabled={uploadMutation.isPending}>
+            <Button
+              variant="outline"
+              onClick={() => setIsUploadOpen(false)}
+              disabled={uploadMutation.isPending}
+            >
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={uploadMutation.isPending}>
@@ -575,6 +504,14 @@ function ReportingSection({
 // ── Main component ──────────────────────────────────────────
 
 export default function DocumentsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const activeTab = ["governing", "notices", "reporting", "upload"].includes(
+    requestedTab ?? "",
+  )
+    ? requestedTab!
+    : "governing";
+  const [documentSearch, setDocumentSearch] = useState("");
   const fundId = DEFAULT_FUND_CODE;
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -595,7 +532,10 @@ export default function DocumentsPage() {
   const [uploadParentId, setUploadParentId] = useState<string>("");
   const [uploadEffectiveDate, setUploadEffectiveDate] = useState<string>("");
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [viewerDoc, setViewerDoc] = useState<{ id: string; filename: string } | null>(null);
+  const [viewerDoc, setViewerDoc] = useState<{
+    id: string;
+    filename: string;
+  } | null>(null);
   const [showGenerateNoticeModal, setShowGenerateNoticeModal] = useState(false);
   const [noticeForm, setNoticeForm] = useState<{
     type: "CAPITAL_CALL" | "DISTRIBUTION" | "TRANSFER" | "GENERAL";
@@ -616,10 +556,6 @@ export default function DocumentsPage() {
   });
   const [bodyTouched, setBodyTouched] = useState(false);
   const [availableTokens, setAvailableTokens] = useState<readonly string[]>([]);
-
-  const governingDocColumns = buildGoverningDocColumns((doc) =>
-    setViewerDoc({ id: doc.documentId, filename: doc.originalFilename }),
-  );
 
   // ── Queries ────────────────────────────────────────────────
 
@@ -656,8 +592,7 @@ export default function DocumentsPage() {
   const { data: extractedFieldsData } = useQuery({
     queryKey: QUERY_KEYS.extractedFields(selectedDocId ?? ""),
     queryFn: () => getExtractedFields(selectedDocId!).then((r) => r.data),
-    enabled:
-      !!selectedDocId && parseStatusData?.parseStatus === "COMPLETED",
+    enabled: !!selectedDocId && parseStatusData?.parseStatus === "COMPLETED",
   });
 
   const { data: investors } = useQuery({
@@ -749,9 +684,7 @@ export default function DocumentsPage() {
       setUploadEffectiveDate("");
     },
     onError: (err: unknown) => {
-      setUploadError(
-        err instanceof Error ? err.message : "Upload failed",
-      );
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
     },
   });
 
@@ -869,7 +802,9 @@ export default function DocumentsPage() {
       const count =
         (result as { anchoredCount?: number } | null)?.anchoredCount ?? 0;
       toast.success(
-        count > 0 ? `Anchored ${count} document${count === 1 ? "" : "s"}` : "No pending documents to anchor",
+        count > 0
+          ? `Anchored ${count} document${count === 1 ? "" : "s"}`
+          : "No pending documents to anchor",
       );
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.documents(fundId) });
     },
@@ -936,7 +871,10 @@ export default function DocumentsPage() {
     const fromFund = parseFloat(fundData?.targetCommitment ?? "");
     if (Number.isFinite(fromFund) && fromFund > 0) return fromFund;
     const fieldMap = new Map(
-      extractedFields.map((f) => [f.fieldName.toLowerCase(), fieldDisplayValue(f)]),
+      extractedFields.map((f) => [
+        f.fieldName.toLowerCase(),
+        fieldDisplayValue(f),
+      ]),
     );
     return parseFloat(fieldMap.get("total_commitment") ?? "0") || 10000000;
   };
@@ -1100,12 +1038,40 @@ export default function DocumentsPage() {
   };
 
   // ── Derived state ──────────────────────────────────────────
+  const workspaceDocuments = (documents ?? [])
+    .filter(isWorkspaceDocument)
+    .sort((a, b) => {
+      const aHasParent = !!a.parentDocumentId;
+      const bHasParent = !!b.parentDocumentId;
+      if (aHasParent !== bHasParent) return aHasParent ? 1 : -1;
+      if (aHasParent && bHasParent) {
+        if (a.parentDocumentId !== b.parentDocumentId)
+          return (a.parentDocumentId ?? "").localeCompare(
+            b.parentDocumentId ?? "",
+          );
+        return (a.version ?? 0) - (b.version ?? 0);
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
-  const selectedDoc = documents?.find(
-    (d) => d.documentId === selectedDocId,
-  );
+  useEffect(() => {
+    const requested = searchParams.get("document");
+    if (
+      requested &&
+      documents?.some(
+        (doc) => doc.documentId === requested && isWorkspaceDocument(doc),
+      )
+    ) {
+      setSelectedDocId(requested);
+    } else if (!selectedDocId && documents?.length) {
+      setSelectedDocId(documents.find(isWorkspaceDocument)?.documentId ?? null);
+    }
+  }, [documents, searchParams, selectedDocId]);
+
+  const selectedDoc = documents?.find((d) => d.documentId === selectedDocId);
   const isParsed = parseStatusData?.parseStatus === "COMPLETED";
-  const isApproved = !!(selectedDoc?.metadata as Record<string, unknown>)?.approved;
+  const isApproved = !!(selectedDoc?.metadata as Record<string, unknown>)
+    ?.approved;
   const isMasterLpa = selectedDoc?.documentType === "MASTER_LPA";
   const isAmendment = selectedDoc?.documentType === "LPA_AMENDMENT";
   // A doc qualifies for subscription creation once it is "ready": a parsed
@@ -1162,9 +1128,20 @@ export default function DocumentsPage() {
   });
 
   const noticeColumns: Column<NoticeRow>[] = [
-    { key: "type", header: "Notice Type", render: (r) => <span className="font-medium text-foreground">{r.type}</span> },
+    {
+      key: "type",
+      header: "Notice Type",
+      render: (r) => (
+        <span className="font-medium text-foreground">{r.type}</span>
+      ),
+    },
     { key: "recipientName", header: "Recipient LP" },
-    { key: "generatedAt", header: "Date Generated", render: (r) => r.generatedAt ? new Date(r.generatedAt).toLocaleDateString() : "--" },
+    {
+      key: "generatedAt",
+      header: "Date Generated",
+      render: (r) =>
+        r.generatedAt ? new Date(r.generatedAt).toLocaleDateString() : "--",
+    },
     {
       key: "documentHash",
       header: "Document Hash",
@@ -1172,9 +1149,14 @@ export default function DocumentsPage() {
         if (!r.documentHash) return <span className="text-gray-400">--</span>;
         return (
           <span className="inline-flex items-center gap-1">
-            <span className="font-mono text-xs text-foreground">{truncateHash(r.documentHash)}</span>
+            <span className="font-mono text-xs text-foreground">
+              {truncateHash(r.documentHash)}
+            </span>
             <button
-              onClick={(e) => { e.stopPropagation(); copyToClipboard(r.documentHash); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                copyToClipboard(r.documentHash);
+              }}
               className="text-gray-400 hover:text-gray-600 p-0.5"
               title="Copy hash"
             >
@@ -1187,11 +1169,30 @@ export default function DocumentsPage() {
     {
       key: "anchorTxHash",
       header: "Anchor Transaction",
-      render: (r) => r.anchorTxHash ? <ExplorerLink value={r.anchorTxHash} type="tx" /> : <span className="text-gray-400">--</span>,
+      render: (r) =>
+        r.anchorTxHash ? (
+          <ExplorerLink value={r.anchorTxHash} type="tx" />
+        ) : (
+          <span className="text-gray-400">--</span>
+        ),
     },
-    { key: "sentAt", header: "Sent", render: (r) => r.sentAt ? new Date(r.sentAt).toLocaleString() : "--" },
-    { key: "openedAt", header: "Opened", render: (r) => r.openedAt ? new Date(r.openedAt).toLocaleString() : "--" },
-    { key: "downloadedAt", header: "Downloaded", render: (r) => r.downloadedAt ? new Date(r.downloadedAt).toLocaleString() : "--" },
+    {
+      key: "sentAt",
+      header: "Sent",
+      render: (r) => (r.sentAt ? new Date(r.sentAt).toLocaleString() : "--"),
+    },
+    {
+      key: "openedAt",
+      header: "Opened",
+      render: (r) =>
+        r.openedAt ? new Date(r.openedAt).toLocaleString() : "--",
+    },
+    {
+      key: "downloadedAt",
+      header: "Downloaded",
+      render: (r) =>
+        r.downloadedAt ? new Date(r.downloadedAt).toLocaleString() : "--",
+    },
     {
       key: "status",
       header: "Status",
@@ -1231,7 +1232,20 @@ export default function DocumentsPage() {
     <div>
       <PageHeader
         title="Documents"
-        subtitle="Upload governing documents, review extracted terms, and manage notices"
+        subtitle="Browse source documents, inspect provenance, and review extracted terms."
+        action={
+          <Button
+            size="sm"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.set("tab", "upload");
+              setSearchParams(next);
+            }}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Add documents
+          </Button>
+        }
       />
 
       {/* Success banner */}
@@ -1252,7 +1266,15 @@ export default function DocumentsPage() {
       )}
 
       {/* Tabbed sections */}
-      <Tabs defaultValue="governing" className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          const next = new URLSearchParams(searchParams);
+          next.set("tab", value);
+          setSearchParams(next);
+        }}
+        className="w-full"
+      >
         <TabsList className="mb-6">
           <TabsTrigger value="governing" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -1273,10 +1295,13 @@ export default function DocumentsPage() {
         </TabsList>
 
         {/* Tab 1: Governing Documents */}
-        <TabsContent value="governing">
+        <TabsContent
+          value="governing"
+          className="grid items-start gap-4 data-[state=inactive]:hidden xl:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.65fr)]"
+        >
           <SectionCard
-            title="Uploaded Documents"
-            className="mb-6"
+            title={`Documents · ${documents?.filter(isWorkspaceDocument).length ?? "…"}`}
+            className="min-w-0 xl:sticky xl:top-0"
             action={
               <Button
                 variant="outline"
@@ -1286,7 +1311,9 @@ export default function DocumentsPage() {
                 className="gap-1.5"
               >
                 <ShieldCheck className="h-4 w-4" />
-                {anchorPendingMutation.isPending ? "Anchoring…" : "Anchor Pending"}
+                {anchorPendingMutation.isPending
+                  ? "Anchoring…"
+                  : "Anchor Pending"}
               </Button>
             }
           >
@@ -1302,420 +1329,513 @@ export default function DocumentsPage() {
                 message={`${(docsError as Error).message}. Try refreshing the page.`}
               />
             )}
-            {!docsLoading && !docsError && (!documents || documents.length === 0) && (
-              <EmptyState
-                title="No documents uploaded"
-                message="Upload a Master LPA to get started. The document will be parsed and its hash anchored on-chain."
-              />
-            )}
-            {documents && documents.length > 0 && (() => {
-              // Keep this in sync with backend GOVERNING_DOCUMENT_TYPES.
-              const GOVERNING_TYPES = new Set([
-                "MASTER_LPA",
-                "LPA_AMENDMENT",
-                "SIDE_LETTER",
-                "JOINDER",
-                "ASSIGNMENT_AND_ASSUMPTION",
-              ]);
-              const governingDocs = documents
-                .filter(
-                  (d) => GOVERNING_TYPES.has(d.documentType) || !d.documentType,
-                )
-                // Sort so each Master LPA's amendments cluster directly under
-                // it, ordered by version. Standalone Master LPAs go by date.
-                .sort((a, b) => {
-                  const aIsAmendment = !!a.parentDocumentId;
-                  const bIsAmendment = !!b.parentDocumentId;
-                  if (aIsAmendment !== bIsAmendment) return aIsAmendment ? 1 : -1;
-                  if (aIsAmendment && bIsAmendment) {
-                    if (a.parentDocumentId !== b.parentDocumentId) {
-                      return (a.parentDocumentId ?? "").localeCompare(
-                        b.parentDocumentId ?? "",
-                      );
-                    }
-                    return (a.version ?? 0) - (b.version ?? 0);
-                  }
-                  return (
-                    new Date(b.createdAt).getTime() -
-                    new Date(a.createdAt).getTime()
-                  );
-                });
-              if (governingDocs.length === 0) {
-                return (
-                  <EmptyState
-                    title="No governing documents"
-                    message="Upload a Master LPA, Amendment, or Side Letter to get started."
-                  />
-                );
-              }
-              return (
-                <div className="max-h-80 overflow-y-auto">
-                  <DataTable
-                    columns={governingDocColumns}
-                    data={governingDocs}
-                    getRowId={(row) => row.documentId}
-                    onRowClick={(row) => setSelectedDocId(row.documentId)}
-                    selectedId={selectedDocId ?? undefined}
+            {!docsLoading &&
+              !docsError &&
+              (!documents || documents.length === 0) && (
+                <EmptyState
+                  title="No documents uploaded"
+                  message="Upload a Master LPA to get started. The document will be parsed and its hash anchored on-chain."
+                />
+              )}
+            {documents && documents.length > 0 && (
+              <div>
+                <div className="relative mb-3">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    aria-label="Search documents"
+                    value={documentSearch}
+                    onChange={(event) => setDocumentSearch(event.target.value)}
+                    placeholder="Search or select a document…"
+                    className="h-9 w-full rounded-md border border-border bg-background pl-8 pr-2 text-xs"
                   />
                 </div>
-              );
-            })()}
+                <div
+                  className="max-h-[65vh] space-y-2 overflow-y-auto"
+                  aria-label="Source documents"
+                >
+                  {workspaceDocuments
+                    .filter((doc) =>
+                      `${doc.originalFilename} ${doc.documentType}`
+                        .toLowerCase()
+                        .includes(documentSearch.trim().toLowerCase()),
+                    )
+                    .map((doc) => (
+                      <button
+                        key={doc.documentId}
+                        type="button"
+                        aria-pressed={selectedDocId === doc.documentId}
+                        onClick={() => {
+                          setSelectedDocId(doc.documentId);
+                          const next = new URLSearchParams(searchParams);
+                          next.set("document", doc.documentId);
+                          setSearchParams(next, { replace: true });
+                        }}
+                        className={`block w-full rounded-md border p-3 text-left transition-colors ${selectedDocId === doc.documentId ? "border-primary/60 bg-primary/5" : "border-border hover:bg-muted"}`}
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="workspace-eyebrow truncate">
+                            {friendlyDocumentType(doc.documentType)}
+                          </span>
+                          <StatusBadge
+                            status={mapParseStatus(doc.parseStatus)}
+                          />
+                        </div>
+                        <span className="block break-words text-[13px] font-medium text-foreground">
+                          {doc.originalFilename}
+                        </span>
+                        <span className="mt-2 flex gap-2 text-[10px] text-muted-foreground">
+                          <span>
+                            {Math.max(1, Math.round(doc.byteSize / 1024))} KB
+                          </span>
+                          <span className="rounded border border-border px-1">
+                            v{doc.version ?? 1}
+                          </span>
+                          <span>
+                            {doc.extractedFieldCount ?? 0} extracted fields
+                          </span>
+                        </span>
+                        <span className="mt-1.5 block text-[10px] text-muted-foreground">
+                          {new Date(doc.createdAt).toLocaleDateString()} ·{" "}
+                          {doc.hash?.anchoredOnchain
+                            ? "Anchored"
+                            : "Not anchored"}
+                        </span>
+                      </button>
+                    ))}
+                  {!workspaceDocuments.some((doc) =>
+                    `${doc.originalFilename} ${doc.documentType}`
+                      .toLowerCase()
+                      .includes(documentSearch.trim().toLowerCase()),
+                  ) && (
+                    <p className="py-6 text-center text-xs text-muted-foreground">
+                      No documents match this search.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </SectionCard>
 
-          {/* Document Detail (only shown when a doc is selected) */}
-          {selectedDoc && (
-            <>
-              {/* Info + Hashes */}
-              <SectionCard title="Document Details" className="mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left: Basic Info */}
-                  <div className="space-y-4">
-                    <DetailRow label="Document Name" value={selectedDoc.originalFilename} />
-                    <DetailRow
-                      label="Document ID"
-                      value={selectedDoc.documentId}
-                      mono
-                    />
-                    <DetailRow
-                      label="Uploaded"
-                      value={new Date(selectedDoc.createdAt).toLocaleString()}
-                    />
-                    <DetailRow
-                      label="Document Type"
-                      value={selectedDoc.documentType ?? "Master LPA"}
-                    />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Parse Status</span>
-                      <StatusBadge
-                        status={mapParseStatus(
-                          parseStatusData?.parseStatus ?? selectedDoc.parseStatus,
-                        )}
+          <div className="min-w-0">
+            {/* Document Detail (only shown when a doc is selected) */}
+            {selectedDoc && (
+              <>
+                {/* Info + Hashes */}
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h2 className="min-w-0 break-words text-sm font-medium">
+                    {selectedDoc.originalFilename}
+                  </h2>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setViewerDoc({
+                        id: selectedDoc.documentId,
+                        filename: selectedDoc.originalFilename,
+                      })
+                    }
+                  >
+                    <Eye className="mr-2 h-3.5 w-3.5" />
+                    View source
+                  </Button>
+                </div>
+                <SectionCard title="Provenance" className="mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Left: Basic Info */}
+                    <div className="space-y-4">
+                      <DetailRow
+                        label="Document Name"
+                        value={selectedDoc.originalFilename}
                       />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Hash Status</span>
-                      <StatusBadge
-                        status={mapHashStatus(
-                          parseStatusData?.hashStatus ?? (selectedDoc.hash?.anchoredOnchain ? "ANCHORED" : "PENDING"),
-                        )}
+                      <DetailRow
+                        label="Document ID"
+                        value={selectedDoc.documentId}
+                        mono
                       />
-                    </div>
-                    {parseStatusData?.extractionSummary && (
-                      <>
-                        <DetailRow
-                          label="Fields Extracted"
-                          value={String(
-                            parseStatusData.extractionSummary.fieldsExtracted,
+                      <DetailRow
+                        label="Uploaded"
+                        value={new Date(selectedDoc.createdAt).toLocaleString()}
+                      />
+                      <DetailRow
+                        label="Document Type"
+                        value={selectedDoc.documentType ?? "Master LPA"}
+                      />
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Parse Status
+                        </span>
+                        <StatusBadge
+                          status={mapParseStatus(
+                            parseStatusData?.parseStatus ??
+                              selectedDoc.parseStatus,
                           )}
                         />
-                        <DetailRow
-                          label="Low Confidence Fields"
-                          value={String(
-                            parseStatusData.extractionSummary.lowConfidenceFields,
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Hash Status
+                        </span>
+                        <StatusBadge
+                          status={mapHashStatus(
+                            parseStatusData?.hashStatus ??
+                              (selectedDoc.hash?.anchoredOnchain
+                                ? "ANCHORED"
+                                : "PENDING"),
                           )}
                         />
-                      </>
-                    )}
-                  </div>
+                      </div>
+                      {parseStatusData?.extractionSummary && (
+                        <>
+                          <DetailRow
+                            label="Fields Extracted"
+                            value={String(
+                              parseStatusData.extractionSummary.fieldsExtracted,
+                            )}
+                          />
+                          <DetailRow
+                            label="Low Confidence Fields"
+                            value={String(
+                              parseStatusData.extractionSummary
+                                .lowConfidenceFields,
+                            )}
+                          />
+                        </>
+                      )}
+                    </div>
 
-                  {/* Right: Verification summary + expandable details */}
-                  <div>
-                    {hashesData && hashesData.length > 0 ? (
-                      <div className="space-y-3">
-                        {/* Summary: show verification status at a glance */}
-                        <div className="flex items-center gap-2 py-2">
-                          <ShieldCheck className="h-5 w-5 text-green-600" />
-                          <span className="text-sm font-medium text-foreground">
-                            {hashesData.filter((h: DocumentHash) => h.anchoredOnchain).length} of{" "}
-                            {hashesData.length} hash{hashesData.length !== 1 ? "es" : ""} verified and anchored
-                          </span>
-                        </div>
-
-                        <TechnicalDetails label="Verification Details">
-                          <div className="space-y-3">
-                            {hashesData.map((h: DocumentHash) => (
-                              <div
-                                key={h.hashId}
-                                className="rounded-md border border-border p-3"
-                              >
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-xs font-medium text-muted-foreground uppercase">
-                                    {h.algorithm}
-                                  </span>
-                                  <StatusBadge
-                                    status={
-                                      h.anchoredOnchain ? "Completed" : "Pending"
-                                    }
-                                  />
-                                </div>
-                                <p className="text-xs font-mono text-foreground break-all">
-                                  {h.hashHex}
-                                </p>
-                                {h.anchor && (
-                                  <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
-                                    <p>Chain ID: {h.anchor.chainId}</p>
-                                    <p className="break-all flex items-center gap-1">
-                                      Tx:{" "}
-                                      <ExplorerLink
-                                        value={h.anchor.txHash}
-                                        type="tx"
-                                      />
-                                    </p>
-                                    {h.anchor.blockNumber && (
-                                      <p>Block: {h.anchor.blockNumber}</p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                    {/* Right: Verification summary + expandable details */}
+                    <div>
+                      {hashesData && hashesData.length > 0 ? (
+                        <div className="space-y-3">
+                          {/* Summary: show verification status at a glance */}
+                          <div className="flex items-center gap-2 py-2">
+                            <ShieldCheck className="h-5 w-5 text-green-600" />
+                            <span className="text-sm font-medium text-foreground">
+                              {
+                                hashesData.filter(
+                                  (h: DocumentHash) => h.anchoredOnchain,
+                                ).length
+                              }{" "}
+                              of {hashesData.length} hash
+                              {hashesData.length !== 1 ? "es" : ""} verified and
+                              anchored
+                            </span>
                           </div>
-                        </TechnicalDetails>
+
+                          <TechnicalDetails label="Verification Details">
+                            <div className="space-y-3">
+                              {hashesData.map((h: DocumentHash) => (
+                                <div
+                                  key={h.hashId}
+                                  className="rounded-md border border-border p-3"
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase">
+                                      {h.algorithm}
+                                    </span>
+                                    <StatusBadge
+                                      status={
+                                        h.anchoredOnchain
+                                          ? "Completed"
+                                          : "Pending"
+                                      }
+                                    />
+                                  </div>
+                                  <p className="text-xs font-mono text-foreground break-all">
+                                    {h.hashHex}
+                                  </p>
+                                  {h.anchor && (
+                                    <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
+                                      <p>Chain ID: {h.anchor.chainId}</p>
+                                      <p className="break-all flex items-center gap-1">
+                                        Tx:{" "}
+                                        <ExplorerLink
+                                          value={h.anchor.txHash}
+                                          type="tx"
+                                        />
+                                      </p>
+                                      {h.anchor.blockNumber && (
+                                        <p>Block: {h.anchor.blockNumber}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </TechnicalDetails>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                          <Clock className="h-4 w-4" />
+                          Hash computation in progress...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </SectionCard>
+
+                {/* Wire confirmation info */}
+                {selectedDoc.documentType === "WIRE_CONFIRMATION" && (
+                  <SectionCard title="Wire Confirmation" className="mb-6">
+                    <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                      <FileText className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium">Payment Evidence Document</p>
+                        <p className="text-blue-600 mt-1">
+                          Wire confirmations are used during settlement
+                          validation to verify payment. Each document is
+                          cryptographically hashed for tamper-proof provenance.
+                        </p>
+                      </div>
+                    </div>
+                  </SectionCard>
+                )}
+
+                {/* Extracted Fields */}
+                {isParsed && isMasterLpa && (
+                  <SectionCard
+                    title={
+                      isApproved
+                        ? "Extracted Fields (Approved)"
+                        : "Extracted Fields (Review & Edit)"
+                    }
+                    className="mb-6"
+                  >
+                    {extractedFields.length === 0 ? (
+                      <div className="flex items-center gap-2 py-6 justify-center text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        No extracted fields available.
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-                        <Clock className="h-4 w-4" />
-                        Hash computation in progress...
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </SectionCard>
-
-              {/* Wire confirmation info */}
-              {selectedDoc.documentType === "WIRE_CONFIRMATION" && (
-                <SectionCard title="Wire Confirmation" className="mb-6">
-                  <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-                    <FileText className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">Payment Evidence Document</p>
-                      <p className="text-blue-600 mt-1">
-                        Wire confirmations are used during settlement validation to verify payment.
-                        Each document is cryptographically hashed for tamper-proof provenance.
-                      </p>
-                    </div>
-                  </div>
-                </SectionCard>
-              )}
-
-              {/* Extracted Fields */}
-              {isParsed && isMasterLpa && (
-                <SectionCard
-                  title={isApproved ? "Extracted Fields (Approved)" : "Extracted Fields (Review & Edit)"}
-                  className="mb-6"
-                >
-                  {extractedFields.length === 0 ? (
-                    <div className="flex items-center gap-2 py-6 justify-center text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      No extracted fields available.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border">
-                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Field Name
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Value
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {extractedFields.map((field) => (
-                            <tr
-                              key={field.fieldId}
-                              className="border-b border-border"
-                            >
-                              <td className="px-4 py-3 text-foreground font-medium">
-                                {field.fieldName}
-                              </td>
-                              <td className="px-4 py-3">
-                                {isApproved ? (
-                                  <span className="text-foreground">
-                                    {fieldDisplayValue(field)}
-                                  </span>
-                                ) : (
-                                  <input
-                                    type="text"
-                                    value={
-                                      fieldEdits[field.fieldId] !== undefined
-                                        ? fieldEdits[field.fieldId]
-                                        : fieldDisplayValue(field)
-                                    }
-                                    onChange={(e) =>
-                                      setFieldEdits((prev) => ({
-                                        ...prev,
-                                        [field.fieldId]: e.target.value,
-                                      }))
-                                    }
-                                    className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
-                                  />
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-{/* Save edits button (only before approval) */}
-                  {!isApproved && Object.keys(fieldEdits).length > 0 && (
-                    <div className="mt-4 flex justify-end">
-                      <Button
-                        onClick={handleSaveFields}
-                        disabled={saveFieldsMutation.isPending}
-                        variant="outline"
-                        className="text-gray-700"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        {saveFieldsMutation.isPending ? "Saving..." : "Save Field Changes"}
-                      </Button>
-                    </div>
-                  )}
-                </SectionCard>
-              )}
-
-              {/* Admin Notes (before approval, MASTER_LPA only) */}
-              {isParsed && isMasterLpa && !isApproved && (
-                <SectionCard title="Admin Notes" className="mb-6">
-                  <div className="flex items-start gap-2 mb-2">
-                    <StickyNote className="h-4 w-4 text-muted-foreground mt-1" />
-                    <span className="text-sm text-muted-foreground">
-                      Add notes or comments for this document review. These will be
-                      saved when you approve the document.
-                    </span>
-                  </div>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Enter additional notes, observations, or instructions..."
-                    rows={3}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                </SectionCard>
-              )}
-
-              {/* Show saved notes on approved docs */}
-              {isParsed && isMasterLpa && isApproved && (selectedDoc?.metadata as Record<string, unknown>)?.notes && (
-                <SectionCard title="Admin Notes" className="mb-6">
-                  <p className="text-sm text-foreground">
-                    {String((selectedDoc?.metadata as Record<string, unknown>)?.notes)}
-                  </p>
-                </SectionCard>
-              )}
-
-              {/* Eligible Investors (Master LPA + LPA Amendment) */}
-              {isSubscriptionReady && (
-                <SectionCard
-                  title={
-                    isAmendment
-                      ? "Eligible Investors (Amendment Allocation)"
-                      : "Eligible Investors"
-                  }
-                  className="mb-6"
-                >
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-                    <MetricCard
-                      label="Total Eligible"
-                      value={eligibleInvestors.length}
-                    />
-                    <MetricCard
-                      label="With Wallets"
-                      value={
-                        eligibleInvestors.filter((i) => i.wallets.length > 0).length
-                      }
-                    />
-                    <MetricCard
-                      label="Fields Extracted"
-                      value={extractedFields.length}
-                    />
-                  </div>
-
-                  {eligibleInvestors.length === 0 ? (
-                    <EmptyState
-                      title="No eligible investors"
-                      message="No investors are currently eligible for this fund. Approve investor eligibility before creating subscriptions."
-                    />
-                  ) : (
-                    <>
-                      <div className="overflow-x-auto mb-4">
+                      <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border">
                               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                Investor
+                                Field Name
                               </th>
                               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                Email
-                              </th>
-                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                Wallet
-                              </th>
-                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                Verification
-                              </th>
-                              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                Eligibility
+                                Value
                               </th>
                             </tr>
                           </thead>
                           <tbody>
-                            {eligibleInvestors.map((inv) => {
-                              const wallet =
-                                inv.wallets.find((w) => w.isPrimary) ??
-                                inv.wallets[0];
-                              return (
-                                <tr
-                                  key={inv.investorId}
-                                  className="border-b border-border"
-                                >
-                                  <td className="px-4 py-3 font-medium text-foreground">
-                                    {inv.legalName}
-                                  </td>
-                                  <td className="px-4 py-3 text-muted-foreground">
-                                    {inv.email}
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <HashDisplay value={wallet?.address} fallback="None" />
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <StatusBadge
-                                      status={inv.verificationStatus}
-                                    />
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <StatusBadge
-                                      status={
-                                        inv.fundEligibility?.status ?? "Unknown"
+                            {extractedFields.map((field) => (
+                              <tr
+                                key={field.fieldId}
+                                className="border-b border-border"
+                              >
+                                <td className="px-4 py-3 text-foreground font-medium">
+                                  {field.fieldName}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {isApproved ? (
+                                    <span className="text-foreground">
+                                      {fieldDisplayValue(field)}
+                                    </span>
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      value={
+                                        fieldEdits[field.fieldId] !== undefined
+                                          ? fieldEdits[field.fieldId]
+                                          : fieldDisplayValue(field)
                                       }
+                                      onChange={(e) =>
+                                        setFieldEdits((prev) => ({
+                                          ...prev,
+                                          [field.fieldId]: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                                     />
-                                  </td>
-                                </tr>
-                              );
-                            })}
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
                       </div>
+                    )}
 
-                      {!isApproved && (
-                        <div className="flex justify-end">
-                          <Button
-                            onClick={openApproveModal}
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            Review & Create Subscriptions
-                          </Button>
-                        </div>
-                      )}
-                    </>
+                    {/* Save edits button (only before approval) */}
+                    {!isApproved && Object.keys(fieldEdits).length > 0 && (
+                      <div className="mt-4 flex justify-end">
+                        <Button
+                          onClick={handleSaveFields}
+                          disabled={saveFieldsMutation.isPending}
+                          variant="outline"
+                          className="text-gray-700"
+                        >
+                          <Save className="h-4 w-4 mr-2" />
+                          {saveFieldsMutation.isPending
+                            ? "Saving..."
+                            : "Save Field Changes"}
+                        </Button>
+                      </div>
+                    )}
+                  </SectionCard>
+                )}
+
+                {/* Admin Notes (before approval, MASTER_LPA only) */}
+                {isParsed && isMasterLpa && !isApproved && (
+                  <SectionCard title="Admin Notes" className="mb-6">
+                    <div className="flex items-start gap-2 mb-2">
+                      <StickyNote className="h-4 w-4 text-muted-foreground mt-1" />
+                      <span className="text-sm text-muted-foreground">
+                        Add notes or comments for this document review. These
+                        will be saved when you approve the document.
+                      </span>
+                    </div>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Enter additional notes, observations, or instructions..."
+                      rows={3}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-foreground placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </SectionCard>
+                )}
+
+                {/* Show saved notes on approved docs */}
+                {isParsed &&
+                  isMasterLpa &&
+                  isApproved &&
+                  (selectedDoc?.metadata as Record<string, unknown>)?.notes && (
+                    <SectionCard title="Admin Notes" className="mb-6">
+                      <p className="text-sm text-foreground">
+                        {String(
+                          (selectedDoc?.metadata as Record<string, unknown>)
+                            ?.notes,
+                        )}
+                      </p>
+                    </SectionCard>
                   )}
-                </SectionCard>
-              )}
-            </>
-          )}
+
+                {/* Eligible Investors (Master LPA + LPA Amendment) */}
+                {isSubscriptionReady && (
+                  <SectionCard
+                    title={
+                      isAmendment
+                        ? "Eligible Investors (Amendment Allocation)"
+                        : "Eligible Investors"
+                    }
+                    className="mb-6"
+                  >
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+                      <MetricCard
+                        label="Total Eligible"
+                        value={eligibleInvestors.length}
+                      />
+                      <MetricCard
+                        label="With Wallets"
+                        value={
+                          eligibleInvestors.filter((i) => i.wallets.length > 0)
+                            .length
+                        }
+                      />
+                      <MetricCard
+                        label="Fields Extracted"
+                        value={extractedFields.length}
+                      />
+                    </div>
+
+                    {eligibleInvestors.length === 0 ? (
+                      <EmptyState
+                        title="No eligible investors"
+                        message="No investors are currently eligible for this fund. Approve investor eligibility before creating subscriptions."
+                      />
+                    ) : (
+                      <>
+                        <div className="overflow-x-auto mb-4">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border">
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                  Investor
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                  Email
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                  Wallet
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                  Verification
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                  Eligibility
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {eligibleInvestors.map((inv) => {
+                                const wallet =
+                                  inv.wallets.find((w) => w.isPrimary) ??
+                                  inv.wallets[0];
+                                return (
+                                  <tr
+                                    key={inv.investorId}
+                                    className="border-b border-border"
+                                  >
+                                    <td className="px-4 py-3 font-medium text-foreground">
+                                      {inv.legalName}
+                                    </td>
+                                    <td className="px-4 py-3 text-muted-foreground">
+                                      {inv.email}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <HashDisplay
+                                        value={wallet?.address}
+                                        fallback="None"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <StatusBadge
+                                        status={inv.verificationStatus}
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <StatusBadge
+                                        status={
+                                          inv.fundEligibility?.status ??
+                                          "Unknown"
+                                        }
+                                      />
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {!isApproved && (
+                          <div className="flex justify-end">
+                            <Button
+                              onClick={openApproveModal}
+                              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              Review & Create Subscriptions
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </SectionCard>
+                )}
+              </>
+            )}
+            {!selectedDoc && (
+              <SectionCard title="Source detail">
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  Select a document to inspect its provenance and extracted
+                  terms.
+                </p>
+              </SectionCard>
+            )}
+          </div>
         </TabsContent>
 
         {/* Tab 2: Generated Notices */}
@@ -1758,7 +1878,9 @@ export default function DocumentsPage() {
         <TabsContent value="reporting">
           <ReportingSection
             fundId={fundId}
-            onView={(doc) => setViewerDoc({ id: doc.documentId, filename: doc.fileName })}
+            onView={(doc) =>
+              setViewerDoc({ id: doc.documentId, filename: doc.fileName })
+            }
           />
         </TabsContent>
 
@@ -1922,10 +2044,13 @@ export default function DocumentsPage() {
       </Tabs>
 
       {/* Approve Modal */}
-      <Dialog open={showApproveModal} onOpenChange={(open) => {
-        setShowApproveModal(open);
-        if (!open) setShowAddDropdown(false);
-      }}>
+      <Dialog
+        open={showApproveModal}
+        onOpenChange={(open) => {
+          setShowApproveModal(open);
+          if (!open) setShowAddDropdown(false);
+        }}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-foreground">
@@ -2030,7 +2155,10 @@ export default function DocumentsPage() {
                       {draft.investorName}
                     </td>
                     <td className="px-3 py-2">
-                      <HashDisplay value={draft.walletAddress} fallback="None" />
+                      <HashDisplay
+                        value={draft.walletAddress}
+                        fallback="None"
+                      />
                     </td>
                     <td className="px-3 py-2">
                       <span
@@ -2057,14 +2185,19 @@ export default function DocumentsPage() {
                         min="0"
                         value={draft.committedAmount}
                         onChange={(e) =>
-                          updateDraftAmount(idx, parseFloat(e.target.value) || 0)
+                          updateDraftAmount(
+                            idx,
+                            parseFloat(e.target.value) || 0,
+                          )
                         }
                         className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                       />
                     </td>
                     <td className="px-3 py-2">
                       <button
-                        onClick={() => removeInvestorFromDrafts(draft.investorId)}
+                        onClick={() =>
+                          removeInvestorFromDrafts(draft.investorId)
+                        }
                         className="rounded-full p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
                         title={`Remove ${draft.investorName}`}
                       >
@@ -2075,8 +2208,12 @@ export default function DocumentsPage() {
                 ))}
                 {subscriptionDrafts.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
-                      No investors added yet. Use the button below to add investors.
+                    <td
+                      colSpan={5}
+                      className="px-3 py-6 text-center text-sm text-muted-foreground"
+                    >
+                      No investors added yet. Use the button below to add
+                      investors.
                     </td>
                   </tr>
                 )}
@@ -2095,65 +2232,79 @@ export default function DocumentsPage() {
                 Add Investor
               </button>
 
-              {showAddDropdown && (() => {
-                const draftIds = new Set(subscriptionDrafts.map((d) => d.investorId));
-                const available = (investors ?? []).filter(
-                  (inv) =>
-                    !draftIds.has(inv.investorId) &&
-                    (inv.fundEligibility?.status === "APPROVED" ||
-                      inv.fundEligibility?.status === "ELIGIBLE"),
-                );
-                const filtered = investorSearch
-                  ? available.filter((inv) =>
-                      inv.legalName.toLowerCase().includes(investorSearch.toLowerCase()) ||
-                      inv.email.toLowerCase().includes(investorSearch.toLowerCase()),
-                    )
-                  : available;
+              {showAddDropdown &&
+                (() => {
+                  const draftIds = new Set(
+                    subscriptionDrafts.map((d) => d.investorId),
+                  );
+                  const available = (investors ?? []).filter(
+                    (inv) =>
+                      !draftIds.has(inv.investorId) &&
+                      (inv.fundEligibility?.status === "APPROVED" ||
+                        inv.fundEligibility?.status === "ELIGIBLE"),
+                  );
+                  const filtered = investorSearch
+                    ? available.filter(
+                        (inv) =>
+                          inv.legalName
+                            .toLowerCase()
+                            .includes(investorSearch.toLowerCase()) ||
+                          inv.email
+                            .toLowerCase()
+                            .includes(investorSearch.toLowerCase()),
+                      )
+                    : available;
 
-                return (
-                  <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-md border border-border bg-card shadow-lg">
-                    <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-                      <Search className="h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={investorSearch}
-                        onChange={(e) => setInvestorSearch(e.target.value)}
-                        placeholder="Search by name or email..."
-                        className="flex-1 text-sm text-foreground placeholder-gray-400 outline-none"
-                        autoFocus
-                      />
+                  return (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-md border border-border bg-card shadow-lg">
+                      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+                        <Search className="h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={investorSearch}
+                          onChange={(e) => setInvestorSearch(e.target.value)}
+                          placeholder="Search by name or email..."
+                          className="flex-1 text-sm text-foreground placeholder-gray-400 outline-none"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="max-h-40 overflow-y-auto">
+                        {filtered.length === 0 ? (
+                          <div className="px-3 py-3 text-sm text-muted-foreground text-center">
+                            {available.length === 0
+                              ? "All eligible investors are already added"
+                              : "No matching investors"}
+                          </div>
+                        ) : (
+                          filtered.map((inv) => {
+                            const wallet =
+                              inv.wallets.find((w) => w.isPrimary) ??
+                              inv.wallets[0];
+                            return (
+                              <button
+                                key={inv.investorId}
+                                onClick={() => addInvestorToDrafts(inv)}
+                                className="flex items-center justify-between w-full px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
+                              >
+                                <div>
+                                  <span className="font-medium text-foreground">
+                                    {inv.legalName}
+                                  </span>
+                                  <span className="ml-2 text-muted-foreground">
+                                    {inv.email}
+                                  </span>
+                                </div>
+                                {wallet && (
+                                  <HashDisplay value={wallet.address} />
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
-                    <div className="max-h-40 overflow-y-auto">
-                      {filtered.length === 0 ? (
-                        <div className="px-3 py-3 text-sm text-muted-foreground text-center">
-                          {available.length === 0
-                            ? "All eligible investors are already added"
-                            : "No matching investors"}
-                        </div>
-                      ) : (
-                        filtered.map((inv) => {
-                          const wallet = inv.wallets.find((w) => w.isPrimary) ?? inv.wallets[0];
-                          return (
-                            <button
-                              key={inv.investorId}
-                              onClick={() => addInvestorToDrafts(inv)}
-                              className="flex items-center justify-between w-full px-3 py-2 text-sm text-left hover:bg-muted transition-colors"
-                            >
-                              <div>
-                                <span className="font-medium text-foreground">{inv.legalName}</span>
-                                <span className="ml-2 text-muted-foreground">{inv.email}</span>
-                              </div>
-                              {wallet && (
-                                <HashDisplay value={wallet.address} />
-                              )}
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
             </div>
 
             {!isAmendment && (
@@ -2174,23 +2325,35 @@ export default function DocumentsPage() {
               == fund total => 100%). Amendment top-up: new allocations only
               need to fit within the fund's remaining headroom. */}
           {(() => {
-            const totalAmt = subscriptionDrafts.reduce((sum, d) => sum + d.committedAmount, 0);
+            const totalAmt = subscriptionDrafts.reduce(
+              (sum, d) => sum + d.committedAmount,
+              0,
+            );
             return (
               <>
                 <div className="flex items-center justify-between rounded-lg border border-border bg-muted px-4 py-3 text-sm">
                   <span className="font-medium text-gray-700">
-                    {subscriptionDrafts.length} investor{subscriptionDrafts.length !== 1 ? "s" : ""}
+                    {subscriptionDrafts.length} investor
+                    {subscriptionDrafts.length !== 1 ? "s" : ""}
                   </span>
                   <div className="flex items-center gap-6">
                     <span className="text-muted-foreground">
                       {isAmendment ? "New LP allocation:" : "Allocation:"}{" "}
-                      <span className={`font-semibold ${isDraftAllocationValid ? "text-green-700" : "text-red-600"}`}>
-                        {(isAmendment ? amendmentDraftPct : draftTotalPct).toFixed(2)}%
+                      <span
+                        className={`font-semibold ${isDraftAllocationValid ? "text-green-700" : "text-red-600"}`}
+                      >
+                        {(isAmendment
+                          ? amendmentDraftPct
+                          : draftTotalPct
+                        ).toFixed(2)}
+                        %
                       </span>
                     </span>
                     <span className="text-muted-foreground">
                       Committed:{" "}
-                      <span className="font-semibold text-foreground">{fmt(totalAmt)}</span>
+                      <span className="font-semibold text-foreground">
+                        {fmt(totalAmt)}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -2329,7 +2492,8 @@ export default function DocumentsPage() {
                   <option value="">Select a capital call…</option>
                   {(capitalCalls ?? []).map((call) => (
                     <option key={call.id} value={call.id}>
-                      Call #{call.callNumber} — ${Number(call.amountDue).toLocaleString()}
+                      Call #{call.callNumber} — $
+                      {Number(call.amountDue).toLocaleString()}
                     </option>
                   ))}
                 </select>

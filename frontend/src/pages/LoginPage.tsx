@@ -43,8 +43,8 @@ function LoginIllustration() {
         </g>
       </svg>
       <div className="mt-8 text-center">
-        <h2 className="text-xl font-semibold text-foreground mb-1">Fund Infrastructure, Simplified</h2>
-        <p className="text-muted-foreground text-sm max-w-sm">Blockchain-verified settlement, automated compliance, and real-time cap table management.</p>
+        <h2 className="text-xl font-semibold text-foreground mb-1">Your fund. Every decision in view.</h2>
+        <p className="text-muted-foreground text-sm max-w-sm">Review fund records, follow capital activity, and trace the evidence behind each workflow.</p>
       </div>
     </div>
   );
@@ -135,7 +135,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md mx-auto">
           {/* Logo */}
           <div className="flex items-center gap-2 mb-12">
-            <img src="/logo-combomark-black.svg" alt="Angainor" className="h-7" />
+            <img src="/logo-combomark-black.svg" alt="Angainor" className="h-7 dark:hidden" /><img src="/logo-combomark-white.svg" alt="Angainor" className="hidden h-7 dark:block" />
           </div>
 
           {/* Heading */}

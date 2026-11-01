@@ -6,103 +6,80 @@
 
 @layer base {
   :root {
-    --background: 220 14% 96%;
-    --foreground: 222 47% 11%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 11%;
-
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-
-    --accent: 0 0% 9%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 72% 51%;
+    --background: 40 16% 97%;
+    --foreground: 220 10% 15%;
+    --card: 40 25% 99%;
+    --card-foreground: 220 10% 15%;
+    --popover: 40 25% 99%;
+    --popover-foreground: 220 10% 15%;
+    --primary: 23 80% 56%;
+    --primary-foreground: 20 30% 9%;
+    --secondary: 35 15% 94%;
+    --secondary-foreground: 220 10% 15%;
+    --muted: 35 12% 93%;
+    --muted-foreground: 220 4% 43%;
+    --accent: 28 32% 92%;
+    --accent-foreground: 20 62% 34%;
+    --destructive: 0 65% 45%;
     --destructive-foreground: 0 0% 100%;
-
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 0 0% 9%;
-
-    --radius: 0.5rem;
-
-    --topbar: 0 0% 5%;
-    --topbar-foreground: 0 0% 100%;
-
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 9% 46%;
-    --sidebar-primary: 0 0% 9%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 95%;
-    --sidebar-accent-foreground: 0 0% 9%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 0 0% 9%;
-
-    --success: 142 72% 29%;
+    --border: 35 9% 88%;
+    --input: 35 9% 85%;
+    --ring: 23 80% 56%;
+    --radius: 0.45rem;
+    --topbar: 40 16% 97%;
+    --topbar-foreground: 220 10% 15%;
+    --sidebar-background: 40 20% 98%;
+    --sidebar-foreground: 220 5% 36%;
+    --sidebar-primary: 23 80% 56%;
+    --sidebar-primary-foreground: 20 30% 9%;
+    --sidebar-accent: 23 65% 94%;
+    --sidebar-accent-foreground: 20 65% 34%;
+    --sidebar-border: 35 9% 88%;
+    --sidebar-ring: 23 80% 56%;
+    --success: 147 40% 32%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    --warning: 38 80% 42%;
     --warning-foreground: 0 0% 100%;
-    --info: 217 91% 60%;
+    --info: 217 65% 50%;
     --info-foreground: 0 0% 100%;
   }
 
   .dark {
-    --background: 224 20% 10%;
-    --foreground: 210 20% 92%;
-
-    --card: 224 18% 13%;
-    --card-foreground: 210 20% 92%;
-
-    --popover: 224 18% 13%;
-    --popover-foreground: 210 20% 92%;
-
-    --primary: 239 69% 60%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 224 16% 18%;
-    --secondary-foreground: 210 20% 92%;
-
-    --muted: 224 16% 18%;
-    --muted-foreground: 220 9% 56%;
-
-    --accent: 239 69% 60%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 62% 55%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 224 14% 20%;
-    --input: 224 14% 20%;
-    --ring: 0 0% 90%;
-
-    --topbar: 0 0% 5%;
-    --topbar-foreground: 210 20% 92%;
-
-    --sidebar-background: 224 20% 12%;
-    --sidebar-foreground: 220 9% 56%;
-    --sidebar-primary: 0 0% 90%;
-    --sidebar-primary-foreground: 0 0% 5%;
-    --sidebar-accent: 0 0% 18%;
-    --sidebar-accent-foreground: 0 0% 80%;
-    --sidebar-border: 224 14% 20%;
-    --sidebar-ring: 0 0% 90%;
-
-    --success: 142 60% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 80% 55%;
-    --warning-foreground: 0 0% 100%;
-    --info: 217 80% 65%;
-    --info-foreground: 0 0% 100%;
+    --background: 220 20% 5%;
+    --foreground: 40 8% 92%;
+    --card: 220 8% 8%;
+    --card-foreground: 40 8% 92%;
+    --popover: 220 8% 9%;
+    --popover-foreground: 40 8% 92%;
+    --primary: 23 80% 58%;
+    --primary-foreground: 20 30% 8%;
+    --secondary: 220 7% 12%;
+    --secondary-foreground: 40 8% 92%;
+    --muted: 220 7% 12%;
+    --muted-foreground: 40 3% 60%;
+    --accent: 25 19% 15%;
+    --accent-foreground: 26 78% 67%;
+    --destructive: 0 68% 66%;
+    --destructive-foreground: 0 0% 8%;
+    --border: 220 6% 17%;
+    --input: 220 6% 21%;
+    --ring: 23 80% 58%;
+    --topbar: 220 14% 6%;
+    --topbar-foreground: 40 8% 92%;
+    --sidebar-background: 220 12% 6%;
+    --sidebar-foreground: 40 5% 72%;
+    --sidebar-primary: 23 80% 58%;
+    --sidebar-primary-foreground: 20 30% 8%;
+    --sidebar-accent: 20 25% 12%;
+    --sidebar-accent-foreground: 25 75% 65%;
+    --sidebar-border: 220 6% 14%;
+    --sidebar-ring: 23 80% 58%;
+    --success: 147 36% 67%;
+    --success-foreground: 0 0% 8%;
+    --warning: 38 65% 65%;
+    --warning-foreground: 0 0% 8%;
+    --info: 217 65% 68%;
+    --info-foreground: 0 0% 8%;
   }
 }
 
@@ -285,3 +262,35 @@
     transition: none !important;
   }
 }
+
+/* Control Room: shared application surfaces, separate from the public landing page. */
+@layer components {
+  .workspace-eyebrow { @apply text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground; }
+  .workspace-nav-item { @apply mb-0.5 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-sidebar-foreground transition-colors hover:bg-muted hover:text-foreground; }
+  .workspace-nav-active { @apply bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground; }
+  .workspace-icon-button { @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground; }
+  .workspace-search { @apply flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:w-64; }
+  .workspace-search kbd { @apply ml-auto rounded bg-muted px-1 text-[10px]; }
+  .workspace-result { @apply flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm hover:bg-muted focus-visible:bg-muted; }
+  .overview-row { @apply flex items-start justify-between gap-3 py-1.5 text-sm; }
+  .overview-row dt { @apply text-muted-foreground; }
+  .overview-row dd { @apply text-right tabular-nums; }
+  .overview-link { @apply flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2.5 text-xs transition-colors hover:border-primary/40 hover:bg-muted; }
+  .control-room :is(button, a, input, select, textarea):focus-visible { @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background; }
+  .control-room [role="tablist"] { @apply h-auto max-w-full flex-wrap justify-start gap-1 rounded-md border border-border bg-transparent p-1; }
+  .control-room [role="tab"][data-state="active"] { @apply bg-sidebar-accent text-sidebar-accent-foreground shadow-none; }
+  .control-room table { @apply tabular-nums; }
+  .control-room th { @apply text-[10px] tracking-wider; }
+  .control-room td { @apply text-xs; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .control-room *, .control-room *::before, .control-room *::after { animation: none !important; transition: none !important; }
+}
+
+.dark .control-room :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--input)) !important;
+}
+
+.control-room .text-primary { color: hsl(var(--sidebar-accent-foreground)); }
