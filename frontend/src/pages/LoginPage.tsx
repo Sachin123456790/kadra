@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { ROUTES, ADMIN_ROLES } from "@/config/constants";
+import { ROUTES, ADMIN_ROLES, DEMO_MODE } from "@/config/constants";
 import { ApiRequestError } from "@/services/api-client";
 import { login as loginRequest, signup as signupRequest } from "@/services/auth.service";
 import { Eye, EyeOff } from "lucide-react";
+import { DemoEntry } from "@/components/angainor/DemoEntry";
 
 function LoginIllustration() {
   return (
@@ -127,6 +128,8 @@ export default function LoginPage() {
       setIsSubmitting(false);
     }
   }
+
+  if (DEMO_MODE) return <DemoEntry />;
 
   return (
     <div className="min-h-screen flex bg-card">
