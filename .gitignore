@@ -34,3 +34,9 @@ feedback/
 *.pdf
 *.csv
 run.md
+# Local runtime credentials and functional sandbox data
+Library/
+backend/.sandbox/
+backend/.env.sandbox
+
+backend/dist-sandbox/

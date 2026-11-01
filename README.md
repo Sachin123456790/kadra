@@ -1,5 +1,7 @@
 # Angainor
 
+For the new local, persistent functional demo, see [Functional sandbox setup and scope](docs/functional-sandbox.md). Start it with `node scripts/run-sandbox.mjs` after installing backend and frontend dependencies. The sandbox uses a separate API and does not run the legacy blockchain workflows below.
+
 Programmable infrastructure layer for private real estate funds. Replaces manual back-office workflows with a blockchain-based settlement engine using ERC-3643 security tokens.
 
 ## Prerequisites
